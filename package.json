@@ -1,0 +1,27 @@
+{
+  "name": "onehr-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspaces",
+    "db:migrate": "npx prisma migrate dev --schema=./prisma/schema.prisma",
+    "db:generate": "npx prisma generate --schema=./prisma/schema.prisma",
+    "db:seed": "tsx apps/api/src/prisma/seed.ts",
+    "lint": "eslint .",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "prisma": "5.14.0",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "@prisma/client": "5.14.0"
+  }
+}

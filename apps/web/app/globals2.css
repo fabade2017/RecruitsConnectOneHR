@@ -1,0 +1,304 @@
+
+  /* ===== WIDGET ROOT ===== */
+  #ava-widget-root {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 999999;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  /* ===== FLOATING AVATAR BUTTON ===== */
+  .ava-toggle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: 3px solid rgba(255,255,255,0.15);
+    box-shadow: 0 8px 32px rgba(102,126,234,0.4), 0 0 0 4px rgba(102,126,234,0.1);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  .ava-toggle:hover { transform: scale(1.08); box-shadow: 0 12px 40px rgba(102,126,234,0.5); }
+  .ava-toggle:active { transform: scale(0.95); }
+  .ava-toggle.open { transform: scale(0) rotate(90deg); opacity: 0; pointer-events: none; }
+  .ava-toggle svg { width: 42px; height: 42px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+
+  /* Notification dot */
+  .ava-toggle .notif {
+    position: absolute;
+    top: -2px; right: -2px;
+    width: 18px; height: 18px;
+    background: #e53e3e;
+    border-radius: 50%;
+    border: 2px solid white;
+    animation: notif-pulse 2s infinite;
+  }
+  @keyframes notif-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(229,62,62,0.4);} 50%{box-shadow:0 0 0 6px rgba(229,62,62,0);} }
+
+  /* ===== CHAT PANEL ===== */
+  .ava-panel {
+    position: absolute;
+    bottom: 80px;
+    right: 0;
+    width: 380px;
+    max-width: calc(100vw - 40px);
+    height: 560px;
+    max-height: calc(100vh - 120px);
+    background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 24px;
+    box-shadow: 0 25px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(20px) scale(0.92);
+    pointer-events: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .ava-panel.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: all;
+  }
+
+  /* Close button */
+  .ava-close {
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: none;
+    color: #a0aec0;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 10;
+  }
+  .ava-close:hover { background: rgba(255,255,255,0.15); color: white; }
+
+  /* ===== HEADER ===== */
+  .ava-header {
+    padding: 20px 20px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+  }
+  .ava-header-avatar {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 4px 12px rgba(102,126,234,0.3);
+    flex-shrink: 0;
+  }
+  .ava-header-info h3 { font-size: 15px; font-weight: 600; color: #e2e8f0; }
+  .ava-header-info span { font-size: 11px; color: #48bb78; display: flex; align-items: center; gap: 5px; }
+  .ava-header-info span::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%; background: #48bb78;
+    box-shadow: 0 0 6px #48bb78;
+  }
+
+  /* ===== AVATAR STAGE (compact) ===== */
+  .ava-stage {
+    height: 180px;
+    background: radial-gradient(ellipse at 50% 90%, rgba(102,126,234,0.1) 0%, transparent 60%);
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .ava-stage::before {
+    content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+    background: conic-gradient(from 0deg, transparent, rgba(102,126,234,0.04), transparent 30%);
+    animation: rotate 12s linear infinite; pointer-events: none;
+  }
+  @keyframes rotate { to { transform: rotate(360deg); } }
+
+  .ava-svg {
+    width: 140px;
+    height: 175px;
+    filter: drop-shadow(0 8px 16px rgba(0,0,0,0.3));
+    z-index: 2;
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .ava-svg.thinking { animation: float 2.5s ease-in-out infinite; }
+  .ava-svg.listening { animation: lean 1.2s ease-in-out infinite; }
+  .ava-svg.talking { animation: breathe 0.9s ease-in-out infinite; }
+  @keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-4px);} }
+  @keyframes lean { 0%,100%{transform:rotate(0deg);} 50%{transform:rotate(1.5deg);} }
+  @keyframes breathe { 0%,100%{transform:scale(1);} 50%{transform:scale(1.01);} }
+
+  .mouth-path { transition: d 0.1s ease; }
+  .mouth-group.talking .mouth-path { animation: mouth-morph 0.15s ease-in-out infinite alternate; }
+  @keyframes mouth-morph {
+    0% { d: path("M 62 100 Q 70 103 78 100"); }
+    100% { d: path("M 60 98 Q 70 110 80 98"); }
+  }
+
+  .eye-lid { transition: transform 0.1s ease; }
+  .eye-lid.blink { transform: scaleY(0.03); }
+  .pupil-group { transition: transform 0.12s ease; }
+
+  .eyebrow { transition: transform 0.3s ease; transform-origin: center; }
+  .eyebrow.surprised { transform: translateY(-3px) rotate(-6deg); }
+  .eyebrow.right.surprised { transform: translateY(-3px) rotate(6deg); }
+  .eyebrow.happy { transform: translateY(1px) rotate(5deg); }
+  .eyebrow.right.happy { transform: translateY(1px) rotate(-5deg); }
+
+  .hand-left, .hand-right { transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .hand-left { transform-origin: 28px 148px; }
+  .hand-right { transform-origin: 112px 148px; }
+  .hand-left.wave { animation: wave-left 0.8s ease-in-out infinite; }
+  .hand-right.wave { animation: wave-right 0.8s ease-in-out infinite; }
+  .hand-left.think { transform: rotate(30deg) translate(2px, -8px); }
+  .hand-right.think { transform: rotate(-30deg) translate(-2px, -8px); }
+  @keyframes wave-left { 0%,100%{transform:rotate(5deg);} 50%{transform:rotate(40deg);} }
+  @keyframes wave-right { 0%,100%{transform:rotate(-5deg);} 50%{transform:rotate(-40deg);} }
+
+  /* Bubble */
+  .ava-bubble {
+    position: absolute;
+    top: 10px; right: 10px;
+    max-width: 140px;
+    background: rgba(255,255,255,0.95);
+    color: #1a202c;
+    padding: 8px 12px;
+    border-radius: 14px 14px 2px 14px;
+    font-size: 11px;
+    line-height: 1.4;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    opacity: 0; transform: translateY(8px) scale(0.95);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 10; pointer-events: none;
+  }
+  .ava-bubble.show { opacity: 1; transform: translateY(0) scale(1); }
+  .ava-bubble::after {
+    content: ''; position: absolute; bottom: -5px; right: 14px;
+    width: 10px; height: 10px; background: rgba(255,255,255,0.95);
+    transform: rotate(45deg); border-radius: 2px;
+  }
+
+  /* Viz */
+  .ava-viz {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 2px; align-items: flex-end; height: 18px;
+    opacity: 0; transition: opacity 0.3s; z-index: 5;
+  }
+  .ava-viz.show { opacity: 1; }
+  .ava-vbar { width: 3px; background: linear-gradient(to top, #667eea, #a3bffa); border-radius: 2px; transition: height 0.04s ease; }
+
+  /* ===== MESSAGES ===== */
+  .ava-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .ava-messages::-webkit-scrollbar { width: 3px; }
+  .ava-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+  .ava-msg {
+    padding: 10px 13px;
+    border-radius: 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    max-width: 88%;
+    animation: msg-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    word-break: break-word;
+  }
+  @keyframes msg-pop { from { opacity:0; transform:translateY(8px) scale(0.95);} }
+  .ava-msg.user {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white; align-self: flex-end;
+    border-radius: 14px 14px 4px 14px;
+  }
+  .ava-msg.bot {
+    background: rgba(255,255,255,0.06);
+    color: #e2e8f0; align-self: flex-start;
+    border-radius: 14px 14px 14px 4px;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .ava-msg .time { font-size: 9px; opacity: 0.45; margin-top: 4px; display: block; }
+  .ava-msg.transcribing {
+    background: rgba(102,126,234,0.12);
+    color: #a3bffa; align-self: flex-end;
+    border-radius: 14px 14px 4px 14px;
+    font-style: italic; font-size: 12px;
+  }
+  .ava-sources { font-size: 9px; color: #718096; margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .ava-source-tag { background: rgba(102,126,234,0.12); color: #a3bffa; padding: 1px 6px; border-radius: 4px; text-decoration: none; }
+
+  /* ===== INPUT AREA ===== */
+  .ava-input-wrap {
+    padding: 12px 14px 16px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    flex-shrink: 0;
+  }
+  .ava-transcript-banner {
+    background: linear-gradient(90deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));
+    border: 1px solid rgba(102,126,234,0.2);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #c3dafe;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    animation: slide-in 0.25s ease;
+  }
+  .ava-transcript-banner.show { display: flex; }
+  @keyframes slide-in { from { opacity:0; transform:translateY(-6px);} }
+  .ava-transcript-banner .label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; color: #a3bffa; font-weight: 700; white-space: nowrap; }
+  .ava-transcript-banner .text { flex: 1; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ava-transcript-banner .send-now {
+    background: rgba(102,126,234,0.35); border: none; color: white;
+    padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.2s; white-space: nowrap;
+  }
+  .ava-transcript-banner .send-now:hover { background: rgba(102,126,234,0.55); }
+  .ava-transcript-banner .dismiss { background: transparent; border: none; color: #a0aec0; font-size: 14px; cursor: pointer; padding: 0 2px; }
+  .ava-transcript-banner .dismiss:hover { color: white; }
+
+  .ava-input-row { display: flex; gap: 8px; }
+  .ava-input-row input {
+    flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px; padding: 10px 12px; color: #e2e8f0; font-size: 13px; outline: none; transition: all 0.2s;
+  }
+  .ava-input-row input::placeholder { color: #718096; }
+  .ava-input-row input:focus { border-color: #667eea; background: rgba(255,255,255,0.08); }
+  .ava-btn {
+    border: none; border-radius: 12px; padding: 10px 14px;
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .ava-btn-send { background: linear-gradient(135deg, #667eea, #764ba2); color: white; box-shadow: 0 3px 12px rgba(102,126,234,0.25); }
+  .ava-btn-send:hover { transform: translateY(-1px); }
+  .ava-btn-send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .ava-btn-mic { width: 38px; padding: 0; background: rgba(255,255,255,0.06); color: #a0aec0; border: 1px solid rgba(255,255,255,0.06); font-size: 16px; }
+  .ava-btn-mic:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
+  .ava-btn-mic.recording { background: linear-gradient(135deg, #e53e3e, #c53030); color: white; animation: mic-glow 1s infinite; border-color: transparent; }
+  @keyframes mic-glow { 0%,100%{box-shadow:0 0 0 0 rgba(229,62,62,0.4);} 50%{box-shadow:0 0 0 8px rgba(229,62,62,0);} }
+
+  /* Typing indicator */
+  .ava-typing { display: none; align-items: center; gap: 4px; padding: 8px 12px; }
+  .ava-typing.show { display: flex; }
+  .ava-typing span { width: 5px; height: 5px; background: #a0aec0; border-radius: 50%; animation: typing-bounce 1.4s infinite ease-in-out both; }
+  .ava-typing span:nth-child(1) { animation-delay: -0.32s; }
+  .ava-typing span:nth-child(2) { animation-delay: -0.16s; }
+  @keyframes typing-bounce { 0%,80%,100%{transform:scale(0);opacity:0.4;} 40%{transform:scale(1);opacity:1;} }

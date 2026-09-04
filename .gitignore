@@ -1,0 +1,26 @@
+# Environment variables / secrets
+.env
+.env.local
+.env.production
+.env.development
+.env.*.local
+
+# Keep example env files
+!.env.example
+!.env.production.example
+
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Archives
+*.zip
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
