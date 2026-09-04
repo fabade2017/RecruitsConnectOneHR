@@ -135,7 +135,8 @@ async function bootstrap() {
             console.warn('Swagger setup failed (non-blocking):', e.message);
         }
     }
-    const port = process.env.PORT_API ? parseInt(process.env.PORT_API, 10) : 3001;
+    //const port = process.env.PORT_API ? parseInt(process.env.PORT_API, 10) : 3001;
+    const port = parseInt(process.env.PORT || process.env.PORT_API || '3001', 10);
     await app.listen(port, '0.0.0.0');
     console.log(`OneHR API listening on http://localhost:${port}/v1 (env=${process.env.NODE_ENV || 'development'})`);
     // Graceful shutdown

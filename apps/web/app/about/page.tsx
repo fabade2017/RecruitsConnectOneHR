@@ -82,7 +82,7 @@ export default function AboutPage() {
         <div className="bg-gradient-to-br from-violet-600 to-sky-600 rounded-2xl p-8 text-white flex flex-col md:flex-row justify-between gap-4">
           <div>
             <h3 className="text-2xl font-black">Ready to see OneHR live?</h3>
-            <p className="text-white/80 text-sm mt-1">14-day free trial • No card • NGN pricing • MSSQL ready</p>
+            <p className="text-white/80 text-sm mt-1">14-day free trial • No card • NGN pricing</p>
           </div>
           <div className="flex gap-3 self-start">
             <Link href="/register" className="bg-white text-slate-900 rounded-full px-6 py-3 font-semibold">Get started</Link>

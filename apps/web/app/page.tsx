@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import ContactForm from '../components/ContactForm';
-import AvaWidget from '../components/AvaWidget';
+import CsWidget from '../components/CsWidget';
 import { Users, Clock, ShieldCheck, Sparkles, TrendingUp, GraduationCap, Wallet, Building2, Check, ArrowRight, Star, Quote, MapPin, Phone, Mail, Play, Zap, Fingerprint, BarChart3, Layers, HeartHandshake, Briefcase, Shield, Menu, X, LogOut } from 'lucide-react';
 
 function AuthNav() {
@@ -341,7 +341,7 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
-      <AvaWidget />
+      <CsWidget />
     </main>
   );
 }

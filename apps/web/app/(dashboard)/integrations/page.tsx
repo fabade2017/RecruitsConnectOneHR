@@ -95,7 +95,7 @@ export default function IntegrationsPage() {
         <div className="mt-4 flex flex-wrap gap-2 text-xs">
           <span className="bg-white/15 rounded-full px-3 py-1">API: /v1/integrations • /v1/webhooks</span>
           <span className="bg-white/15 rounded-full px-3 py-1">Events: employee.*, leave.*, payroll.*, attendance.*</span>
-          <span className="bg-white/15 rounded-full px-3 py-1">44 modules integration-ready</span>
+          <span className="bg-white/15 rounded-full px-3 py-1">Integration-ready</span>
         </div>
       </GradientCard>
 

@@ -17,10 +17,10 @@ export default function ManualPage() {
           <div>
             <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-3 py-1 text-xs"><BookOpen size={14}/> RecruitConnect OneHR™ Manual</div>
             <h1 className="text-3xl font-black mt-3">About the Application</h1>
-            <p className="text-white/70 mt-2 max-w-xl">One Platform. Complete Workforce Intelligence. 44 modules, MSSQL <code>onehr_v2</code>, RBAC, face liveness, bulk Excel, and superadmin onboarding — all in one PDF.</p>
+            <p className="text-white/70 mt-2 max-w-xl">One Platform. Complete Workforce Intelligence. Face verification, bulk import, and streamlined onboarding — all in one PDF.</p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
-              <span className="bg-white text-slate-900 rounded-full px-3 py-1 font-semibold">10 pages • 18K • v1.0 2026-09-02</span>
-              <span className="bg-white/10 border border-white/20 rounded-full px-3 py-1">MSSQL • NestJS • Next.js</span>
+              <span className="bg-white text-slate-900 rounded-full px-3 py-1 font-semibold">10 pages • v1.0 2026-09-02</span>
+              <span className="bg-white/10 border border-white/20 rounded-full px-3 py-1">Secure • Compliant • Audit-ready</span>
             </div>
           </div>
           <div className="bg-white rounded-2xl p-4 text-slate-900 min-w-[260px]">
