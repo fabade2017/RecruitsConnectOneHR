@@ -94,7 +94,7 @@ export default function LandingPage() {
         <div className="relative max-w-7xl mx-auto px-6 lg:px-8 pt-14 pb-10 lg:pt-20 lg:pb-16 grid lg:grid-cols-2 gap-10 items-center">
           <div>
             <div className="inline-flex items-center gap-2 bg-slate-900 text-white rounded-full px-3 py-1.5 text-xs font-medium">
-              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" /> New: MSSQL `onehr_v2` • 44 modules • RBAC hardened
+              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" /> Trusted by 120+ teams • 4.9/5 rated
             </div>
             <h1 className="text-4xl lg:text-[52px] font-black leading-[0.95] tracking-tight mt-4">
               One Platform.<br />
@@ -165,8 +165,8 @@ export default function LandingPage() {
       {/* 4 PILLARS */}
       <section id="features" className="max-w-7xl mx-auto px-6 lg:px-8 py-14">
         <div className="text-center max-w-3xl mx-auto">
-          <div className="inline-flex bg-violet-50 text-violet-700 rounded-full px-3 py-1 text-xs font-semibold">FOUR PILLARS • §43</div>
-          <h2 className="text-3xl font-black mt-3">Four pillars. 44 modules. One truth.</h2>
+          <div className="inline-flex bg-violet-50 text-violet-700 rounded-full px-3 py-1 text-xs font-semibold">FOUR PILLARS</div>
+          <h2 className="text-3xl font-black mt-3">Four pillars. One truth.</h2>
           <p className="text-slate-600 mt-2">Manage People → Manage Work → Measure → Predict. From hire to alumni, clock to payslip, review to AI copilot.</p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 mt-8">
@@ -241,7 +241,7 @@ export default function LandingPage() {
             {name:'Enterprise', price:'₦400,000', sub:'1000 emp • 50 branches', features:['Everything in Growth','+ 45 modules','+ AI Copilot','+ Digital Twin','+ Simulator'], cta:'Contact sales', dark:false},
           ].map(p=> <div key={p.name} className={`rounded-[20px] p-6 border ${p.dark?'bg-slate-900 text-white border-slate-900':'bg-white'}`}><div className="flex items-center justify-between"><h3 className="font-black text-lg">{p.name}</h3>{p.badge && <span className="bg-emerald-500 text-white text-[11px] rounded-full px-2 py-1 font-bold">{p.badge}</span>}</div><div className="text-3xl font-black mt-2">{p.price}<span className="text-sm font-normal opacity-70">/mo</span></div><div className="text-xs opacity-70">{p.sub}</div><ul className="mt-4 space-y-2 text-sm">{p.features.map(f=> <li key={f} className="flex items-center gap-2"><Check size={14} className={p.dark?'text-emerald-400':'text-emerald-600'}/>{f}</li>)}</ul><Link href="/register" className={`mt-5 w-full inline-flex justify-center rounded-full py-3 font-semibold ${p.dark?'bg-white text-slate-900 hover:bg-slate-100':'bg-slate-900 text-white hover:bg-slate-800'}`}>{p.cta} <ArrowRight size={16}/></Link></div>)}
         </div>
-        <p className="text-center text-xs text-slate-500 mt-4">All plans include MSSQL `onehr_v2`, RBAC, audit logs, `trustServerCertificate`. Custom pricing for group of companies.</p>
+        <p className="text-center text-xs text-slate-500 mt-4">All plans include audit logs, secure access & support. Custom pricing for group of companies.</p>
       </section>
 
       {/* FAQ */}
@@ -255,7 +255,7 @@ export default function LandingPage() {
           </div>
           <div id="about" className="bg-white rounded-2xl p-6 border">
             <h3 className="font-black text-lg">About RecruitConnect OneHR™</h3>
-            <p className="text-sm text-slate-600 mt-2 leading-6">We’re building the Intelligent Workforce Operating System for Africa and beyond — from Lagos to global. OneHR merges people, work, time and intelligence so HR, managers and execs finally see the same truth. 4 pillars, 44 modules, group-of-companies, subscriptions and RBAC hardened (`super_admin` → `employee`).</p>
+            <p className="text-sm text-slate-600 mt-2 leading-6">We’re building the Intelligent Workforce Operating System for Africa and beyond — from Lagos to global. OneHR merges people, work, time and intelligence so HR, managers and execs finally see the same truth.</p>
             <div className="mt-4 grid grid-cols-3 gap-3 text-center">
               <div className="bg-slate-50 rounded-xl p-3"><div className="font-black">120+</div><div className="text-xs text-slate-500">Teams</div></div>
               <div className="bg-slate-50 rounded-xl p-3"><div className="font-black">12k+</div><div className="text-xs text-slate-500">Employees</div></div>
@@ -297,7 +297,7 @@ export default function LandingPage() {
               <img src="/logo.svg" alt="OneHR" className="w-9 h-9 rounded-xl shadow bg-white p-1" />
               <div className="font-bold">RecruitConnect OneHR™</div>
             </div>
-            <p className="text-sm text-white/60 mt-2 leading-6">One Platform. Complete Workforce Intelligence. Manage people, manage work, measure, predict — on MSSQL `onehr_v2` with RBAC, RLS-ready, audit logs.</p>
+            <p className="text-sm text-white/60 mt-2 leading-6">One Platform. Complete Workforce Intelligence. Manage people, manage work, measure and predict — secure, compliant and audit-ready.</p>
             <div className="mt-4 flex gap-2">
               <a href="https://github.com" className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20">in</a>
               <a href="https://github.com" className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20">𝕏</a>
@@ -336,7 +336,7 @@ export default function LandingPage() {
         </div>
         <div className="border-t border-white/10">
           <div className="max-w-7xl mx-auto px-6 lg:px-8 py-4 flex flex-col md:flex-row justify-between gap-2 text-xs text-white/50">
-            <span>© 2026 RecruitConnect OneHR™ — Built for Africa, ready for global. MSSQL `onehr_v2` • 44 modules.</span>
+            <span>© 2026 RecruitConnect OneHR™ — Built for Africa, ready for global.</span>
             <span className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" /> All systems operational • API docs at /api/docs</span>
           </div>
         </div>

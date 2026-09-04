@@ -27,9 +27,9 @@ export default function AboutPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-slate-50 to-violet-50/40" />
         <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-16">
           <div className="max-w-3xl">
-            <div className="inline-flex bg-violet-50 text-violet-700 rounded-full px-3 py-1 text-xs font-semibold">OUR STORY • §43</div>
+            <div className="inline-flex bg-violet-50 text-violet-700 rounded-full px-3 py-1 text-xs font-semibold">OUR STORY</div>
             <h1 className="text-4xl font-black leading-tight mt-3">We’re building the <span className="bg-gradient-to-r from-violet-600 to-sky-600 bg-clip-text text-transparent">Workforce Operating System</span> for Africa.</h1>
-            <p className="text-slate-600 mt-4 leading-7">RecruitConnect started as a recruitment agency in Lagos. We saw the same pain everywhere: spreadsheets for people, WhatsApp for leave, Excel for payroll, and no single truth for “what is happening right now?”. OneHR is our answer — an Intelligent Workforce OS that merges people, work, time and prediction, on MSSQL `onehr_v2` with RBAC, audit and retention by design.</p>
+            <p className="text-slate-600 mt-4 leading-7">RecruitConnect started as a recruitment agency in Lagos. We saw the same pain everywhere: spreadsheets for people, WhatsApp for leave, Excel for payroll, and no single truth for “what is happening right now?”. OneHR is our answer — an Intelligent Workforce OS that merges people, work, time and prediction, secure and audit-ready by design.</p>
             <div className="mt-6 flex gap-3">
               <Link href="/register" className="bg-slate-900 text-white rounded-full px-6 py-3 font-semibold inline-flex items-center gap-2">Join 120+ teams <ArrowRight size={16}/></Link>
               <Link href="/contact" className="bg-white border rounded-full px-6 py-3 font-semibold">Talk to founders</Link>
@@ -42,7 +42,7 @@ export default function AboutPage() {
         {[
           { icon: Target, title: 'Mission', desc: 'Make workforce intelligence as accessible as payroll — for every team from 50 to 10,000.' },
           { icon: HeartHandshake, title: 'Values', desc: 'Privacy-first, consent-based, no auto-accusations. Flag for review, not punish.' },
-          { icon: Globe, title: 'Vision', desc: 'From Lagos to global: 7 industry templates, 44 modules, group-of-companies, NGN + multi-currency.' },
+          { icon: Globe, title: 'Vision', desc: 'From Lagos to global: industry templates, group-of-companies, NGN + multi-currency.' },
         ].map(c=> <div key={c.title} className="bg-white rounded-2xl border p-6"><div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center"><c.icon size={18}/></div><h3 className="font-bold mt-3">{c.title}</h3><p className="text-sm text-slate-600 mt-1 leading-6">{c.desc}</p></div>)}
       </section>
 
@@ -53,8 +53,8 @@ export default function AboutPage() {
             {[
               {k:'Teams', v:'120+', sub:'Across 6 industries'},
               {k:'Employees', v:'12k+', sub:'Under management'},
-              {k:'Modules', v:'44', sub:'From hire to alumni'},
-              {k:'Uptime', v:'99.9%', sub:'MSSQL + Redis'},
+              {k:'Modules', v:'20+', sub:'From hire to alumni'},
+              {k:'Uptime', v:'99.9%', sub:'Enterprise-grade'},
             ].map(s=> <div key={s.k} className="bg-white rounded-2xl border p-6 text-center"><div className="text-3xl font-black">{s.v}</div><div className="font-semibold">{s.k}</div><div className="text-xs text-slate-500">{s.sub}</div></div>)}
           </div>
         </div>
@@ -66,7 +66,7 @@ export default function AboutPage() {
           {[
             {n:'Femi Adeyemi', r:'Founder & CEO', b:'Ex-Andela, Sterling Bank CHRO advisor'},
             {n:'Dr. Sarah Okonkwo', r:'CPO', b:'IO Psychology, University of Lagos'},
-            {n:'Tunde Martins', r:'CTO', b:'Ex-Flutterwave, MSSQL & Next.js'},
+            {n:'Tunde Martins', r:'CTO', b:'Ex-Flutterwave, Platform Engineering'},
           ].map(p=> <div key={p.n} className="bg-white rounded-2xl border p-6 flex gap-4"><img src={`https://api.dicebear.com/7.x/initials/svg?seed=${p.n}`} alt="" className="w-12 h-12 rounded-full bg-slate-100"/><div><div className="font-bold">{p.n}</div><div className="text-xs text-violet-600 font-semibold">{p.r}</div><div className="text-xs text-slate-500 mt-1">{p.b}</div></div></div>)}
         </div>
         <div className="mt-8 bg-slate-900 text-white rounded-2xl p-6 flex flex-col md:flex-row justify-between gap-4">

@@ -55,10 +55,10 @@ export default function RegisterPage() {
           <div className="mt-14">
             <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-3 py-1 text-xs"><Sparkles size={14}/> 14-day free trial • No card</div>
             <h1 className="text-4xl font-black leading-tight mt-4">Start your<br/>workforce<br/><span className="text-violet-300">intelligence</span> today.</h1>
-            <p className="text-white/60 mt-3 leading-6">Join 120+ teams running payroll, clocking, leave and analytics on MSSQL `onehr_v2` with RBAC and audit logs.</p>
+            <p className="text-white/60 mt-3 leading-6">Join 120+ teams running payroll, attendance and analytics — secure, compliant and audit-ready.</p>
             <ul className="mt-8 space-y-3 text-sm">
               {[
-                '44 modules — enable only what you need',
+                'Modular — enable only what you need',
                 '7 clocking methods, facial 98%, GPS opt-in',
                 'HR Health 89/100 — 6 indicators, early warnings',
                 'Group of companies + subscriptions (NGN)',
@@ -122,7 +122,7 @@ export default function RegisterPage() {
                     <input type="password" value={form.confirm} onChange={e=>setForm({...form, confirm:e.target.value})} placeholder="••••••••" required className="w-full mt-1 px-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-violet-500"/>
                   </label>
                 </div>
-                <label className="flex items-start gap-2 text-xs text-slate-600"><input type="checkbox" required className="mt-0.5"/> I agree to <a href="#" className="underline">Terms</a> and <a href="#" className="underline">Privacy</a>. Data hosted on MSSQL with retention controls.</label>
+                <label className="flex items-start gap-2 text-xs text-slate-600"><input type="checkbox" required className="mt-0.5"/> I agree to <a href="#" className="underline">Terms</a> and <a href="#" className="underline">Privacy</a>.</label>
                 <button disabled={loading} className="w-full bg-slate-900 text-white rounded-full py-3 font-semibold hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2">{loading ? 'Creating…' : 'Create workspace'} <ArrowRight size={16}/></button>
                 <div className="flex items-center gap-3 text-xs text-slate-500 justify-center">
                   <span className="flex items-center gap-1"><ShieldCheck size={14} className="text-emerald-600"/> ISO-ready</span>
