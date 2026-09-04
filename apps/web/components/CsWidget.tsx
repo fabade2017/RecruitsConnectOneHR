@@ -556,13 +556,18 @@ export default function CsWidget() {
     if (document.getElementById('cs-widget-js-inline')) return;
     const script = document.createElement('script');
     script.id = 'cs-widget-js-inline';
-    // Pass API via data-api
-    const api = (typeof window !== 'undefined' && (window as any).NEXT_PUBLIC_CHATBOT_API) || (process.env.NEXT_PUBLIC_CHATBOT_API as string | undefined) || 'http://localhost:8003';
+    // NEXT_PUBLIC_ is inlined at build-time — use window fallback for runtime override
+    // Do NOT use `import` for env; Next.js replaces process.env.NEXT_PUBLIC_* at build.
+    // Set NEXT_PUBLIC_CHATBOT_API in apps/web/.env.local or Vercel env and rebuild: `npm run build`
+    const envApi = (typeof process !== 'undefined' && (process.env as any).NEXT_PUBLIC_CHATBOT_API) as string | undefined;
+    const winApi = typeof window !== 'undefined' ? ((window as any).NEXT_PUBLIC_CHATBOT_API || (window as any).CS_API) : undefined;
+    const api = winApi || envApi || 'http://localhost:8003';
+    console.log(`${api}`);
     script.setAttribute('data-api', api);
     script.setAttribute('data-title', 'Support');
     script.textContent = CS_JS;
     document.body.appendChild(script);
-    // Also set global for widget fallback
+    // Also set global for widget fallback (window.CS_API read by widget.js)
     (window as any).CS_API = api;
     (window as any).NEXT_PUBLIC_CHATBOT_API = api;
   }, []);
