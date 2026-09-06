@@ -23,7 +23,7 @@ import { useEffect } from 'react';
 const CHATBOT_API =
   (typeof process !== 'undefined' &&
     (process.env.NEXT_PUBLIC_CHATBOT_API as string | undefined)) ||
-  'http://localhost:8003';
+  'https://localhost:8003';
 
 // If you have a bespoke <style>...</style> from the agent, paste it here.
 // Leave empty to use the remote /static/css/widget.css.
