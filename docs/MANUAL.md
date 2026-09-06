@@ -1,6 +1,6 @@
 # OneHR — Operations Manual (MSSQL `onehr_v2`)
 
-> Updated 2026-09-01 — covers MSSQL migration, landing, auth, People edit, face clock, register → superadmin onboarding.
+> Updated 2026-09-06 — covers MSSQL migration, landing, auth, People edit, face clock, register → superadmin onboarding, **Leave full lifecycle (edit/cancel/delete)** and **ChatBot contrast fix**.
 
 ## 1. Quick Verify (2 min)
 
@@ -67,6 +67,53 @@ curl -X POST http://localhost:3001/v1/organizations -H "Content-Type: applicatio
 curl -H "Authorization: Bearer $SUPER_TOKEN" http://localhost:3001/v1/admin/organizations | jq '.[].acronym'
 curl -X POST http://localhost:3001/v1/auth/login -d '{"email":"acme@demo.ng","password":"Acme@123"}' # new org_admin can now add employees to ACM
 ```
+
+## 5. Leave — Full Lifecycle (New 2026-09-06)
+
+**Module:** `apps/api/src/modules/leave/{leave.service.ts,leave.controller.ts}` + `apps/web/app/(dashboard)/leave/page.tsx`
+
+**Backend endpoints (see `docs/API_SPEC.md §7`):**
+- `POST /leave/requests` — create `pending`
+- `GET /leave/requests` — list with `include:{leaveType,employee}`, RBAC: employee own, manager team, hr all
+- `GET /leave/requests/:id` — single with relations
+- `PATCH /leave/requests/:id` — **edit pending only** (owner/hr/manager-of-owner), partial `leave_type_id/start_date/end_date/reason`, recalculates `days`
+- `PATCH /leave/requests/:id/cancel` — `pending|approved → cancelled` (withdraw)
+- `DELETE /leave/requests/:id` — **hard delete pending only** (wrong entry), else `403 Use cancel`
+- `PATCH /leave/requests/:id/approve|reject` — only `pending`, manager team, employee blocked
+- `GET /leave/balances/:employeeId` — with `leaveType`
+
+**UI:** `HR → Leave`:
+1. Left `Request Leave` form (type, dates, reason) → `Submit`
+2. Right `Requests` table: `Type | Dates → Reason | Days | Status Pill | Actions`. Actions per row gated by `status`:
+   - `pending`: **Edit (Pencil)** → modal prefilled → `PATCH`, **Cancel (Ban)** → `PATCH /cancel`, **Delete (Trash2)** → `DELETE` (confirm), **Approve (Check)/Reject (X)** (manager/hr, backend enforces)
+   - `approved`: **Cancel (Ban)** only
+   - `rejected|cancelled`: `—` (delete blocked, shows error `Only pending can be deleted`)
+3. Edit modal: `leave_type_id` select, dates, reason → `Save` → `PATCH`. Toast success/error (4s).
+4. Delete confirm: `Delete this leave request? This cannot be undone. Only pending...` → `DELETE`.
+
+**Verify:**
+```bash
+# as employee
+curl -X POST http://localhost:3001/v1/leave/requests -H "Authorization: Bearer $TOKEN" -d '{"leave_type_id":"...","start_date":"2026-09-10","end_date":"2026-09-12","reason":"test"}'
+curl http://localhost:3001/v1/leave/requests -H "Authorization: Bearer $TOKEN" # sees own
+# edit pending
+curl -X PATCH http://localhost:3001/v1/leave/requests/<id> -H "Authorization: Bearer $TOKEN" -d '{"reason":"updated"}'
+# delete wrong entry
+curl -X DELETE http://localhost:3001/v1/leave/requests/<id> -H "Authorization: Bearer $TOKEN"
+# cancel
+curl -X PATCH http://localhost:3001/v1/leave/requests/<id>/cancel -H "Authorization: Bearer $TOKEN"
+```
+
+## 5a. ChatBot Contrast Fix (New 2026-09-06)
+
+**Issue:** Bot response `white on white` invisible until highlight — `apps/web/components/CsWidget.tsx:122-305` local light theme vs remote dark theme `https://customer-service-agent-sr5j.onrender.com/static/css/widget.css` clash.
+
+**Fix `CsWidget.tsx:131-305,554-555`:**
+- Forced high-contrast `!important` pairs: `assistant #ffffff/#1e293b + #e2e8f0 border`, `user #667eea/#ffffff`, `#cs-panel/#cs-messages/#cs-footer/#cs-input/#cs-mic/#cs-send` light `!important`, final overrides `#cs-messages .cs-msg.assistant/user`.
+- Disabled remote `cssHref` injection `CsWidget.tsx:322-324` (commented, keeps local only).
+- Purge stale `link[data-cs-widget-css]` `CsWidget.tsx:555` on mount.
+
+**Verify:** Open landing `http://localhost:3000` → `CsWidget` launcher `💬` → bot bubble `white` + `dark #1e293b` text visible, user bubble `blue` + `white` text. No remote CSS in `<head>`.
 
 ## 5. Header Auth Toggle
 

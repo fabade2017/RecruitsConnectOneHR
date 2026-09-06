@@ -208,23 +208,43 @@ Filter: `employee_id, date_from, date_to`.
 
 ---
 
-## 7. Leave
+## 7. Leave — Full Lifecycle (Updated 2026-09-06)
 
 ### GET /leave/types
+List leave types for org. **RBAC:** `leave:read`. **Include:** `leaveType` relation.
+
 ### POST /leave/types (org_admin)
+Create type. **RBAC:** `hr_admin,org_admin,super_admin` + `leave:*`. **Body:** `{ "name": "Annual", "max_days": 21 }`
 
 ### POST /leave/requests
 - **Body:** `{ "leave_type_id": "uuid", "start_date": "2026-08-20", "end_date": "2026-08-22", "reason": "..." }`
-- **201:** Creates workflow_instance, checks balance.
+- **RBAC:** `leave:request:self` (employee/manager/hr). Resolves `employeeId` from `user.sub`, calculates `days`.
+- **201:** Creates `leaveRequest` `pending` with `include:{leaveType}`.
 
 ### GET /leave/requests
-- **Query:** `?status=pending&employee_id=...` (manager sees team).
+- **Query:** `?status=pending&employee_id=...` — employee sees own only, manager sees own+team, hr sees all. **Include:** `leaveType, employee{employeeCode,jobTitle}`.
+- **RBAC:** `leave:read`.
+
+### GET /leave/requests/:id
+Get single request with `leaveType, employee`. **RBAC:** employee own, manager team, hr all. **Errors:** `404`, `403`.
+
+### PATCH /leave/requests/:id
+Edit **pending** request only. **Body (partial):** `{ "leave_type_id", "start_date", "end_date", "reason" }` (recalculates `days`). **RBAC:** owner or `hr_admin/org_admin/super_admin` or manager-of-owner; else `403 Only pending can be edited`.
+
+### PATCH /leave/requests/:id/cancel
+Cancel `pending|approved → cancelled`. **RBAC:** same as update (owner/privileged/manager-of-owner). Use for withdrawing approved leave.
+
+### DELETE /leave/requests/:id
+Hard delete **pending only** (wrong entry). **RBAC:** same as update. **Errors:** `403 Only pending can be deleted. Use cancel for approved/rejected.` Returns `{success:true,id}`.
 
 ### PATCH /leave/requests/:id/approve | /reject
-- **Body:** `{ "comment": "..." }` → advances workflow, updates calendar, notifies.
+- **Body:** `{ "comment": "..." }` → advances workflow, updates calendar, notifies. **RBAC:** `manager,hr_admin,org_admin,super_admin` + `leave:approve:team`, manager only team, employee blocked, only `pending` can be approved.
+- **200:** Updated request `approved|rejected`.
 
 ### GET /leave/balances/:employee_id
-- **200:** `{ "annual": { "entitled": 21, "used": 5, "remaining": 16 } }`
+- **RBAC:** employee can only view own. **Include:** `leaveType`. **200:** `{ "annual": { "entitled": 21, "used": 5, "remaining": 16 } }` (derived from `leaveRequest` list; future: aggregated balance).
+
+**Frontend:** `apps/web/app/(dashboard)/leave/page.tsx` — Request form + Requests table with Edit (Pencil), Cancel (Ban), Delete (Trash2), Approve (Check), Reject (X) gated by `status`, plus Edit modal. See `docs/MANUAL.md § Leave`.
 
 ---
 

@@ -100,6 +100,14 @@
 
 ---
 
+## Patch Log 2026-09-06 — Leave Complete & ChatBot Fix (Audited)
+
+**Leave full lifecycle** `apps/api/src/modules/leave/leave.service.ts:13-116`, `leave.controller.ts:13-16`, `apps/web/app/(dashboard)/leave/page.tsx:30-156`: Added `GET :id`, `PATCH :id` (edit pending, owner/hr/manager-of-owner, recalculates days), `PATCH :id/cancel` (pending|approved→cancelled), `DELETE :id` (hard delete pending only, wrong entry), `include:{leaveType,employee}`. UI: Edit modal (Pencil), Cancel (Ban), Delete (Trash2), Approve/Check, Reject/X gated by status, toasts. See `docs/API_SPEC.md §7`, `docs/MANUAL.md §5`.
+
+**ChatBot contrast** `apps/web/components/CsWidget.tsx:131-305,554-555`: Fixed white-on-white invisible bot text (local light vs remote dark CSS clash). Forced `!important` light pairs, disabled remote `cssHref` injection, purge stale `link[data-cs-widget-css]`. See `docs/MANUAL.md §5a`.
+
+**Module audit 2026-09-06** — all `apps/api/src/modules/*` checked vs Leave gold standard: complete: departments/branches/documents/engagement/learning/jobs/notifications. Gaps: payroll missing DELETE/GET :id/cancel, shifts missing roster PATCH/DELETE, employees missing DELETE, performance/projects/talent/workflows/compliance/integrations missing edit/delete/RBAC hardening (see audit). No regressions.
+
 ## Immediate Decisions Needed (Blocking Phase 1)
 
 1. Industry template to build first (Banking vs Tech vs School)?

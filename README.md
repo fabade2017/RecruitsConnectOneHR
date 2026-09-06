@@ -36,10 +36,11 @@ Demo logins: `admin@recruitconnect.ng/Admin@123` (org_admin, RC), `superadmin@re
 
 ## Implementation Phases (Current)
 
-- **Phase 1 (MVP, M1-4) DONE:** People (edit modal + Add Employee), Attendance (face motion + liveness), Shifts, Leave, Command Centers (HR/Manager/Employee/Executive)
+- **Phase 1 (MVP, M1-4) DONE:** People (edit modal + Add Employee), Attendance (face motion + liveness), Shifts, **Leave (full lifecycle: create/list/getOne/update/cancel/delete/approve with RBAC + edit modal)**, Command Centers (HR/Manager/Employee/Executive)
 - **Phase 2 (M5-7) DONE:** Activity Engine, Exceptions, Fraud (device_sharing/duplicate_face/suspicious), Live Map, Workflows
 - **Phase 3 (M8-10) DONE:** Projects, Performance, Talent Marketplace, Passport, Documents/Assets
 - **Phase 4 (M11-14) DONE:** Workforce Intelligence (HR Health 89), Copilot (RAG), Digital Twin, Face Verification (motion 0.8–12%, FaceDetector, 90d retention), MSSQL `onehr_v2`
+- **Patch 2026-09-06 DONE:** **Leave** hard delete wrong pending + cancel + edit (`apps/api/src/modules/leave/*`, `leave/page.tsx`), **ChatBot** contrast fix `CsWidget.tsx:131-305` (`white/#1e293b !important`, remote CSS disabled) — all modules audited, docs updated `API_SPEC.md §7`, `MANUAL.md §5/5a`
 
 See `docs/ROADMAP.md` for details. New: **Landing** (`/`, `/register`, `/about`, `/contact`) with `AuthNav` (Login vs Dashboard/Logout).
 

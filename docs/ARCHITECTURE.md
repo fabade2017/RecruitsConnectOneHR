@@ -66,7 +66,7 @@ src/
 │   ├── employees/      (CRUD, passport, timeline)
 │   ├── attendance/     (clock, sessions, events, exceptions, fraud detection)
 │   ├── shifts/         (shifts, rosters)
-│   ├── leave/          (types, requests, balances, workflow integration)
+│   ├── leave/          (types, requests, balances, workflow integration — full CRUD: list/getOne/create/update/cancel/delete/approve, RBAC isOwner/isManagerOf, include:leaveType — patched 2026-09-06)
 │   ├── projects/       (projects, tasks, workload)
 │   ├── performance/    (reviews, kpis)
 │   ├── documents/      (upload, signed URLs)
