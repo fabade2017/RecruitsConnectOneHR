@@ -126,17 +126,20 @@ const CS_CSS = `
     font-size: 0.9rem;
     line-height: 1.4;
     word-break: break-word;
+    color: #1e293b;
   }
   .cs-msg.user {
     align-self: flex-end;
-    background: #667eea;
-    color: white;
+    background: #667eea !important;
+    color: #ffffff !important;
     border-bottom-right-radius: 4px;
+    border: 1px solid transparent;
   }
   .cs-msg.assistant {
     align-self: flex-start;
-    background: white;
-    color: var(--text-dark);
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
     border-bottom-left-radius: 4px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   }
@@ -271,23 +274,35 @@ const CS_CSS = `
     50% { opacity: 0.3; }
     100% { opacity: 1; }
   }
-  /* Legacy ids from widget.js for compatibility */
-  #cs-widget-root { position: fixed; right: 20px; bottom: 20px; z-index: 99999; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  /* Legacy ids from widget.js for compatibility — high contrast light theme with !important to beat remote widget.css */
+  #cs-widget-root { position: fixed; right: 20px; bottom: 20px; z-index: 99999; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1e293b; }
+  #cs-widget-root * { box-sizing: border-box; }
   #cs-launcher { width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; font-size: 26px; box-shadow: 0 10px 30px rgba(0,0,0,.35); display: grid; place-items: center; }
   #cs-launcher.open { background: #2a314d; }
-  #cs-panel { display: none; flex-direction: column; width: 380px; max-width: calc(100vw - 32px); height: 560px; max-height: calc(100vh - 100px); margin-bottom: 12px; background: #1a1f35; border: 1px solid #323a5a; border-radius: 16px; box-shadow: 0 16px 50px rgba(0,0,0,.45); overflow: hidden; }
+  #cs-panel { display: none; flex-direction: column; width: 380px; max-width: calc(100vw - 32px); height: 560px; max-height: calc(100vh - 100px); margin-bottom: 12px; background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 16px; box-shadow: 0 16px 50px rgba(0,0,0,.15); overflow: hidden; }
   #cs-panel.open { display: flex; }
   #cs-header { padding: 14px 16px; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: space-between; color: white; }
-  #cs-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: #f8fafc; }
-  .cs-msg .meta { font-size: 11px; opacity: 0.7; margin-bottom: 4px; }
-  #cs-footer { padding: 12px; background: white; border-top: 1px solid #e2e8f0; }
+  #cs-header .title { color: #fff !important; }
+  #cs-header .sub { color: rgba(255,255,255,0.9) !important; }
+  #cs-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: #f8fafc !important; }
+  .cs-msg .meta { font-size: 11px; opacity: 0.7; margin-bottom: 4px; color: #64748b !important; }
+  .cs-msg.user .meta { color: rgba(255,255,255,0.85) !important; }
+  .cs-msg.assistant .meta { color: #64748b !important; }
+  #cs-footer { padding: 12px; background: #ffffff !important; border-top: 1px solid #e2e8f0 !important; }
   #cs-form { display: flex; gap: 8px; align-items: center; }
-  #cs-input { flex: 1; border: 1px solid #e2e8f0; border-radius: 20px; padding: 10px 16px; outline: none; }
-  #cs-mic, #cs-send { padding: 8px 14px; border-radius: 20px; border: none; cursor: pointer; }
-  #cs-mic.recording { background: #fee2e2; color: #ef4444; }
-  #cs-options { font-size: 12px; margin-top: 8px; color: #64748b; }
-  #cs-voice-status { font-size: 12px; color: #ef4444; min-height: 16px; }
+  #cs-input { flex: 1; border: 1px solid #e2e8f0 !important; border-radius: 20px; padding: 10px 16px; outline: none; background: #ffffff !important; color: #1e293b !important; }
+  #cs-input::placeholder { color: #94a3b8 !important; }
+  #cs-input:focus { border-color: #667eea !important; }
+  #cs-mic { background: #ffffff !important; border: 1px solid #e2e8f0 !important; color: #1e293b !important; }
+  #cs-send { background: linear-gradient(135deg, #667eea, #764ba2) !important; color: #fff !important; }
+  #cs-mic, #cs-send { padding: 8px 14px; border-radius: 20px; cursor: pointer; }
+  #cs-mic.recording { background: #fee2e2 !important; color: #ef4444 !important; border-color: #fecaca !important; }
+  #cs-options { font-size: 12px; margin-top: 8px; color: #64748b !important; }
+  #cs-voice-status { font-size: 12px; color: #ef4444 !important; min-height: 16px; }
   .cs-typing span { display: inline-block; width: 6px; height: 6px; background: #94a3b8; border-radius: 50%; margin: 0 2px; animation: pulse 1s infinite; }
+  /* Final override to ensure remote widget.css never makes text invisible (white-on-white) */
+  #cs-messages .cs-msg.assistant { background: #ffffff !important; color: #1e293b !important; }
+  #cs-messages .cs-msg.user { background: #667eea !important; color: #ffffff !important; }
 `;
 
 const CS_JS = `(function () {
@@ -304,14 +319,9 @@ const CS_JS = `(function () {
   }
   const sessionId = localStorage.getItem("cs_widget_session") || uuid();
   localStorage.setItem("cs_widget_session", sessionId);
-  const cssHref = API.replace(/\\/$/, "") + "/static/css/widget.css";
-  if (!document.querySelector('link[data-cs-widget-css]')) {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = cssHref;
-    link.setAttribute("data-cs-widget-css", "1");
-    document.head.appendChild(link);
-  }
+  // Remote widget.css disabled — local CS_CSS already provides high-contrast light theme.
+  // Keeping this block removed prevents dark-theme override (white-on-white invisible text).
+  // If you need remote CSS, ensure it matches local light theme or uses !important.
   function el(tag, attrs, children) {
     const n = document.createElement(tag);
     if (attrs) Object.entries(attrs).forEach(([k, v]) => {
@@ -541,7 +551,8 @@ const CS_JS = `(function () {
 
 export default function CsWidget() {
   useEffect(() => {
-    // Clean old Ava widget
+    // Clean old Ava widget and any stale remote dark-theme CSS that causes white-on-white
+    document.querySelectorAll('link[data-cs-widget-css]').forEach((el) => el.remove());
     document.getElementById('ava-widget-root')?.remove();
     document.getElementById('ava-widget-css')?.remove();
     document.getElementById('ava-widget-js-v2')?.remove();
