@@ -11,6 +11,7 @@ type NavSection = { title: string; items: { href: string; label: string; icon: a
 
 const NAV: NavSection[] = [
   { title: 'OVERVIEW', items: [
+    { href: '/chat', label: 'Chat', icon: MessageCircle },
     { href: '/hr', label: 'Command Center', icon: LayoutDashboard, roles: ['hr_admin','org_admin','hr_manager'] },
     { href: '/executive', label: 'Executive', icon: Building2, roles: ['executive','org_admin'] },
     { href: '/manager', label: 'My Team', icon: Users2, roles: ['manager','hr_admin','org_admin'] },
@@ -23,9 +24,7 @@ const NAV: NavSection[] = [
     { href: '/documents', label: 'Documents', icon: FileText },
     { href: '/assets', label: 'Assets', icon: Boxes },
   ]},
-  { title: 'COMMUNICATE', items: [
-    { href: '/chat', label: 'Chat', icon: MessageCircle },
-  ]},
+  // Chat now in OVERVIEW (most prominent) — keep COMMUNICATE for quick access duplicate removed to avoid double link
   { title: 'MANAGE WORK', items: [
     { href: '/attendance', label: 'Attendance', icon: Clock },
     { href: '/attendance', label: 'Smart Clocking', icon: Timer },
@@ -70,7 +69,29 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [branding, setBranding] = useState<any>(null);
+  const [chatUnread, setChatUnread] = useState<number>(0);
   const role = user?.role || null;
+
+  // Chat unread badge — poll + socket via storage event from ChatProvider
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const t = localStorage.getItem('onehr_token');
+        if (!t) return;
+        const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
+        const r = await fetch(`${api}/chat/unread/count`, { headers: { Authorization: `Bearer ${t}` } });
+        if (r.ok) { const d = await r.json(); setChatUnread(d.total || 0); }
+      } catch {}
+    };
+    fetchUnread();
+    const id = setInterval(fetchUnread, 15000);
+    const onStorage = (e: StorageEvent) => { if (e.key === 'onehr_chat_unread') setChatUnread(parseInt(e.newValue || '0', 10)); };
+    window.addEventListener('storage', onStorage);
+    // also listen to custom event from ChatProvider
+    const onCustom = (e: any) => setChatUnread(e.detail ?? 0);
+    window.addEventListener('chat:unread' as any, onCustom);
+    return () => { clearInterval(id); window.removeEventListener('storage', onStorage); window.removeEventListener('chat:unread' as any, onCustom); };
+  }, [pathname]);
 
   useEffect(() => {
     const u = localStorage.getItem('onehr_user');
@@ -114,14 +135,21 @@ export default function Sidebar() {
                 {sec.items.filter(i => visible(i.roles)).map(item => {
                   const Icon = item.icon;
                   const active = pathname === item.href || pathname.startsWith(item.href + '/');
+                  const isChat = item.href === '/chat';
+                  const chatBadge = isChat && chatUnread > 0 ? String(chatUnread > 99 ? '99+' : chatUnread) : null;
+                  const badge = chatBadge || item.badge;
+                  const badgeClass = isChat && chatBadge ? 'bg-emerald-500 text-white' : 'bg-white/15';
                   return (
                     <Link key={item.href+item.label} href={item.href}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${active ? 'bg-white text-slate-900 shadow-[0_4px_16px_rgba(255,255,255,0.15)]' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
-                      title={collapsed ? item.label : undefined}
+                      title={collapsed ? `${item.label}${chatBadge ? ` (${chatBadge})` : ''}` : undefined}
                     >
-                      <Icon size={18} className={active ? 'text-slate-900' : 'text-white/80'} />
+                      <span className="relative">
+                        <Icon size={18} className={active ? 'text-slate-900' : 'text-white/80'} />
+                        {collapsed && chatBadge && <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 text-[10px] leading-none rounded-full bg-red-500 text-white flex items-center justify-center font-bold">{chatBadge}</span>}
+                      </span>
                       {!collapsed && <span className="truncate font-medium">{item.label}</span>}
-                      {!collapsed && item.badge && <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-white/15">{item.badge}</span>}
+                      {!collapsed && badge && <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full ${badgeClass} ${active && !isChat ? 'bg-slate-900 text-white' : ''}`}>{badge}</span>}
                     </Link>
                   );
                 })}

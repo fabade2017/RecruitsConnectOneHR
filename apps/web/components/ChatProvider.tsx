@@ -28,15 +28,27 @@ export default function ChatProvider(){
       const id = Date.now().toString()+Math.random();
       setPopups(prev=> [...prev.slice(-2), { id, content: message.content, sender: message.sender?.email||'Someone', convId: conversationId }]);
       setTimeout(()=> setPopups(prev=> prev.filter(x=>x.id!==id)), 5000);
-      setUnread((v: number)=> v+1);
+      setUnread((v: number)=> {
+        const nv = v+1;
+        try { localStorage.setItem('onehr_chat_unread', String(nv)); window.dispatchEvent(new CustomEvent('chat:unread', { detail: nv })); } catch {}
+        return nv;
+      });
       if(typeof Notification !== 'undefined' && Notification.permission==='granted'){
         new Notification(message.sender?.email||'New message', { body: message.content.slice(0,100)});
       }
     });
-    s.on('message:new', ()=> setUnread((v: number)=> v+1));
+    s.on('message:new', ()=> setUnread((v: number)=> {
+      const nv = v+1;
+      try { localStorage.setItem('onehr_chat_unread', String(nv)); window.dispatchEvent(new CustomEvent('chat:unread', { detail: nv })); } catch {}
+      return nv;
+    }));
     // poll unread count initially
     fetch(`${api}/chat/unread/count`, { headers:{ Authorization:`Bearer ${token}` }})
-      .then(r=>r.json()).then(d=> setUnread(d.total||0)).catch(()=>{});
+      .then(r=>r.json()).then(d=> {
+        const tot = d.total||0;
+        setUnread(tot);
+        try { localStorage.setItem('onehr_chat_unread', String(tot)); window.dispatchEvent(new CustomEvent('chat:unread', { detail: tot })); } catch {}
+      }).catch(()=>{});
     const onFocus = ()=> {
       // when user focuses window, could clear? keep simple
     };
@@ -53,11 +65,19 @@ export default function ChatProvider(){
       if(!token) return;
       try{
         const r=await fetch(`${api}/chat/unread/count`, { headers:{ Authorization:`Bearer ${token}` }});
-        const d=await r.json(); setUnread(d.total||0);
+        const d=await r.json();
+        const tot=d.total||0;
+        setUnread(tot);
+        try { localStorage.setItem('onehr_chat_unread', String(tot)); window.dispatchEvent(new CustomEvent('chat:unread', { detail: tot })); } catch {}
       }catch{}
     },30000);
     return ()=>clearInterval(id);
   },[]);
+
+  // Broadcast unread to Sidebar via event/localStorage when unread changes
+  useEffect(()=>{
+    try { localStorage.setItem('onehr_chat_unread', String(unread)); window.dispatchEvent(new CustomEvent('chat:unread', { detail: unread })); } catch {}
+  },[unread]);
 
   return (
     <div className="fixed top-4 right-4 z-[60] space-y-2 pointer-events-none">
