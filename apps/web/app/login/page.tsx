@@ -32,7 +32,7 @@ export default function LoginPage() {
         setShowClockPopup(true);
         return;
       }
-      const target = role === 'manager' ? '/manager' : role === 'executive' ? '/executive' : role === 'recruiter' ? '/jobs' : '/hr';
+      const target = role === 'super_admin' ? '/admin' : role === 'manager' ? '/manager' : role === 'executive' ? '/executive' : role === 'recruiter' ? '/jobs' : '/hr';
       router.push(target);
     } catch (err: any) {
       setError(err.message);

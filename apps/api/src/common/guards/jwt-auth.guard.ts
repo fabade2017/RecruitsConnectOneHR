@@ -35,11 +35,13 @@ export class JwtAuthGuard {
       req.user = payload;
       // Tenant resolution: prefer JWT org_id, fallback to header
       req.orgId = payload.org_id || payload.orgId || (req.headers['x-organization-id'] as string);
-      if (!req.orgId) throw new UnauthorizedException('Missing organization context');
+      // super_admin is global — allow missing org context (admin endpoints are org-agnostic)
+      if (!req.orgId && payload.role !== 'super_admin') throw new UnauthorizedException('Missing organization context');
       return true;
     } catch (e: any) {
+      if (e instanceof UnauthorizedException) throw e;
       if (e.name === 'TokenExpiredError') throw new UnauthorizedException('Token expired');
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException(e.message || 'Invalid token');
     }
   }
 }

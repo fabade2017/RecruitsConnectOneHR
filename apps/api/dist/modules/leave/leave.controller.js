@@ -26,6 +26,10 @@ let LeaveController = class LeaveController {
     createType(req, dto) { return this.svc.createType(req.orgId, dto); }
     request(req, dto) { return this.svc.request(req.orgId, req.user.sub, dto); }
     list(req, q) { return this.svc.list(req.orgId, q, req.user); }
+    getOne(req, id) { return this.svc.getOne(req.orgId, id, req.user); }
+    update(req, id, dto) { return this.svc.update(req.orgId, id, req.user, dto); }
+    cancel(req, id) { return this.svc.cancel(req.orgId, id, req.user); }
+    remove(req, id) { return this.svc.remove(req.orgId, id, req.user); }
     approve(id, req) { return this.svc.approve(id, req.user.sub, 'approved', req.user); }
     reject(id, req) { return this.svc.approve(id, req.user.sub, 'rejected', req.user); }
     bal(req, eid) { return this.svc.balances(req.orgId, eid, req.user); }
@@ -67,6 +71,43 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], LeaveController.prototype, "list", null);
+__decorate([
+    (0, common_1.Get)('requests/:id'),
+    (0, rbac_guard_1.RequirePermissions)('leave:read'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], LeaveController.prototype, "getOne", null);
+__decorate([
+    (0, common_1.Patch)('requests/:id'),
+    (0, rbac_guard_1.RequirePermissions)('leave:request:self'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", void 0)
+], LeaveController.prototype, "update", null);
+__decorate([
+    (0, common_1.Patch)('requests/:id/cancel'),
+    (0, rbac_guard_1.RequirePermissions)('leave:request:self'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], LeaveController.prototype, "cancel", null);
+__decorate([
+    (0, common_1.Delete)('requests/:id'),
+    (0, rbac_guard_1.RequirePermissions)('leave:request:self'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], LeaveController.prototype, "remove", null);
 __decorate([
     (0, common_1.Patch)('requests/:id/approve'),
     (0, rbac_guard_1.Roles)('manager', 'hr_admin', 'org_admin', 'super_admin'),

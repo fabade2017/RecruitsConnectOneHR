@@ -27,16 +27,33 @@ export default function SuperAdminPage() {
 
   const load = async () => {
     const h = auth();
-    const [r, g, pl, o] = await Promise.all([
-      fetch(`${api}/admin/roles`, { headers: h }).then(x=>x.json()).catch(()=>[]),
-      fetch(`${api}/admin/groups`, { headers: h }).then(x=>x.json()).catch(()=>[]),
-      fetch(`${api}/admin/plans`, { headers: h }).then(x=>x.json()).catch(()=>[]),
-      fetch(`${api}/admin/organizations`, { headers: h }).then(x=>x.json()).catch(()=> fetch(`${api}/organizations`, { headers: h }).then(y=>y.json()).catch(()=>[])),
-    ]);
-    setRoles(Array.isArray(r)?r:parseApiList(r));
-    setGroups(Array.isArray(g)?g:parseApiList(g));
-    setPlans(Array.isArray(pl)?pl:parseApiList(pl));
-    setOrgs(Array.isArray(o)?o:parseApiList(o));
+    if (!h.Authorization) { setPermsError('Missing token — please re-login as superadmin@recruitconnect.ng'); return; }
+    const safeJson = async (url: string, fallbackUrl?: string) => {
+      const res = await fetch(url, { headers: h });
+      if (res.ok) return res.json();
+      if (res.status === 401) throw new Error(`401 Unauthorized — token expired or invalid (${url})`);
+      if (res.status === 403) throw new Error(`403 Forbidden — requires super_admin (${url})`);
+      if (fallbackUrl) {
+        const fb = await fetch(fallbackUrl, { headers: h });
+        if (fb.ok) return fb.json();
+        throw new Error(`Failed ${res.status} on ${url} and ${fb.status} on fallback`);
+      }
+      throw new Error(`Failed ${res.status} on ${url}`);
+    };
+    try {
+      const [r, g, pl, o] = await Promise.all([
+        safeJson(`${api}/admin/roles`),
+        safeJson(`${api}/admin/groups`),
+        safeJson(`${api}/admin/plans`),
+        safeJson(`${api}/admin/organizations`, `${api}/organizations`),
+      ]);
+      setRoles(Array.isArray(r)?r:parseApiList(r));
+      setGroups(Array.isArray(g)?g:parseApiList(g));
+      setPlans(Array.isArray(pl)?pl:parseApiList(pl));
+      setOrgs(Array.isArray(o)?o:parseApiList(o));
+    } catch (e:any) {
+      setPermsError(e.message || 'Failed to load admin data');
+    }
   };
 
   const loadPermissionsGrouped = async () => {
