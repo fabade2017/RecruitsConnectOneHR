@@ -28,6 +28,7 @@ import { BranchesModule } from './modules/branches/branches.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { ChatModule } from './modules/chat/chat.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RbacGuard } from './common/guards/rbac.guard';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -63,6 +64,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     OnboardingModule,
     IntegrationsModule,
     AuditModule,
+    ChatModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

@@ -37,6 +37,7 @@ const branches_module_1 = require("./modules/branches/branches.module");
 const onboarding_module_1 = require("./modules/onboarding/onboarding.module");
 const integrations_module_1 = require("./modules/integrations/integrations.module");
 const audit_module_1 = require("./modules/audit/audit.module");
+const chat_module_1 = require("./modules/chat/chat.module");
 const jwt_auth_guard_1 = require("./common/guards/jwt-auth.guard");
 const rbac_guard_1 = require("./common/guards/rbac.guard");
 const audit_log_interceptor_1 = require("./common/interceptors/audit-log.interceptor");
@@ -75,6 +76,7 @@ exports.AppModule = AppModule = __decorate([
             onboarding_module_1.OnboardingModule,
             integrations_module_1.IntegrationsModule,
             audit_module_1.AuditModule,
+            chat_module_1.ChatModule,
         ],
         providers: [
             { provide: core_1.APP_GUARD, useClass: jwt_auth_guard_1.JwtAuthGuard },

@@ -1,6 +1,7 @@
 'use client';
 import Sidebar from '../../components/Sidebar';
 import Watermark from '../../components/Watermark';
+import ChatProvider from '../../components/ChatProvider';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
@@ -15,6 +16,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_20%_-10%,#e0f2fe_0%,transparent_60%),radial-gradient(1000px_500px_at_90%_0%,#f0f9ff_0%,transparent_60%),linear-gradient(to_bottom,#f8fafc,#f1f5f9)] flex relative">
       <Watermark />
+      <ChatProvider />
       <Sidebar />
       <div className="flex-1 min-w-0 relative z-10">
         <header className="sticky top-0 z-10 backdrop-blur-xl bg-white/60 border-b border-white/60">

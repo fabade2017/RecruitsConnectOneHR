@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, UserPlus, Clock, CalendarCheck, Timer, Briefcase, Wallet, TrendingUp, GraduationCap, Heart, ShieldCheck, FileText, Boxes, ArrowUpCircle, UserMinus, Users2, Scale, Headset, BarChart3, Brain, Workflow, Plug, Settings,
-  MapPin, AlertTriangle, Building2, ChevronLeft, ChevronRight, LogOut, Sparkles, Layers
+  MapPin, AlertTriangle, Building2, ChevronLeft, ChevronRight, LogOut, Sparkles, Layers, MessageCircle
 } from 'lucide-react';
 
 type NavSection = { title: string; items: { href: string; label: string; icon: any; badge?: string; roles?: string[] }[] };
@@ -22,6 +22,9 @@ const NAV: NavSection[] = [
     { href: '/onboarding', label: 'Onboarding', icon: ArrowUpCircle },
     { href: '/documents', label: 'Documents', icon: FileText },
     { href: '/assets', label: 'Assets', icon: Boxes },
+  ]},
+  { title: 'COMMUNICATE', items: [
+    { href: '/chat', label: 'Chat', icon: MessageCircle },
   ]},
   { title: 'MANAGE WORK', items: [
     { href: '/attendance', label: 'Attendance', icon: Clock },
