@@ -113,6 +113,11 @@ export class EmployeesService {
         acronym: org.acronym,
         logoUrl: org.logoUrl,
         watermarkEnabled: org.watermarkEnabled,
+        watermarkText: (org as any).watermarkText,
+        watermarkOpacity: (org as any).watermarkOpacity,
+        watermarkPosition: (org as any).watermarkPosition,
+        primaryColor: (org as any).primaryColor,
+        config: (()=>{ try{ return typeof org.config==='string' ? JSON.parse(org.config) : org.config } catch { return {} }})(),
       },
       qr: {
         legacy: emp.qrCode,
@@ -159,6 +164,7 @@ export class EmployeesService {
     }
     const employees = await this.prisma.employee.findMany({ where, take: Math.min(parseInt(query.limit || '50'), 100), orderBy: { createdAt: 'desc' }, include: { department: true, branch: true, organization: true, user: { select: { email: true } } } });
     const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
+    const orgCfg = (()=>{ try{ return typeof (org as any).config==='string' ? JSON.parse((org as any).config) : (org as any).config } catch { return {} }})();
     const cards = await Promise.all(employees.map(async (emp) => {
       const { token, qrSecure } = await this.generateSecureQrData(org, emp);
       return {
@@ -171,7 +177,7 @@ export class EmployeesService {
         photoUrl: emp.photoUrl,
         qrSecure,
         secureToken: token,
-        organization: { name: org?.name, acronym: org?.acronym, logoUrl: org?.logoUrl },
+        organization: { name: org?.name, acronym: org?.acronym, logoUrl: org?.logoUrl, watermarkEnabled: (org as any).watermarkEnabled, watermarkOpacity: (org as any).watermarkOpacity, watermarkText: (org as any).watermarkText, watermarkPosition: (org as any).watermarkPosition, primaryColor: (org as any).primaryColor, config: orgCfg },
       };
     }));
     return { total: cards.length, cards };
