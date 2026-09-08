@@ -141,12 +141,38 @@ export class EmployeesService {
     if (role === 'employee') {
       const ownId = await this.resolveEmployeeIdFromUser(user);
       if (ownId !== id) throw new ForbiddenException('Employees can only update self');
-      const allowed = ['phone','address','photoUrl','skills'];
-      const filtered: any = {};
-      for (const k of allowed) if (dto[k] !== undefined) filtered[k] = dto[k];
-      if (Object.keys(filtered).length === 0) throw new ForbiddenException('No permitted fields');
-      if (filtered.skills && Array.isArray(filtered.skills)) filtered.skills = JSON.stringify(filtered.skills);
-      return this.prisma.employee.update({ where: { id }, data: filtered });
+      // Employee self can update: phone/email (User), skills/photoUrl (Employee)
+      const userUpdates: any = {};
+      if (dto.phone !== undefined) userUpdates.phone = dto.phone;
+      if (dto.email !== undefined) userUpdates.email = dto.email;
+      // allow skills and photoUrl on employee
+      const empUpdates: any = {};
+      if (dto.skills !== undefined) empUpdates.skills = Array.isArray(dto.skills) ? JSON.stringify(dto.skills) : dto.skills;
+      if (dto.photoUrl !== undefined) empUpdates.photoUrl = dto.photoUrl;
+      if (dto.address !== undefined) empUpdates.metadata = dto.address; // store loosely if needed
+      if (Object.keys(userUpdates).length === 0 && Object.keys(empUpdates).length === 0) throw new ForbiddenException('No permitted fields (employee can only edit phone/skills/photo)');
+      if (Object.keys(userUpdates).length) {
+        const empForUser = await this.prisma.employee.findUnique({ where: { id }, select: { userId: true } });
+        if (empForUser?.userId) {
+          if (userUpdates.email) {
+            const exists = await this.prisma.user.findFirst({ where: { email: userUpdates.email, organizationId: orgId, id: { not: empForUser.userId } } });
+            if (exists) throw new ConflictException('Email already exists in organization');
+          }
+          await this.prisma.user.update({ where: { id: empForUser.userId }, data: userUpdates });
+        } else if (userUpdates.email) {
+          // create user link if not exists (first time phone/email set)
+          const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { acronym: true } });
+          const hash = await bcrypt.hash('Temp@123', 10);
+          const newUser = await this.prisma.user.create({ data: { organizationId: orgId, email: userUpdates.email, phone: userUpdates.phone, passwordHash: hash, role: 'employee', mustChangePassword: true } });
+          await this.prisma.employee.update({ where: { id }, data: { userId: newUser.id } });
+        } else {
+          throw new ConflictException('No linked user to update phone — provide email first');
+        }
+      }
+      if (Object.keys(empUpdates).length) {
+        await this.prisma.employee.update({ where: { id }, data: empUpdates });
+      }
+      return this.prisma.employee.findUnique({ where: { id }, include: { user: { select: { id: true, email: true, phone: true, role: true } }, department: true, branch: true } });
     }
     if (role === 'manager') {
       const ownId = await this.resolveEmployeeIdFromUser(user);
