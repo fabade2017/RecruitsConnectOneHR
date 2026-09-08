@@ -222,6 +222,30 @@ export default function AttendancePage() {
     load();
   };
 
+  const [gpsStatus, setGpsStatus] = useState<'idle'|'locating'|'ok'|'denied'|'unavailable'>('idle');
+  const [lastGps, setLastGps] = useState<{latitude:number; longitude:number; accuracy:number} | null>(null);
+
+  const getGps = (): Promise<{latitude:number; longitude:number; accuracy:number} | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) { setGpsStatus('unavailable'); resolve(null); return; }
+      setGpsStatus('locating');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const c = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
+          setLastGps(c); setGpsStatus('ok'); resolve(c);
+        },
+        (err) => {
+          console.warn('GPS denied/unavailable', err.message);
+          setGpsStatus(err.code===1 ? 'denied' : 'unavailable');
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    });
+  };
+
+  useEffect(()=>{ getGps(); }, []);
+
   const doClock = async (type: string, snapshotBase64?: string, meta?: any) => {
     const t = localStorage.getItem('onehr_token');
     const map: any = { 'clock-in': '/attendance/clock-in', 'clock-out': '/attendance/clock-out', 'break/start': '/attendance/break/start', 'break/end': '/attendance/break/end' };
@@ -231,8 +255,21 @@ export default function AttendancePage() {
       body.face_snapshot_base64 = snapshotBase64;
       body.face_meta = meta;
     }
-    // Add GPS if allowed (mock Lagos)
-    body.ip = '41.58.0.1';
+    // Real GPS — request fresh fix, fallback to last known
+    let gps = await getGps();
+    if (!gps && lastGps) gps = lastGps;
+    if (gps) {
+      body.location = gps;
+      body.gps = gps;
+      body.latitude = gps.latitude;
+      body.longitude = gps.longitude;
+      body.accuracy = gps.accuracy;
+    } else {
+      body.location = null;
+    }
+    // IP still sent for audit
+    try { const ipRes = await fetch('https://api.ipify.org?format=json').then(r=>r.json()).catch(()=>null); if (ipRes?.ip) body.ip = ipRes.ip; } catch {}
+    if (!body.ip) body.ip = '0.0.0.0';
     setPending(type);
     try {
       const res = await fetch(`${api}${map[type]}`, { method: 'POST', headers: { 'Content-Type':'application/json', Authorization: `Bearer ${t}` }, body: JSON.stringify(body) });
@@ -296,6 +333,13 @@ export default function AttendancePage() {
           </button>
         </div>
         {pending && <div className="mt-3 flex items-center gap-2 text-sm text-slate-600"><RefreshCw size={14} className="animate-spin"/> Processing {pending}…</div>}
+        <div className="mt-2 flex items-center gap-2 text-xs">
+          <span className={`glass rounded-full px-3 py-1 flex items-center gap-1 ${gpsStatus==='ok'?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-amber-50 border-amber-200'}`}>
+            <MapPin size={12}/> GPS: {gpsStatus==='ok' && lastGps ? `${lastGps.latitude.toFixed(5)}, ${lastGps.longitude.toFixed(5)} ±${Math.round(lastGps.accuracy)}m` : gpsStatus==='locating'?'Locating…' : gpsStatus==='denied'?'Denied — enable location in browser' : gpsStatus==='unavailable'?'Unavailable — clock still works, flagged' : 'Idle'}
+          </span>
+          <button onClick={getGps} className="text-xs underline">Retry GPS</button>
+          {lastGps && <span className="text-slate-400">Real geolocation captured on each clock</span>}
+        </div>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <span className="glass rounded-full px-3 py-1 flex items-center gap-1 bg-emerald-50 border-emerald-200"><Camera size={12}/> Facial liveness</span>
           <span className="glass rounded-full px-3 py-1 flex items-center gap-1"><Fingerprint size={12}/> 98% match</span>

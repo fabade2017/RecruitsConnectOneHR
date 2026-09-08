@@ -2,6 +2,27 @@ import { Injectable, ConflictException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../../prisma/prisma.service';
 
 function diffMinutes(a: Date, b: Date) { return Math.round((b.getTime() - a.getTime()) / 60000); }
+function toRadians(deg: number) { return deg * Math.PI / 180; }
+function haversineMeters(lat1:number, lon1:number, lat2:number, lon2:number) {
+  const R=6371000;
+  const dLat=toRadians(lat2-lat1); const dLon=toRadians(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRadians(lat1))*Math.cos(toRadians(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function normalizeLocation(dto:any): { str: string | null, obj: any | null, lat: number|null, lng:number|null, accuracy:number|null } {
+  let obj:any = dto.location || dto.gps || dto.coords || null;
+  if (!obj && dto.latitude != null && dto.longitude != null) obj = { latitude: dto.latitude, longitude: dto.longitude, accuracy: dto.accuracy, address: dto.address };
+  if (!obj) return { str:null, obj:null, lat:null, lng:null, accuracy:null };
+  if (typeof obj === 'string') {
+    try { const parsed = JSON.parse(obj); return { str: obj, obj: parsed, lat: parsed.latitude ?? parsed.lat ?? null, lng: parsed.longitude ?? parsed.lng ?? null, accuracy: parsed.accuracy ?? null }; }
+    catch { return { str: obj, obj: null, lat:null, lng:null, accuracy:null }; }
+  }
+  const lat = obj.latitude ?? obj.lat ?? null;
+  const lng = obj.longitude ?? obj.lng ?? null;
+  const accuracy = obj.accuracy ?? null;
+  // store as JSON string
+  return { str: JSON.stringify(obj), obj, lat: lat!=null?Number(lat):null, lng: lng!=null?Number(lng):null, accuracy: accuracy!=null?Number(accuracy):null };
+}
 
 @Injectable()
 export class AttendanceService {
@@ -23,6 +44,7 @@ export class AttendanceService {
     const faceRef = dto.face_snapshot_base64 ? `snap/${session.id}/in.jpg` : null;
     const faceHash = dto.face_snapshot_base64 ? dto.face_snapshot_base64.slice(0, 100) : null;
     const isFacial = !!dto.face_snapshot_base64;
+    const loc = normalizeLocation(dto);
     await this.prisma.attendanceEvent.create({
       data: {
         organizationId: orgId, employeeId: employee.id, workSessionId: session.id,
@@ -30,7 +52,9 @@ export class AttendanceService {
         faceSnapshotRef: faceRef,
         faceConfidence: isFacial ? (dto.face_meta?.liveness === 'verified' ? 98 : 75) : null,
         verificationStatus: isFacial ? (dto.face_meta?.liveness === 'verified' ? 'verified' : 'pending') : 'verified', ipAddress: dto.ip,
-      },
+        location: loc.str,
+        metadata: JSON.stringify({ ...(dto.metadata ? JSON.parse(JSON.stringify(dto.metadata)) : {}), gps: loc.obj, gpsAccuracy: loc.accuracy, consentGps: employee.consentGps }),
+      } as any,
     });
     // Device sharing check
     if (dto.device_fingerprint) {
@@ -99,6 +123,41 @@ export class AttendanceService {
         data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'low', details: JSON.stringify({ reason: 'no_face_snapshot', method: dto.method }) },
       });
     }
+    // GPS handling — real geolocation
+    try {
+      const policy = await this.prisma.attendancePolicy.findUnique({ where: { organizationId: orgId } });
+      const requireGps = policy?.requireGps || false;
+      if (requireGps && !loc.str) {
+        await this.prisma.attendanceException.create({
+          data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'high', details: JSON.stringify({ reason: 'missing_gps', message: 'GPS required but not provided', consentGps: employee.consentGps }) },
+        });
+      }
+      if (loc.lat != null && loc.lng != null) {
+        // Check consent
+        if (!employee.consentGps) {
+          await this.prisma.consentLog.create({ data: { employeeId: employee.id, type: 'gps', granted: false, ip: dto.ip } } as any).catch(()=>{});
+        }
+        // Geofence vs branch
+        if (employee.branchId) {
+          const branch = await this.prisma.branch.findUnique({ where: { id: employee.branchId } });
+          if (branch?.latitude != null && branch?.longitude != null) {
+            const dist = haversineMeters(loc.lat, loc.lng, branch.latitude as number, branch.longitude as number);
+            const radius = (branch as any).gpsRadius || 200;
+            if (dist > radius) {
+              await this.prisma.attendanceException.create({
+                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'out_of_geofence', severity: dist > radius*3 ? 'high' : 'medium', details: JSON.stringify({ reason: 'out_of_geofence', distance_m: Math.round(dist), radius_m: radius, branch: branch.name, gps: loc.obj }) },
+              });
+            }
+          }
+        }
+        // Poor accuracy flag
+        if (loc.accuracy != null && loc.accuracy > 100) {
+          await this.prisma.attendanceException.create({
+            data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'low', details: JSON.stringify({ reason: 'poor_gps_accuracy', accuracy: loc.accuracy }) },
+          });
+        }
+      }
+    } catch {}
     return session;
   }
 
@@ -123,6 +182,7 @@ export class AttendanceService {
       where: { id: session.id },
       data: { clockOutAt, grossDurationMinutes: gross, breakDurationMinutes: breakMins, netWorkingMinutes: net, overtimeMinutes: overtime, status: 'clocked_out' },
     });
+    const locOut = normalizeLocation(dto);
     await this.prisma.attendanceEvent.create({
       data: {
         organizationId: orgId, employeeId: employee.id, workSessionId: session.id,
@@ -132,7 +192,9 @@ export class AttendanceService {
         faceConfidence: isFacialOut ? (dto.face_meta?.liveness === 'verified' ? 98 : 75) : null,
         verificationStatus: isFacialOut ? (dto.face_meta?.liveness === 'verified' ? 'verified' : 'pending') : 'verified',
         ipAddress: dto.ip,
-      },
+        location: locOut.str,
+        metadata: JSON.stringify({ gps: locOut.obj }),
+      } as any,
     });
     if (isFacialOut && dto.face_meta) {
       const m = parseFloat(dto.face_meta.motion || 0);
@@ -142,6 +204,21 @@ export class AttendanceService {
         });
       }
     }
+    // GPS for clock-out
+    try {
+      if (locOut.lat != null && locOut.lng != null && employee.branchId) {
+        const branch = await this.prisma.branch.findUnique({ where: { id: employee.branchId } });
+        if (branch?.latitude != null && branch?.longitude != null) {
+          const dist = haversineMeters(locOut.lat, locOut.lng, branch.latitude as number, branch.longitude as number);
+          const radius = (branch as any).gpsRadius || 200;
+          if (dist > radius) {
+            await this.prisma.attendanceException.create({
+              data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'out_of_geofence', severity: 'medium', details: JSON.stringify({ reason: 'out_of_geofence_out', distance_m: Math.round(dist), radius_m: radius, gps: locOut.obj }) },
+            });
+          }
+        }
+      }
+    } catch {}
     return updated;
   }
 

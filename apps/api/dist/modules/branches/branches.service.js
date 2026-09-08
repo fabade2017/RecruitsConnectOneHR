@@ -46,6 +46,9 @@ let BranchesService = class BranchesService {
                 name: dto.name,
                 address: dto.address || null,
                 location: dto.location || null,
+                latitude: dto.latitude != null ? Number(dto.latitude) : dto.lat != null ? Number(dto.lat) : null,
+                longitude: dto.longitude != null ? Number(dto.longitude) : dto.lng != null ? Number(dto.lng) : null,
+                gpsRadius: dto.gpsRadius != null ? Number(dto.gpsRadius) : dto.gps_radius != null ? Number(dto.gps_radius) : 200,
                 isHeadOffice: dto.isHeadOffice ?? dto.is_head_office ?? false,
             },
         });
@@ -61,6 +64,18 @@ let BranchesService = class BranchesService {
             data.address = dto.address;
         if (dto.location !== undefined)
             data.location = dto.location;
+        if (dto.latitude !== undefined)
+            data.latitude = Number(dto.latitude);
+        if (dto.lat !== undefined)
+            data.latitude = Number(dto.lat);
+        if (dto.longitude !== undefined)
+            data.longitude = Number(dto.longitude);
+        if (dto.lng !== undefined)
+            data.longitude = Number(dto.lng);
+        if (dto.gpsRadius !== undefined)
+            data.gpsRadius = Number(dto.gpsRadius);
+        if (dto.gps_radius !== undefined)
+            data.gpsRadius = Number(dto.gps_radius);
         if (dto.isHeadOffice !== undefined)
             data.isHeadOffice = dto.isHeadOffice;
         if (dto.is_head_office !== undefined)

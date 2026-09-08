@@ -77,6 +77,9 @@ model Branch {
   name           String
   address        String?
   location       String?
+  latitude       Float?       @map("latitude")
+  longitude      Float?       @map("longitude")
+  gpsRadius      Int?         @default(200) @map("gps_radius") // meters geofence
   isHeadOffice   Boolean      @default(false) @map("is_head_office")
   createdAt      DateTime     @default(now()) @map("created_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
