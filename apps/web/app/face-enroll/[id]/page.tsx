@@ -4,7 +4,6 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { GlassCard, Pill } from '../../../components/ui/GlassCard';
 import { Camera, Check, X, AlertTriangle, ShieldCheck, ArrowLeft, RefreshCw, Eye } from 'lucide-react';
-import { loadFaceModels, getDescriptorFromCanvas, descriptorToArray } from '../../../lib/face';
 
 export default function FaceEnrollPage() {
   const params = useParams() as { id: string };
@@ -22,6 +21,9 @@ export default function FaceEnrollPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [faceModelReady, setFaceModelReady] = useState(false);
+  const loadModels = async () => {
+    try { const { loadFaceModels } = await import('../../../lib/face'); await loadFaceModels(); setFaceModelReady(true); } catch { setFaceModelReady(false); }
+  };
 
   const auth = () => ({ Authorization: `Bearer ${localStorage.getItem('onehr_token')}` });
 
@@ -32,7 +34,7 @@ export default function FaceEnrollPage() {
     fetch(`${api}/employees/${id}/face-profile`, { headers: auth() }).then(r=>r.json()).then(setEnrolled).catch(()=>{});
   }, [id]);
 
-  useEffect(() => { loadFaceModels().then(()=> setFaceModelReady(true)).catch(()=> setFaceModelReady(false)); }, []);
+  useEffect(() => { loadModels(); }, []);
   useEffect(() => {
     let s: MediaStream | null = null;
     (async () => {
@@ -74,6 +76,7 @@ export default function FaceEnrollPage() {
     // Generate descriptor for intelligent matching
     let desc: number[] | null = null;
     try {
+      const { getDescriptorFromCanvas, descriptorToArray } = await import('../../../lib/face');
       const d = await getDescriptorFromCanvas(c);
       if (d) { desc = descriptorToArray(d); }
     } catch {}

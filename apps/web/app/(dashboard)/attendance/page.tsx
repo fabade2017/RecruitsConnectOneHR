@@ -5,7 +5,6 @@ import { StatCard } from '../../../components/ui/StatCard';
 import { Clock, Timer, AlertTriangle, CalendarCheck, MapPin, Fingerprint, QrCode, Smartphone, Building2, Camera, Eye, ShieldCheck, Activity, X, Check, RefreshCw } from 'lucide-react';
 import dynamic from 'next/dynamic';
 const AttendanceMap = dynamic(() => import('../../../components/AttendanceMap'), { ssr: false });
-import { loadFaceModels, getDescriptorFromCanvas, getDescriptorFromVideo, descriptorToArray } from '../../../lib/face';
 
 function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean; onClose: () => void; onCapture: (base64: string, meta: any) => void; action: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -94,7 +93,7 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
   }, [open, liveness]);
 
   const [descriptor, setDescriptor] = useState<number[] | null>(null);
-  useEffect(()=>{ loadFaceModels().catch(()=>{}); }, []);
+  useEffect(()=>{ import('../../../lib/face').then(m=> m.loadFaceModels().catch(()=>{})).catch(()=>{}); }, []);
   const snap = async () => {
     if (!videoRef.current || !canvasRef.current) return;
     const v = videoRef.current;
@@ -107,8 +106,9 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
     // Intelligent descriptor for true biometric
     let desc: number[] | null = null;
     try {
-      const d = await getDescriptorFromCanvas(c);
-      if (d) { desc = descriptorToArray(d); setDescriptor(desc); }
+      const { getDescriptorFromCanvas: gdc, descriptorToArray: dta } = await import('../../../lib/face');
+      const d = await gdc(c);
+      if (d) { desc = dta(d); setDescriptor(desc); }
     } catch {}
     const meta: any = { motion, faceDetected, liveness, timestamp: new Date().toISOString(), width: c.width, height: c.height, descriptor: desc };
     onCapture(base64, meta);

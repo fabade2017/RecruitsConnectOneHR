@@ -1,14 +1,14 @@
 {
   "buildCommand": "npm run build --workspace=apps/web",
-  "installCommand": "npm install",
+  "installCommand": "npm install --legacy-peer-deps",
   "framework": "nextjs",
   "outputDirectory": "apps/web/.next",
   "regions": ["iad1"],
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://api.yourdomain.com/v1",
-    "NEXT_PUBLIC_CHATBOT_API": "https://chatbot.yourdomain.com"
+    "NEXT_PUBLIC_API_URL": "https://recruits-connect-one-hr-api.onrender.com/v1",
+    "NEXT_PUBLIC_CHATBOT_API": "https://customer-service-agent-sr5j.onrender.com"
   },
   "rewrites": [
-    { "source": "/v1/:path*", "destination": "https://api.yourdomain.com/v1/:path*" }
+    { "source": "/v1/:path*", "destination": "https://recruits-connect-one-hr-api.onrender.com/v1/:path*" }
   ]
 }
