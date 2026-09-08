@@ -40,6 +40,7 @@ const audit_module_1 = require("./modules/audit/audit.module");
 const chat_module_1 = require("./modules/chat/chat.module");
 const jwt_auth_guard_1 = require("./common/guards/jwt-auth.guard");
 const rbac_guard_1 = require("./common/guards/rbac.guard");
+const module_guard_1 = require("./common/guards/module.guard");
 const audit_log_interceptor_1 = require("./common/interceptors/audit-log.interceptor");
 const tenant_interceptor_1 = require("./common/interceptors/tenant.interceptor");
 let AppModule = class AppModule {
@@ -81,6 +82,7 @@ exports.AppModule = AppModule = __decorate([
         providers: [
             { provide: core_1.APP_GUARD, useClass: jwt_auth_guard_1.JwtAuthGuard },
             { provide: core_1.APP_GUARD, useClass: rbac_guard_1.RbacGuard },
+            { provide: core_1.APP_GUARD, useClass: module_guard_1.ModuleGuard },
             { provide: core_1.APP_INTERCEPTOR, useClass: tenant_interceptor_1.TenantInterceptor },
             { provide: core_1.APP_INTERCEPTOR, useClass: audit_log_interceptor_1.AuditLogInterceptor },
         ],

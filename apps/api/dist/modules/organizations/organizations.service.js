@@ -122,6 +122,34 @@ let OrganizationsService = class OrganizationsService {
     listAll() {
         return this.prisma.organization.findMany({ orderBy: { createdAt: 'desc' }, include: { _count: { select: { employees: true, branches: true, users: true } } } });
     }
+    async getSubscription(organizationId) {
+        const sub = await this.prisma.organizationSubscription.findFirst({
+            where: { organizationId, status: 'active' },
+            include: { plan: { include: { modules: true } }, organization: true },
+            orderBy: { createdAt: 'desc' },
+        });
+        if (!sub)
+            return { hasSubscription: false, message: 'No active subscription — contact Super Admin' };
+        const catalog = await this.prisma.moduleCatalog.findMany({ where: { key: { in: sub.plan.modules.map(m => m.moduleKey) } } });
+        const catMap = new Map(catalog.map(c => [c.key, c]));
+        const modulesWithPrice = sub.plan.modules.map(m => ({
+            ...m,
+            catalog: catMap.get(m.moduleKey) || null,
+            effectivePrice: m.price != null ? Number(m.price) : (catMap.get(m.moduleKey) ? Number(catMap.get(m.moduleKey).basePrice) : 0),
+        }));
+        const allCatalog = await this.prisma.moduleCatalog.findMany({ orderBy: { key: 'asc' } });
+        const enabledKeys = new Set(sub.plan.modules.map(m => m.moduleKey));
+        const disabledModules = allCatalog.filter(c => !enabledKeys.has(c.key));
+        return {
+            hasSubscription: true,
+            subscription: sub,
+            plan: { ...sub.plan, modules: modulesWithPrice },
+            totalModulePrice: modulesWithPrice.reduce((s, m) => s + m.effectivePrice, 0),
+            totalPrice: Number(sub.plan.price) + modulesWithPrice.reduce((s, m) => s + m.effectivePrice, 0),
+            disabledModules,
+            allCatalog,
+        };
+    }
     async checkAcronym(acronym) {
         const ac = (acronym || '').toUpperCase().trim();
         if (!ac)

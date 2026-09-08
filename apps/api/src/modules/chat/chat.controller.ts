@@ -5,10 +5,12 @@ import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { CreateConversationDto, SendMessageDto, AddParticipantsDto, UpdateConversationDto } from './dto';
 import { RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 
 @ApiTags('chat')
 @ApiBearerAuth()
 @Controller('chat')
+@RequireModule('chat')
 export class ChatController {
   constructor(private svc: ChatService, private gateway: ChatGateway) {}
 

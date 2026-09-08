@@ -13,7 +13,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Protected HR routes — require auth
-  const protectedPrefixes = ['/hr', '/executive', '/manager', '/employee', '/dashboard', '/payroll', '/jobs', '/learning', '/compliance', '/attendance', '/leave', '/employees', '/recruitment', '/admin', '/onboarding', '/shifts', '/projects', '/performance', '/engagement', '/reports', '/analytics', '/workflows', '/integrations', '/settings', '/documents', '/assets', '/chat'];
+  const protectedPrefixes = ['/hr', '/executive', '/manager', '/employee', '/dashboard', '/payroll', '/jobs', '/learning', '/compliance', '/attendance', '/leave', '/employees', '/recruitment', '/admin', '/onboarding', '/shifts', '/projects', '/performance', '/engagement', '/reports', '/analytics', '/workflows', '/integrations', '/settings', '/documents', '/assets', '/chat', '/subscriptions'];
   const isProtected = protectedPrefixes.some((p) => pathname.startsWith(p));
 
   if (isProtected && !token) {

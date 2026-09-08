@@ -31,6 +31,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RbacGuard } from './common/guards/rbac.guard';
+import { ModuleGuard } from './common/guards/module.guard';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
@@ -69,6 +70,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RbacGuard },
+    { provide: APP_GUARD, useClass: ModuleGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
   ],

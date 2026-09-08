@@ -52,6 +52,27 @@ export class AdminController {
   @RequirePermissions('admin:manage')
   createPermission(@Body() dto: any) { return this.svc.createPermission(dto); }
 
+  // ===== Module Catalog (pricing) =====
+  @Get('module-catalog')
+  @RequirePermissions('admin:manage')
+  moduleCatalog() { return this.svc.listModuleCatalog(); }
+
+  @Post('module-catalog')
+  @RequirePermissions('admin:manage')
+  upsertModuleCatalog(@Body() dto: any) { return this.svc.upsertModuleCatalog(dto); }
+
+  @Patch('module-catalog/:key')
+  @RequirePermissions('admin:manage')
+  updateModuleCatalog(@Param('key') key: string, @Body() dto: any) { return this.svc.updateModuleCatalog(key, dto); }
+
+  @Delete('module-catalog/:key')
+  @RequirePermissions('admin:manage')
+  deleteModuleCatalog(@Param('key') key: string) { return this.svc.deleteModuleCatalog(key); }
+
+  @Get('plans/pricing')
+  @RequirePermissions('admin:manage')
+  plansWithPricing() { return this.svc.getPlansWithPricing(); }
+
   // ===== Company Groups (Group of Companies) =====
   @Get('groups')
   @RequirePermissions('admin:manage')
@@ -101,7 +122,11 @@ export class AdminController {
   @Post('plans/:id/modules')
   @RequirePermissions('admin:manage')
   @ApiOperation({ summary: 'Assign modules to subscription plan (Super Admin)' })
-  assignModules(@Param('id') planId: string, @Body() dto: { modules: string[] }) { return this.svc.assignModulesToPlan(planId, dto.modules); }
+  assignModules(@Param('id') planId: string, @Body() dto: { modules: any[] }) { return this.svc.assignModulesToPlan(planId, dto.modules); }
+
+  @Patch('plans/:id/modules/:moduleKey/price')
+  @RequirePermissions('admin:manage')
+  setModulePrice(@Param('id') planId: string, @Param('moduleKey') moduleKey: string, @Body() dto: { price: number }) { return this.svc.setModulePrice(planId, moduleKey, dto.price); }
 
   @Delete('plans/:id/modules/:moduleKey')
   @RequirePermissions('admin:manage')

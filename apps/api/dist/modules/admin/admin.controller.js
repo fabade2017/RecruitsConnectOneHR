@@ -33,6 +33,12 @@ let AdminController = class AdminController {
     permissionsGrouped() { return this.svc.listPermissionsGrouped(); }
     modules() { return this.svc.listModules(); }
     createPermission(dto) { return this.svc.createPermission(dto); }
+    // ===== Module Catalog (pricing) =====
+    moduleCatalog() { return this.svc.listModuleCatalog(); }
+    upsertModuleCatalog(dto) { return this.svc.upsertModuleCatalog(dto); }
+    updateModuleCatalog(key, dto) { return this.svc.updateModuleCatalog(key, dto); }
+    deleteModuleCatalog(key) { return this.svc.deleteModuleCatalog(key); }
+    plansWithPricing() { return this.svc.getPlansWithPricing(); }
     // ===== Company Groups (Group of Companies) =====
     groups() { return this.svc.listGroups(); }
     group(id) { return this.svc.getGroup(id); }
@@ -47,6 +53,7 @@ let AdminController = class AdminController {
     createPlan(dto) { return this.svc.createPlan(dto); }
     updatePlan(id, dto) { return this.svc.updatePlan(id, dto); }
     assignModules(planId, dto) { return this.svc.assignModulesToPlan(planId, dto.modules); }
+    setModulePrice(planId, moduleKey, dto) { return this.svc.setModulePrice(planId, moduleKey, dto.price); }
     removeModule(planId, moduleKey) { return this.svc.removeModuleFromPlan(planId, moduleKey); }
     subscriptions(orgId, groupId) { return this.svc.listSubscriptions(orgId, groupId); }
     assignSubscription(dto) { return this.svc.assignSubscription(dto); }
@@ -132,6 +139,45 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "createPermission", null);
+__decorate([
+    (0, common_1.Get)('module-catalog'),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "moduleCatalog", null);
+__decorate([
+    (0, common_1.Post)('module-catalog'),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "upsertModuleCatalog", null);
+__decorate([
+    (0, common_1.Patch)('module-catalog/:key'),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    __param(0, (0, common_1.Param)('key')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "updateModuleCatalog", null);
+__decorate([
+    (0, common_1.Delete)('module-catalog/:key'),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    __param(0, (0, common_1.Param)('key')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "deleteModuleCatalog", null);
+__decorate([
+    (0, common_1.Get)('plans/pricing'),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "plansWithPricing", null);
 __decorate([
     (0, common_1.Get)('groups'),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
@@ -232,6 +278,16 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "assignModules", null);
+__decorate([
+    (0, common_1.Patch)('plans/:id/modules/:moduleKey/price'),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('moduleKey')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "setModulePrice", null);
 __decorate([
     (0, common_1.Delete)('plans/:id/modules/:moduleKey'),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),

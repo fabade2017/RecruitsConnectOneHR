@@ -20,6 +20,7 @@ const chat_service_1 = require("./chat.service");
 const chat_gateway_1 = require("./chat.gateway");
 const dto_1 = require("./dto");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let ChatController = class ChatController {
     svc;
     gateway;
@@ -262,5 +263,6 @@ exports.ChatController = ChatController = __decorate([
     (0, swagger_1.ApiTags)('chat'),
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.Controller)('chat'),
+    (0, module_guard_1.RequireModule)('chat'),
     __metadata("design:paramtypes", [chat_service_1.ChatService, chat_gateway_1.ChatGateway])
 ], ChatController);

@@ -34,6 +34,12 @@ let OrganizationsController = class OrganizationsController {
     updateBranding(id, dto) { return this.svc.updateBranding(id, dto); }
     uploadLogo(id, file) { return this.svc.uploadLogo(id, file); }
     uploadLogoFile(id, file) { return this.svc.uploadLogo(id, file); }
+    subscription(id, req) {
+        // org_admin can view own, super_admin can view any, others can view own org only
+        if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id)
+            throw new (require('@nestjs/common').ForbiddenException)('Can only view own organization subscription');
+        return this.svc.getSubscription(id);
+    }
     health(id, date) { return this.svc.healthScore(id, date); }
 };
 exports.OrganizationsController = OrganizationsController;
@@ -126,6 +132,15 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "uploadLogoFile", null);
+__decorate([
+    (0, common_1.Get)(':id/subscription'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], OrganizationsController.prototype, "subscription", null);
 __decorate([
     (0, common_1.Get)(':id/health-score'),
     (0, rbac_guard_1.Roles)('executive', 'org_admin', 'hr_admin', 'super_admin'),

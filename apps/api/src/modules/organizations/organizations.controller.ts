@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseInterceptors, UploadedFile, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
 import { OrganizationsService } from './organizations.service';
@@ -19,5 +19,13 @@ export class OrganizationsController {
   @Patch(':id/branding') @Roles('org_admin','super_admin') @RequirePermissions('employee:*') updateBranding(@Param('id') id: string, @Body() dto: any) { return this.svc.updateBranding(id, dto); }
   @Post(':id/logo') @Roles('org_admin','super_admin') @RequirePermissions('employee:*') @UseInterceptors(FileInterceptor('logo')) uploadLogo(@Param('id') id: string, @UploadedFile() file: any) { return this.svc.uploadLogo(id, file); }
   @Post(':id/logo/file') @Roles('org_admin','super_admin') @RequirePermissions('employee:*') @UseInterceptors(FileInterceptor('file')) uploadLogoFile(@Param('id') id: string, @UploadedFile() file: any) { return this.svc.uploadLogo(id, file); }
+  @Get(':id/subscription')
+  @RequirePermissions('employee:read')
+  subscription(@Param('id') id: string, @Req() req: any) {
+    // org_admin can view own, super_admin can view any, others can view own org only
+    if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id) throw new (require('@nestjs/common').ForbiddenException)('Can only view own organization subscription');
+    return this.svc.getSubscription(id);
+  }
+
   @Get(':id/health-score') @Roles('executive','org_admin','hr_admin','super_admin') @RequirePermissions('analytics:read') health(@Param('id') id: string, @Query('date') date: string) { return this.svc.healthScore(id, date); }
 }

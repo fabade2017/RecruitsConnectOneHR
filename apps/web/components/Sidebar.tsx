@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, UserPlus, Clock, CalendarCheck, Timer, Briefcase, Wallet, TrendingUp, GraduationCap, Heart, ShieldCheck, FileText, Boxes, ArrowUpCircle, UserMinus, Users2, Scale, Headset, BarChart3, Brain, Workflow, Plug, Settings,
-  MapPin, AlertTriangle, Building2, ChevronLeft, ChevronRight, LogOut, Sparkles, Layers, MessageCircle
+  MapPin, AlertTriangle, Building2, ChevronLeft, ChevronRight, LogOut, Sparkles, Layers, MessageCircle, CreditCard
 } from 'lucide-react';
 
 type NavSection = { title: string; items: { href: string; label: string; icon: any; badge?: string; roles?: string[] }[] };
@@ -48,6 +48,7 @@ const NAV: NavSection[] = [
     { href: '/intelligence', label: 'Intelligence', icon: Brain },
   ]},
   { title: 'SYSTEM', items: [
+      { href: '/subscriptions', label: 'Subscription', icon: CreditCard },
       { href: '/audit', label: 'Audit Trail', icon: ShieldCheck },
       { href: '/workflows', label: 'Automation', icon: Workflow },
       { href: '/integrations', label: 'Integrations', icon: Plug },
