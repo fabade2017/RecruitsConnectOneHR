@@ -322,8 +322,9 @@ export default function SuperAdminPage() {
                 <div className="text-xs text-slate-500">{p.description}</div>
                 <div className="mt-2 flex items-center gap-2"><span className="text-lg font-black">₦{Number(p.price).toLocaleString()}</span><span className="text-xs text-slate-500">/ {p.billingCycle}</span><span className="ml-auto text-xs bg-slate-50 rounded-full px-2 py-1">{p.maxEmployees} emp • {p.maxBranches} branches</span></div>
                 <div className="mt-3 flex flex-wrap gap-1">
-                  {p.modules?.slice(0,6).map((m:any)=> <span key={m.id} className="text-[11px] bg-slate-50 border rounded-full px-2 py-0.5">{m.moduleKey}</span>)}
-                  {p.modules?.length>6 && <span className="text-xs text-slate-500">+{p.modules.length-6} more</span>}
+                  {(p.modules || []).slice(0,6).map((m:any)=> <span key={m.id || m.moduleKey} className="text-[11px] bg-slate-50 border rounded-full px-2 py-0.5">{m.moduleKey || m}</span>)}
+                  {(p.modules?.length||0)>6 && <span className="text-xs text-slate-500">+{p.modules.length-6} more</span>}
+                  {(!p.modules || p.modules.length===0) && <span className="text-xs text-slate-400">No modules assigned</span>}
                 </div>
                 <div className="mt-3 text-xs text-slate-500">API: <code>POST /v1/admin/plans/:id/modules</code> to assign modules</div>
               </GlassCard>
@@ -358,8 +359,8 @@ export default function SuperAdminPage() {
                   {pending.map((o:any)=> (
                     <div key={o.id} className="bg-white rounded-xl border p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
                       <div>
-                        <div className="font-semibold">{o.name} <span className="font-mono text-xs bg-slate-900 text-white px-2 py-0.5 rounded-full">{o.acronym}</span> <span className="text-xs text-slate-500">• {o.industryTemplate}</span></div>
-                        <div className="text-xs text-slate-500">Created {new Date(o.createdAt).toLocaleString()} • {o._count?.users || 0} users • {o._count?.employees || 0} employees • No plan</div>
+                        <div className="font-semibold">{o.name || '—'} <span className="font-mono text-xs bg-slate-900 text-white px-2 py-0.5 rounded-full">{o.acronym || '—'}</span> <span className="text-xs text-slate-500">• {o.industryTemplate || '—'}</span></div>
+                        <div className="text-xs text-slate-500">Created {o.createdAt ? new Date(o.createdAt).toLocaleString() : '—'} • {o._count?.users || 0} users • {o._count?.employees || 0} employees • No plan</div>
                       </div>
                       <div className="flex gap-2">
                         <select id={`plan-${o.id}`} defaultValue="" className="border rounded-xl px-3 py-2 text-sm bg-white">
@@ -394,15 +395,15 @@ export default function SuperAdminPage() {
                     const needsOnboarding = !o.subscriptions?.length;
                     return (
                       <tr key={o.id} className={`hover:bg-slate-50/50 ${needsOnboarding ? 'bg-amber-50/30' : ''}`}>
-                        <td className="p-3"><div className="font-semibold flex items-center gap-2">{o.name} {needsOnboarding && <span className="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full">NEW</span>}</div><div className="text-xs text-slate-500 font-mono">{o.id.slice(0,8)}</div></td>
-                        <td className="p-2"><span className="font-mono text-xs bg-slate-900 text-white px-2 py-1 rounded-full">{o.acronym}</span></td>
-                        <td className="p-2 text-xs"><Pill tone="slate">{o.industryTemplate}</Pill></td>
+                        <td className="p-3"><div className="font-semibold flex items-center gap-2">{o.name || '—'} {needsOnboarding && <span className="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full">NEW</span>}</div><div className="text-xs text-slate-500 font-mono">{o.id ? o.id.slice(0,8) : '—'}</div></td>
+                        <td className="p-2"><span className="font-mono text-xs bg-slate-900 text-white px-2 py-1 rounded-full">{o.acronym || '—'}</span></td>
+                        <td className="p-2 text-xs"><Pill tone="slate">{o.industryTemplate || '—'}</Pill></td>
                         <td className="p-2 text-center text-xs">{o._count?.users ?? '—'}</td>
                         <td className="p-2 text-center text-xs">{o._count?.employees ?? '—'}</td>
                         <td className="p-2 text-xs">{o.companyGroup?.name || <span className="text-slate-400">—</span>}</td>
                         <td className="p-2 text-xs">{o.subscriptions?.[0]?.plan?.name ? <Pill tone="emerald">{o.subscriptions[0].plan.name}</Pill> : <Pill tone="amber">Needs onboarding</Pill>}</td>
                         <td className="p-2"><Pill tone={needsOnboarding ? 'amber' : 'emerald'}>{needsOnboarding ? 'pending' : 'active'}</Pill></td>
-                        <td className="p-2 text-xs text-slate-500">{new Date(o.createdAt).toLocaleDateString()}</td>
+                        <td className="p-2 text-xs text-slate-500">{o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '—'}</td>
                       </tr>
                     );
                   })}
