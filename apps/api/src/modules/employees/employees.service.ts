@@ -68,11 +68,32 @@ export class EmployeesService {
         const now = new Date();
         const pwd = `${org.acronym}${String(now.getMonth()+1).padStart(2,'0')}${now.getFullYear()}${dobDay}`;
         const hash = await bcrypt.hash(pwd, 10);
-        await this.prisma.user.create({ data: { organizationId: orgId, email, passwordHash: hash, role: dto.role || 'employee', mustChangePassword: true } });
+        const newUser = await this.prisma.user.create({ data: { organizationId: orgId, email, phone: dto.phone || undefined, passwordHash: hash, role: dto.role || 'employee', mustChangePassword: true } });
+        // Link employee to user so list/edit returns user relation
+        try {
+          employee = await this.prisma.employee.update({ where: { id: employee.id }, data: { userId: newUser.id } });
+        } catch {}
         // Return employee with password hint for superadmin template (not stored plain elsewhere)
         (employee as any).generatedPassword = pwd;
         (employee as any).loginEmail = email;
+      } else {
+        // Email exists but employee not linked — link orphan user to this employee
+        if (exists && !employee.userId) {
+          try {
+            employee = await this.prisma.employee.update({ where: { id: employee.id }, data: { userId: exists.id } });
+            // update orphan user phone/role if provided
+            const patch: any = {};
+            if (dto.phone) patch.phone = dto.phone;
+            if (dto.role) patch.role = dto.role;
+            if (Object.keys(patch).length) await this.prisma.user.update({ where: { id: exists.id }, data: patch }).catch(()=>{});
+          } catch {}
+        }
       }
+    }
+    // Ensure returned employee includes user relation for immediate UI populate
+    if (employee?.id) {
+      const withUser = await this.prisma.employee.findUnique({ where: { id: employee.id }, include: { user: { select: { id: true, email: true, phone: true, role: true } }, department: true, branch: true } }).catch(()=> null);
+      if (withUser) return withUser as any;
     }
     return employee;
   }
@@ -100,7 +121,7 @@ export class EmployeesService {
   }
 
   async findOne(orgId: string, id: string, user?: any) {
-    const emp = await this.prisma.employee.findFirst({ where: { id, organizationId: orgId }, include: { department: true, branch: true, manager: true } });
+    const emp = await this.prisma.employee.findFirst({ where: { id, organizationId: orgId }, include: { user: { select: { id: true, email: true, phone: true, role: true } }, department: true, branch: true, manager: true } });
     if (!emp) throw new NotFoundException('Employee not found');
     if (user && !canAccessEmployee(user, id, emp) && !['org_admin','super_admin','hr_admin','hr_manager','executive','auditor','manager'].includes(user.role)) {
       // For manager, we already checked via canAccess but need to allow hr etc
@@ -145,18 +166,42 @@ export class EmployeesService {
           const exists = await this.prisma.user.findFirst({ where: { email: userUpdates.email, organizationId: orgId, id: { not: empForUser.userId } } });
           if (exists) throw new ConflictException('Email already exists in organization');
         }
-        await this.prisma.user.update({ where: { id: empForUser.userId }, data: userUpdates }).catch(()=>{});
-      } else if (dto.email) {
-        // No user yet — create one with default password
-        const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { acronym: true } });
-        const dobRaw = dto.dob || dto.date_of_birth || dto.birth_date;
-        let dobDay = '00';
-        if (dobRaw) { const d=new Date(dobRaw); if(!isNaN(d.getTime())) dobDay=String(d.getDate()).padStart(2,'0'); }
-        const now=new Date(); const pwd=`${org?.acronym || 'ORG'}${String(now.getMonth()+1).padStart(2,'0')}${now.getFullYear()}${dobDay}`;
-        const hash=await bcrypt.hash(pwd,10);
-        const newUser=await this.prisma.user.create({ data:{ organizationId: orgId, email: dto.email, phone: dto.phone, passwordHash: hash, role: 'employee', mustChangePassword:true }});
-        // Link employee to new user
-        await this.prisma.employee.update({ where:{ id }, data:{ userId: newUser.id }}).catch(()=>{});
+        const updatedUser = await this.prisma.user.update({ where: { id: empForUser.userId }, data: userUpdates });
+        if (!updatedUser) throw new NotFoundException('User not found for employee');
+      } else {
+        // Employee has no linked user — handle email/phone/role changes
+        // If email provided, check for orphan user with same email (created earlier without linking)
+        if (dto.email) {
+          const orphan = await this.prisma.user.findFirst({ where: { email: dto.email, organizationId: orgId } });
+          if (orphan) {
+            // Check if orphan is already linked to another employee
+            const linkedEmp = await this.prisma.employee.findUnique({ where: { userId: orphan.id } });
+            if (linkedEmp && linkedEmp.id !== id) throw new ConflictException('Email already exists in organization');
+            // Link orphan and apply updates (phone/role/email)
+            await this.prisma.user.update({ where: { id: orphan.id }, data: userUpdates });
+            await this.prisma.employee.update({ where: { id }, data: { userId: orphan.id } });
+          } else {
+            // No orphan — create new user with default password and link
+            const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { acronym: true } });
+            const dobRaw = dto.dob || dto.date_of_birth || dto.birth_date || dto.dateOfBirth;
+            let dobDay = '00';
+            if (dobRaw) { const d=new Date(dobRaw); if(!isNaN(d.getTime())) dobDay=String(d.getDate()).padStart(2,'0'); }
+            // also try to fetch current employee DOB for password day fallback
+            if (dobDay === '00') {
+              const cur = await this.prisma.employee.findUnique({ where: { id }, select: { dateOfBirth: true } });
+              if (cur?.dateOfBirth) dobDay = String(new Date(cur.dateOfBirth).getDate()).padStart(2,'0');
+            }
+            const now=new Date(); const pwd=`${org?.acronym || 'ORG'}${String(now.getMonth()+1).padStart(2,'0')}${now.getFullYear()}${dobDay}`;
+            const hash=await bcrypt.hash(pwd,10);
+            const newUser=await this.prisma.user.create({ data:{ organizationId: orgId, email: dto.email, phone: dto.phone, passwordHash: hash, role: dto.role || 'employee', mustChangePassword:true }});
+            await this.prisma.employee.update({ where:{ id }, data:{ userId: newUser.id }});
+          }
+        } else if (userUpdates.phone || userUpdates.role) {
+          // Phone/role update without email and no linked user — nothing to update in users table
+          // Create a placeholder? Instead throw to make caller aware, or silently skip with update to employee if needed
+          // We keep consistency: require email to create user linkage
+          throw new ConflictException('Cannot update phone/role without linked user email — provide email first');
+        }
       }
     }
     // Map frontend snake_case to prisma camelCase + stringify JSON fields
@@ -200,10 +245,11 @@ export class EmployeesService {
     }
     if (Object.keys(map).length === 0 && Object.keys(userUpdates).length===0) throw new ConflictException('No fields to update');
     if (Object.keys(map).length) {
-      return this.prisma.employee.update({ where: { id }, data: map });
+      await this.prisma.employee.update({ where: { id }, data: map });
     }
-    // Only user was updated
-    return this.prisma.employee.findUnique({ where: { id } });
+    // Return fresh employee with user included so frontend can repopulate edit form
+    const fresh = await this.prisma.employee.findUnique({ where: { id }, include: { user: { select: { id: true, email: true, phone: true, role: true } }, department: true, branch: true } });
+    return fresh as any;
   }
 
   async timeline(orgId: string, id: string, date: string, user?: any) {
