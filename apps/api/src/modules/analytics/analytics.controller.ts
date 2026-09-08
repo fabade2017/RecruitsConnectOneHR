@@ -2,8 +2,10 @@ import { Controller, Get, Post, Body, Query, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AnalyticsService } from './analytics.service';
 import { RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 
 @ApiTags('analytics')
+@RequireModule('analytics')
 @Controller('analytics')
 export class AnalyticsController {
   constructor(private svc: AnalyticsService) {}

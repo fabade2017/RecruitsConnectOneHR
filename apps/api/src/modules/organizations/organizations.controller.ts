@@ -3,9 +3,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBody, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { OrganizationsService } from './organizations.service';
 import { Roles, RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 import { Public } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('organizations')
+@RequireModule('people')
 @Controller('organizations')
 export class OrganizationsController {
   constructor(private svc: OrganizationsService) {}

@@ -2,9 +2,11 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req } from '@
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { WorkflowsService } from './workflows.service';
 import { Roles, RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 import { Public } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('workflows')
+@RequireModule('workflow')
 @Controller('workflows')
 export class WorkflowsController {
   constructor(private svc: WorkflowsService) {}

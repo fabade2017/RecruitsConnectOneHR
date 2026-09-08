@@ -2,8 +2,10 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req } from '@
 import { ApiTags } from '@nestjs/swagger';
 import { ShiftsService } from './shifts.service';
 import { Roles, RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 
 @ApiTags('shifts')
+@RequireModule('shifts')
 @Controller()
 export class ShiftsController {
   constructor(private svc: ShiftsService) {}

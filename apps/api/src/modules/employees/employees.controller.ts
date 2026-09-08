@@ -3,8 +3,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBody, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { EmployeesService } from './employees.service';
 import { Roles, RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 
 @ApiTags('employees')
+@RequireModule('people')
 @Controller('employees')
 export class EmployeesController {
   constructor(private svc: EmployeesService) {}

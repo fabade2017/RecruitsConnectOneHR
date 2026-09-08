@@ -2,8 +2,10 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req } from '@
 import { ApiTags } from '@nestjs/swagger';
 import { ComplianceService } from './compliance.service';
 import { Roles, RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 
 @ApiTags('compliance')
+@RequireModule('compliance')
 @Controller('compliance')
 export class ComplianceController {
   constructor(private svc: ComplianceService) {}

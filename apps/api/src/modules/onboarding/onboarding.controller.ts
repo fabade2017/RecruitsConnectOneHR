@@ -2,8 +2,10 @@ import { Controller, Get, Patch, Param, Body, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { OnboardingService } from './onboarding.service';
 import { RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 
 @ApiTags('onboarding')
+@RequireModule('onboarding')
 @Controller('onboarding')
 export class OnboardingController {
   constructor(private svc: OnboardingService) {}

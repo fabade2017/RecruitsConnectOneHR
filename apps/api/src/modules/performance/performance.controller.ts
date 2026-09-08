@@ -2,8 +2,10 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req } from '@
 import { ApiTags } from '@nestjs/swagger';
 import { PerformanceService } from './performance.service';
 import { RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 
 @ApiTags('performance')
+@RequireModule('performance')
 @Controller('performance')
 export class PerformanceController {
   constructor(private svc: PerformanceService) {}

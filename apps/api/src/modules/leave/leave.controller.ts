@@ -2,8 +2,10 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req } from '@
 import { ApiTags } from '@nestjs/swagger';
 import { LeaveService } from './leave.service';
 import { Roles, RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 
 @ApiTags('leave')
+@RequireModule('leave')
 @Controller('leave')
 export class LeaveController {
   constructor(private svc: LeaveService) {}

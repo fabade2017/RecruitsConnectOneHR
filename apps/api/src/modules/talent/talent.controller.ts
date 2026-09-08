@@ -2,8 +2,10 @@ import { Controller, Get, Post, Param, Body, Query, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { TalentService } from './talent.service';
 import { RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 
 @ApiTags('talent')
+@RequireModule('talent_marketplace')
 @Controller()
 export class TalentController {
   constructor(private svc: TalentService) {}

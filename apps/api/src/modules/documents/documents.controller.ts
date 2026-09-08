@@ -3,8 +3,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
 import { DocumentsService } from './documents.service';
 import { RequirePermissions } from '../../common/guards/rbac.guard';
+import { RequireModule } from '../../common/guards/module.guard';
 
 @ApiTags('documents')
+@RequireModule('documents')
 @Controller()
 export class DocumentsController {
   constructor(private svc: DocumentsService) {}

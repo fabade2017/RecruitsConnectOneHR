@@ -7,54 +7,52 @@ import {
   MapPin, AlertTriangle, Building2, ChevronLeft, ChevronRight, LogOut, Sparkles, Layers, MessageCircle, CreditCard
 } from 'lucide-react';
 
-type NavSection = { title: string; items: { href: string; label: string; icon: any; badge?: string; roles?: string[] }[] };
+type NavSection = { title: string; items: { href: string; label: string; icon: any; badge?: string; roles?: string[]; perms?: string[]; module?: string }[] };
 
 const NAV: NavSection[] = [
   { title: 'OVERVIEW', items: [
-    { href: '/chat', label: 'Chat', icon: MessageCircle },
-    { href: '/hr', label: 'Command Center', icon: LayoutDashboard, roles: ['hr_admin','org_admin','hr_manager'] },
-    { href: '/executive', label: 'Executive', icon: Building2, roles: ['executive','org_admin'] },
-    { href: '/manager', label: 'My Team', icon: Users2, roles: ['manager','hr_admin','org_admin'] },
-    { href: '/employee', label: 'Home', icon: LayoutDashboard, roles: ['employee','manager','hr_admin'] },
+    { href: '/chat', label: 'Chat', icon: MessageCircle, perms:['employee:read'], module:'chat' },
+    { href: '/hr', label: 'Command Center', icon: LayoutDashboard, roles: ['hr_admin','org_admin','hr_manager','super_admin'], perms:['attendance:read'], module:'attendance' },
+    { href: '/executive', label: 'Executive', icon: Building2, roles: ['executive','org_admin','super_admin'], perms:['analytics:read'] },
+    { href: '/manager', label: 'My Team', icon: Users2, roles: ['manager','hr_admin','org_admin','super_admin'], perms:['employee:read'] },
+    { href: '/employee', label: 'Home', icon: LayoutDashboard, roles: ['employee','manager','hr_admin','org_admin','super_admin'], perms:['employee:read:self'] },
   ]},
   { title: 'MANAGE PEOPLE', items: [
-    { href: '/employees', label: 'People', icon: Users, badge: 'ID' },
-    { href: '/id-cards', label: 'ID Cards', icon: CreditCard, badge: 'QR' },
-    { href: '/recruitment', label: 'Recruitment / ATS', icon: UserPlus },
-    { href: '/onboarding', label: 'Onboarding', icon: ArrowUpCircle },
-    { href: '/documents', label: 'Documents', icon: FileText },
-    { href: '/assets', label: 'Assets', icon: Boxes },
+    { href: '/employees', label: 'People', icon: Users, badge: 'ID', roles:['hr_admin','org_admin','hr_manager','manager','super_admin'], perms:['employee:read'], module:'people' },
+    { href: '/id-cards', label: 'ID Cards', icon: CreditCard, badge: 'QR', roles:['hr_admin','org_admin','hr_manager','manager','super_admin','employee'], perms:['employee:read'], module:'people' },
+    { href: '/recruitment', label: 'Recruitment / ATS', icon: UserPlus, roles:['hr_admin','org_admin','recruiter','super_admin'], perms:['job:*'], module:'recruitment' },
+    { href: '/onboarding', label: 'Onboarding', icon: ArrowUpCircle, roles:['hr_admin','org_admin','super_admin'], perms:['employee:*'], module:'onboarding' },
+    { href: '/documents', label: 'Documents', icon: FileText, perms:['document:read'], module:'documents' },
+    { href: '/assets', label: 'Assets', icon: Boxes, roles:['hr_admin','org_admin','super_admin'], perms:['employee:read'], module:'assets' },
   ]},
-  // Chat now in OVERVIEW (most prominent) — keep COMMUNICATE for quick access duplicate removed to avoid double link
   { title: 'MANAGE WORK', items: [
-    { href: '/attendance', label: 'Attendance', icon: Clock },
-    { href: '/attendance', label: 'Smart Clocking', icon: Timer },
-    { href: '/shifts', label: 'Shifts & Rosters', icon: CalendarCheck },
-    { href: '/leave', label: 'Leave', icon: CalendarCheck },
-    { href: '/projects', label: 'Tasks & Projects', icon: Briefcase },
+    { href: '/attendance', label: 'Attendance', icon: Clock, perms:['attendance:read'], module:'attendance' },
+    { href: '/shifts', label: 'Shifts & Rosters', icon: CalendarCheck, roles:['hr_admin','org_admin','hr_manager','manager','super_admin'], perms:['shift:*'], module:'shifts' },
+    { href: '/leave', label: 'Leave', icon: CalendarCheck, perms:['leave:read'], module:'leave' },
+    { href: '/projects', label: 'Tasks & Projects', icon: Briefcase, perms:['task:read'], module:'tasks' },
   ]},
   { title: 'MEASURE', items: [
-    { href: '/performance', label: 'Performance', icon: TrendingUp },
-    { href: '/learning', label: 'Learning', icon: GraduationCap },
-    { href: '/engagement', label: 'Engagement', icon: Heart },
-    { href: '/payroll', label: 'Payroll', icon: Wallet },
-    { href: '/compliance', label: 'Compliance', icon: ShieldCheck },
-    { href: '/reports', label: 'Reports', icon: BarChart3 },
-    { href: '/hr', label: 'Live Map', icon: MapPin },
-    { href: '/hr', label: 'Exceptions', icon: AlertTriangle, badge: '17' },
+    { href: '/performance', label: 'Performance', icon: TrendingUp, roles:['hr_admin','org_admin','manager','super_admin'], perms:['employee:read'], module:'performance' },
+    { href: '/learning', label: 'Learning', icon: GraduationCap, perms:['learning:read'], module:'learning' },
+    { href: '/engagement', label: 'Engagement', icon: Heart, roles:['hr_admin','org_admin','super_admin'], perms:['engagement:respond'], module:'engagement' },
+    { href: '/payroll', label: 'Payroll', icon: Wallet, roles:['hr_admin','org_admin','super_admin'], perms:['payroll:read'], module:'payroll' },
+    { href: '/compliance', label: 'Compliance', icon: ShieldCheck, roles:['hr_admin','org_admin','auditor','super_admin'], perms:['compliance:read'], module:'compliance' },
+    { href: '/reports', label: 'Reports', icon: BarChart3, roles:['executive','hr_admin','org_admin','auditor','super_admin'], perms:['report:read'], module:'reporting' },
+    { href: '/hr', label: 'Live Map', icon: MapPin, roles:['hr_admin','org_admin','super_admin'], perms:['attendance:read'], module:'attendance' },
+    { href: '/hr', label: 'Exceptions', icon: AlertTriangle, badge: '17', roles:['hr_admin','org_admin','super_admin'], perms:['attendance:*'], module:'attendance' },
   ]},
   { title: 'PREDICT', items: [
-    { href: '/analytics', label: 'People Analytics', icon: BarChart3 },
-    { href: '/ai-copilot', label: 'AI Copilot', icon: Sparkles },
-    { href: '/intelligence', label: 'Intelligence', icon: Brain },
+    { href: '/analytics', label: 'People Analytics', icon: BarChart3, roles:['executive','hr_admin','org_admin','super_admin'], perms:['analytics:read'], module:'analytics' },
+    { href: '/ai-copilot', label: 'AI Copilot', icon: Sparkles, perms:['employee:read'], module:'ai_copilot' },
+    { href: '/intelligence', label: 'Intelligence', icon: Brain, roles:['executive','hr_admin','org_admin','super_admin'], perms:['analytics:read'], module:'workforce_intelligence' },
   ]},
   { title: 'SYSTEM', items: [
-      { href: '/subscriptions', label: 'Subscription', icon: CreditCard },
-      { href: '/audit', label: 'Audit Trail', icon: ShieldCheck },
-      { href: '/workflows', label: 'Automation', icon: Workflow },
-      { href: '/integrations', label: 'Integrations', icon: Plug },
-      { href: '/settings', label: 'Administration', icon: Settings },
-      { href: '/settings/dropdowns', label: 'Dropdowns', icon: Layers },
+      { href: '/subscriptions', label: 'Subscription', icon: CreditCard, roles:['org_admin','super_admin'], perms:['employee:read'], module:'administration' },
+      { href: '/audit', label: 'Audit Trail', icon: ShieldCheck, roles:['auditor','hr_admin','org_admin','super_admin'], perms:['audit:read'], module:'administration' },
+      { href: '/workflows', label: 'Automation', icon: Workflow, roles:['hr_admin','org_admin','super_admin'], perms:['workflow:*'], module:'workflow' },
+      { href: '/integrations', label: 'Integrations', icon: Plug, roles:['org_admin','super_admin'], perms:['employee:read'], module:'integrations' },
+      { href: '/settings', label: 'Administration', icon: Settings, roles:['org_admin','super_admin','hr_admin'], perms:['employee:*'], module:'administration' },
+      { href: '/settings/dropdowns', label: 'Dropdowns', icon: Layers, roles:['org_admin','super_admin','hr_admin'], perms:['employee:*'], module:'administration' },
     ]},
   { title: 'SUPER ADMIN', items: [
     { href: '/admin', label: 'Super Admin', icon: ShieldCheck, roles: ['super_admin'] },
@@ -72,7 +70,9 @@ export default function Sidebar() {
   const [user, setUser] = useState<any>(null);
   const [branding, setBranding] = useState<any>(null);
   const [chatUnread, setChatUnread] = useState<number>(0);
+  const [allowedModules, setAllowedModules] = useState<Set<string> | null>(null);
   const role = user?.role || null;
+  const userPerms: string[] = (user as any)?.permissions || [];
 
   // Chat unread badge — poll + socket via storage event from ChatProvider
   useEffect(() => {
@@ -113,9 +113,47 @@ export default function Sidebar() {
         }
       }
     } catch {}
+    // Load allowed modules from subscription (module guard)
+    try {
+      const t = localStorage.getItem('onehr_token');
+      const userObj = u ? JSON.parse(u) : null;
+      const orgId = userObj?.org_id || userObj?.organizationId;
+      if (t && orgId) {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1'}/organizations/${orgId}/subscription`, { headers: { Authorization: `Bearer ${t}` } as any })
+          .then(r => r.json()).then(s => {
+            const mods = s?.plan?.modules || s?.modules || [];
+            if (Array.isArray(mods) && mods.length) setAllowedModules(new Set(mods.filter((m:any)=>m.enabled).map((m:any)=>m.moduleKey)));
+            else setAllowedModules(null);
+          }).catch(()=> setAllowedModules(null));
+      }
+    } catch {}
   }, [pathname]);
 
-  const visible = (roles?: string[]) => !roles || !role || roles.includes(role) || ['org_admin','super_admin'].includes(role);
+  const hasPerm = (required?: string[]) => {
+    if (!required || !required.length) return true;
+    if (!userPerms.length) return true; // if no perms in JWT, fallback to role check
+    if (userPerms.includes('*')) return true;
+    return required.every(perm => {
+      if (userPerms.includes(perm)) return true;
+      return userPerms.some(p => {
+        if (p.endsWith(':*')) return perm.startsWith(p.replace(':*', ':'));
+        if (perm.endsWith(':*')) return p.startsWith(perm.replace(':*', ':'));
+        return p.split(':').slice(0,2).join(':') === perm.split(':').slice(0,2).join(':');
+      });
+    });
+  };
+  const visible = (roles?: string[], perms?: string[], module?: string) => {
+    // super_admin/org_admin bypass all
+    if (role === 'super_admin' || role === 'org_admin') return true;
+    if (roles && roles.length && role && !roles.includes(role)) return false;
+    if (roles && roles.length && !role) return false;
+    if (perms && !hasPerm(perms)) return false;
+    if (module && allowedModules && !allowedModules.has(module)) return false;
+    // if no roles/perms/module specified, hide from employee (core RBAC)
+    if (!roles && !perms && !module) return false;
+    if (!roles && role === 'employee' && perms) return hasPerm(perms);
+    return true;
+  };
 
   return (
     <aside className={`${collapsed ? 'w-[72px]' : 'w-[280px]'} shrink-0 sticky top-0 h-[100dvh] flex flex-col transition-all duration-300 z-20`}>
@@ -134,7 +172,7 @@ export default function Sidebar() {
             <div key={sec.title}>
               {!collapsed && <div className="px-3 mb-2 text-[10px] tracking-[0.14em] font-semibold text-white/50">{sec.title}</div>}
               <div className="space-y-1">
-                {sec.items.filter(i => visible(i.roles)).map(item => {
+                {sec.items.filter(i => visible(i.roles, i.perms, i.module)).map(item => {
                   const Icon = item.icon;
                   const active = pathname === item.href || pathname.startsWith(item.href + '/');
                   const isChat = item.href === '/chat';
