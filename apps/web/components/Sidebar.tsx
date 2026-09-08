@@ -19,6 +19,7 @@ const NAV: NavSection[] = [
   ]},
   { title: 'MANAGE PEOPLE', items: [
     { href: '/employees', label: 'People', icon: Users, badge: 'ID' },
+    { href: '/id-cards', label: 'ID Cards', icon: CreditCard, badge: 'QR' },
     { href: '/recruitment', label: 'Recruitment / ATS', icon: UserPlus },
     { href: '/onboarding', label: 'Onboarding', icon: ArrowUpCircle },
     { href: '/documents', label: 'Documents', icon: FileText },

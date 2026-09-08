@@ -132,6 +132,23 @@ export default function EmployeeHome() {
   const workArr = employee?.workArrangement || 'office';
   const skills = (() => { try { return employee?.skills ? JSON.parse(employee.skills) : []; } catch { return []; } })();
   const certs = 2; // could fetch from /certifications but keep simple
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !employee) return;
+    if (file.size > 5*1024*1024) return alert('Photo too large (max 5MB)');
+    setPhotoUploading(true);
+    try {
+      const t = localStorage.getItem('onehr_token');
+      const fd = new FormData();
+      fd.append('photo', file);
+      const res = await fetch(`${api}/employees/${employee.id}/photo`, { method:'POST', headers:{ Authorization:`Bearer ${t}` }, body: fd });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) throw new Error(data.message || 'Upload failed');
+      setEmployee((prev:any)=> ({...prev, photoUrl: data.photoUrl}));
+      alert('Passport photo updated — visible to superadmin/management');
+    } catch(err:any){ alert(err.message); } finally { setPhotoUploading(false); }
+  };
 
   const quickActions: [any, string, string][] = [
     [Clock, 'Clock In/Out', '/attendance'],
@@ -167,14 +184,28 @@ export default function EmployeeHome() {
     <div className="max-w-5xl mx-auto space-y-6">
       <GradientCard gradient="from-slate-900 via-slate-800 to-indigo-900">
         <div className="flex flex-col md:flex-row justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Good {now.getHours() < 12 ? 'Morning' : now.getHours() < 18 ? 'Afternoon' : 'Evening'}, {employee?.jobTitle ? employee.jobTitle.split(' ')[0] : 'there'} 👋</h1>
-            <p className="text-white/70 mt-1">Today&apos;s Schedule <span className="text-white font-semibold">{employee?.workArrangement ? workArr : '—'} • {branch}</span> • {displayName} {employee ? `• ${workArr}` : '• Loading...'}</p>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs">
-              <span className="bg-white text-slate-900 rounded-full px-3 py-1 font-semibold">{workArr}</span>
-              <span className="bg-white/15 text-white rounded-full px-3 py-1">{branch}</span>
-              <span className="bg-white/15 text-white rounded-full px-3 py-1">QR: {employee?.qrCode ? '✓' : displayName}</span>
-              {employee?.grade && <span className="bg-white/15 text-white rounded-full px-3 py-1">Grade {employee.grade}</span>}
+          <div className="flex gap-4">
+            <div className="relative">
+              <img src={employee?.photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${displayName}`} className="w-20 h-20 rounded-2xl object-cover border-2 border-white/20 bg-white" alt="passport"/>
+              <label className="absolute -bottom-2 -right-2 bg-white text-slate-900 rounded-full p-1.5 shadow cursor-pointer hover:bg-slate-100" title="Upload passport photo (visible to superadmin/management)">
+                <Camera size={14}/>
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoUpload} className="hidden" disabled={photoUploading}/>
+              </label>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold">Good {now.getHours() < 12 ? 'Morning' : now.getHours() < 18 ? 'Afternoon' : 'Evening'}, {employee?.jobTitle ? employee.jobTitle.split(' ')[0] : 'there'} 👋</h1>
+              <p className="text-white/70 mt-1">Today&apos;s Schedule <span className="text-white font-semibold">{employee?.workArrangement ? workArr : '—'} • {branch}</span> • {displayName} {employee ? `• ${workArr}` : '• Loading...'}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                <span className="bg-white text-slate-900 rounded-full px-3 py-1 font-semibold">{workArr}</span>
+                <span className="bg-white/15 text-white rounded-full px-3 py-1">{branch}</span>
+                <span className="bg-white/15 text-white rounded-full px-3 py-1">QR: {employee?.qrCode ? '✓' : displayName}</span>
+                {employee?.grade && <span className="bg-white/15 text-white rounded-full px-3 py-1">Grade {employee.grade}</span>}
+                <label className="bg-white/15 text-white rounded-full px-3 py-1 cursor-pointer hover:bg-white/25 flex items-center gap-1">
+                  <Camera size={10}/>{photoUploading ? 'Uploading…' : 'Passport Photo'}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoUpload} className="hidden" disabled={photoUploading}/>
+                </label>
+              </div>
+              <div className="text-[11px] text-white/60 mt-1">Passport photo visible to superadmin/management • 5MB max</div>
             </div>
           </div>
           <div className="text-right">

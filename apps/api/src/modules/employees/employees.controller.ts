@@ -37,6 +37,8 @@ export class EmployeesController {
     res.send(Buffer.from(buffer));
   }
   @Get() @RequirePermissions('employee:read') @ApiQuery({name:'limit', required:false, type:Number, example:20}) @ApiQuery({name:'status', required:false, type:String, example:'active'}) @ApiQuery({name:'search', required:false, type:String, example:'SAMPLE'}) @ApiQuery({name:'department_id', required:false, type:String}) list(@Req() req: any, @Query() q: any) { return this.svc.list(req.orgId, q, req.user); }
+  @Get('qr/verify') @ApiOperation({ summary: 'Verify secured QR token' }) @ApiQuery({name:'token', type:String, description:'JWT from QR secure token'}) async verifyQr(@Query('token') token: string) { return this.svc.verifySecureQr(token); }
+  @Get('id-cards') @RequirePermissions('employee:read') @ApiOperation({ summary: 'List ID cards (RBAC filtered, 8 per foolscap)' }) @ApiQuery({name:'limit', required:false, type:Number, example:50}) @ApiQuery({name:'search', required:false, type:String}) async listIdCards(@Req() req: any, @Query() q: any) { return this.svc.listIdCards(req.orgId, q, req.user); }
   @Get(':id') @RequirePermissions('employee:read') @ApiParam({name:'id', type:String, example:'sample-employee-id'}) get(@Req() req: any, @Param('id') id: string) { return this.svc.findOne(req.orgId, id, req.user); }
   @Patch(':id') @RequirePermissions('employee:*') @ApiParam({name:'id', type:String}) @ApiBody({ schema:{ type:'object', properties:{
     jobTitle:{type:'string', example:'Sample Updated Title'},
@@ -59,7 +61,10 @@ export class EmployeesController {
     date_of_birth:{type:'string', example:'1990-05-15'},
     hire_date:{type:'string', example:'2024-01-15'},
     hireDate:{type:'string', example:'2024-01-15'},
+    photoUrl:{type:'string', example:'data:image/jpeg;base64,... or https://...'},
   }}}) update(@Req() req: any, @Param('id') id: string, @Body() dto: any) { return this.svc.update(req.orgId, id, dto, req.user); }
+  @Post(':id/photo') @RequirePermissions('employee:*') @ApiOperation({ summary: 'Upload passport photo (employee self or hr/management, 5MB, visible to superadmin/management)' }) @ApiParam({name:'id', type:String}) @ApiConsumes('multipart/form-data') @ApiBody({ schema:{ type:'object', properties:{ photo:{type:'string', format:'binary', description:'Passport photo jpeg/png/webp 5MB max'} }}}) @UseInterceptors(FileInterceptor('photo')) async uploadPhoto(@Req() req: any, @Param('id') id: string, @UploadedFile() file: any) { return this.svc.uploadPhoto(req.orgId, id, file, req.user); }
+  @Get(':id/id-card') @RequirePermissions('employee:read') @ApiOperation({ summary: 'Get ID card front/back with secured QR' }) @ApiParam({name:'id', type:String}) async getIdCard(@Req() req: any, @Param('id') id: string) { return this.svc.getIdCardData(req.orgId, id, req.user); }
   @Post(':id/face-profile') @RequirePermissions('employee:*') @ApiParam({name:'id', type:String}) @ApiBody({ schema:{ type:'object', required:['images'], properties:{ images:{type:'array', items:{type:'string'}, example:['data:image/jpeg;base64,...']}, descriptors:{type:'array', items:{type:'array', items:{type:'number'}}, description:'128-d face descriptors'}, consent:{type:'boolean', example:true} }}}) async enrollFace(@Req() req: any, @Param('id') id: string, @Body() dto: any) { return this.svc.enrollFace(req.orgId, id, dto, req.user); }
   @Get(':id/face-profile') @RequirePermissions('employee:read') @ApiParam({name:'id', type:String}) getFace(@Req() req: any, @Param('id') id: string) { return this.svc.getFaceProfile(req.orgId, id, req.user); }
   @Get(':id/timeline') @RequirePermissions('attendance:read') @ApiParam({name:'id', type:String}) @ApiQuery({name:'date', required:true, type:String, example:'2024-01-15'}) timeline(@Req() req: any, @Param('id') id: string, @Query('date') date: string) { return this.svc.timeline(req.orgId, id, date, req.user); }

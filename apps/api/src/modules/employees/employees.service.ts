@@ -2,6 +2,7 @@ import { Injectable, ConflictException, ForbiddenException, NotFoundException } 
 import { PrismaService } from '../../prisma/prisma.service';
 import * as QRCode from 'qrcode';
 import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
 
 function canAccessEmployee(user: any, employeeId: string, employee?: any): boolean {
   const role = user?.role;
@@ -25,6 +26,155 @@ export class EmployeesService {
     if (user.employeeId) return user.employeeId;
     const emp = await this.prisma.employee.findUnique({ where: { userId: user.sub } });
     return emp?.id || null;
+  }
+
+  // Secured QR helpers
+  private async generateSecureQrData(org: any, employee: any): Promise<{ token: string; qrSecure: string }> {
+    const payload = {
+      employeeCode: employee.employeeCode,
+      employeeId: employee.id,
+      organizationId: employee.organizationId,
+      orgAcronym: org.acronym,
+      jobTitle: employee.jobTitle,
+      grade: employee.grade,
+      departmentId: employee.departmentId,
+      branchId: employee.branchId,
+      iat: Math.floor(Date.now() / 1000),
+    };
+    const token = jwt.sign(payload, (process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev') as string, { expiresIn: '10y' } as any);
+    // QR contains secure token (can be verified via /employees/qr/verify)
+    const qrSecure = await QRCode.toDataURL(token);
+    return { token, qrSecure };
+  }
+
+  async verifySecureQr(token: string): Promise<any> {
+    try {
+      const decoded: any = jwt.verify(token, (process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev') as string);
+      const emp = await this.prisma.employee.findUnique({ where: { id: decoded.employeeId }, include: { department: true, branch: true, organization: true, user: { select: { email: true, role: true } } } });
+      if (!emp || emp.employeeCode !== decoded.employeeCode) throw new NotFoundException('Employee not found for QR');
+      return { valid: true, decoded, employee: { id: emp.id, employeeCode: emp.employeeCode, jobTitle: emp.jobTitle, grade: emp.grade, department: emp.department?.name, branch: emp.branch?.name, organization: emp.organization.name, photoUrl: emp.photoUrl } };
+    } catch (e: any) {
+      if (e.name === 'TokenExpiredError') throw new ConflictException('QR expired');
+      throw new ConflictException('Invalid QR: ' + e.message);
+    }
+  }
+
+  async uploadPhoto(orgId: string, employeeId: string, file: any, user?: any): Promise<any> {
+    const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, organizationId: orgId } });
+    if (!emp) throw new NotFoundException('Employee not found');
+    if (user && !canAccessEmployee(user, employeeId, emp) && !['org_admin','super_admin','hr_admin','hr_manager','executive','auditor','manager'].includes(user.role)) {
+      if (user.role === 'employee') {
+        const ownId = await this.resolveEmployeeIdFromUser(user);
+        if (ownId !== employeeId) throw new ForbiddenException('Employees can only upload own photo');
+      }
+    }
+    if (!file || !file.buffer) throw new ConflictException('No photo file uploaded. Use field name \"photo\"');
+    if (file.size > 5 * 1024 * 1024) throw new ConflictException('Photo too large (max 5MB)');
+    const allowedMime = ['image/jpeg','image/png','image/webp','image/jpg'];
+    if (file.mimetype && !allowedMime.includes(file.mimetype)) throw new ConflictException('Invalid photo type (jpeg/png/webp only)');
+    const base64 = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    // For MVP store as data URL (in production use S3). Truncate if needed
+    const updated = await this.prisma.employee.update({ where: { id: employeeId }, data: { photoUrl: base64 } });
+    return { employeeId, photoUrl: base64, message: 'Passport photo updated — visible to superadmin/management' };
+  }
+
+  async getIdCardData(orgId: string, employeeId: string, user?: any): Promise<any> {
+    const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, organizationId: orgId }, include: { department: true, branch: true, organization: true, user: { select: { email: true, phone: true, role: true } } } });
+    if (!emp) throw new NotFoundException('Employee not found');
+    if (user && !canAccessEmployee(user, employeeId, emp) && !['org_admin','super_admin','hr_admin','hr_manager','executive','auditor','manager'].includes(user.role)) {
+      if (user.role === 'employee') {
+        const ownId = await this.resolveEmployeeIdFromUser(user);
+        if (ownId !== employeeId) throw new ForbiddenException('Employees can only view own ID card');
+      }
+    }
+    const org = emp.organization;
+    const { token, qrSecure } = await this.generateSecureQrData(org, emp);
+    // Front/back data
+    return {
+      employee: {
+        id: emp.id,
+        employeeCode: emp.employeeCode,
+        jobTitle: emp.jobTitle,
+        grade: emp.grade,
+        department: emp.department?.name || null,
+        branch: emp.branch?.name || null,
+        photoUrl: emp.photoUrl,
+        hireDate: emp.hireDate,
+        dateOfBirth: emp.dateOfBirth,
+        employmentType: emp.employmentType,
+        workArrangement: emp.workArrangement,
+        status: emp.status,
+        email: emp.user?.email || null,
+        phone: emp.user?.phone || null,
+      },
+      organization: {
+        id: org.id,
+        name: org.name,
+        acronym: org.acronym,
+        logoUrl: org.logoUrl,
+        watermarkEnabled: org.watermarkEnabled,
+      },
+      qr: {
+        legacy: emp.qrCode,
+        secureToken: token,
+        secureQr: qrSecure,
+        verifyUrl: `/v1/employees/qr/verify?token=${encodeURIComponent(token)}`,
+      },
+      card: {
+        front: {
+          title: `${org.name} — Staff ID`,
+          photoUrl: emp.photoUrl,
+          employeeCode: emp.employeeCode,
+          jobTitle: emp.jobTitle,
+          department: emp.department?.name,
+          branch: emp.branch?.name,
+          qrSecure,
+        },
+        back: {
+          organization: org.name,
+          acronym: org.acronym,
+          employeeCode: emp.employeeCode,
+          secureToken: token,
+          disclaimer: 'This card is property of ' + org.name + '. If found, return to HR. Secured QR verifies authenticity.',
+          issuedAt: new Date().toISOString(),
+        },
+      },
+    };
+  }
+
+  async listIdCards(orgId: string, query: any, user?: any): Promise<any> {
+    // RBAC scoping same as list
+    const where: any = { organizationId: orgId };
+    if (query.search) where.OR = [{ employeeCode: { contains: query.search, mode: 'insensitive' } }, { jobTitle: { contains: query.search, mode: 'insensitive' } }];
+    const role = user?.role;
+    if (role === 'employee') {
+      const ownId = await this.resolveEmployeeIdFromUser(user);
+      if (!ownId) return [];
+      where.id = ownId;
+    } else if (role === 'manager') {
+      const ownId = await this.resolveEmployeeIdFromUser(user);
+      const team = await this.prisma.employee.findMany({ where: { organizationId: orgId, managerId: ownId }, select: { id: true } });
+      const ids = [ownId, ...team.map(t => t.id)].filter(Boolean) as string[];
+      where.id = { in: ids };
+    }
+    const employees = await this.prisma.employee.findMany({ where, take: Math.min(parseInt(query.limit || '50'), 100), orderBy: { createdAt: 'desc' }, include: { department: true, branch: true, organization: true, user: { select: { email: true } } } });
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
+    const cards = await Promise.all(employees.map(async (emp) => {
+      const { token, qrSecure } = await this.generateSecureQrData(org, emp);
+      return {
+        id: emp.id,
+        employeeCode: emp.employeeCode,
+        jobTitle: emp.jobTitle,
+        grade: emp.grade,
+        department: emp.department?.name,
+        branch: emp.branch?.name,
+        photoUrl: emp.photoUrl,
+        qrSecure,
+        secureToken: token,
+        organization: { name: org?.name, acronym: org?.acronym, logoUrl: org?.logoUrl },
+      };
+    }));
+    return { total: cards.length, cards };
   }
 
   async create(orgId: string, dto: any, user?: any) {

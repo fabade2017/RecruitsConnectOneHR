@@ -168,6 +168,25 @@ export default function PeoplePage() {
     return departments.length ? departments : allDepartments;
   }, [departments, allDepartments, form.branchId, addForm.branchId, editing, showAdd, deptState.loading]);
 
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, empId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5*1024*1024) return alert('Photo too large (max 5MB)');
+    setPhotoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('photo', file);
+      const res = await fetch(`${api}/employees/${empId}/photo`, { method:'POST', headers: authHeader() as any, body: fd });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) throw new Error(data.message || 'Upload failed');
+      setForm((prev:any)=> ({...prev, photoUrl: data.photoUrl}));
+      setEditing((prev:any)=> prev ? {...prev, photoUrl: data.photoUrl} : prev);
+      // update list
+      setEmployees(prev=> prev.map(emp=> emp.id===empId ? {...emp, photoUrl: data.photoUrl} : emp));
+    } catch(err:any){ alert(err.message); } finally { setPhotoUploading(false); }
+  };
+
   const openEdit = (emp:any) => {
     setEditing(emp);
     setForm({
@@ -184,6 +203,7 @@ export default function PeoplePage() {
       dob: emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString().slice(0,10) : '',
       hireDate: emp.hireDate ? new Date(emp.hireDate).toISOString().slice(0,10) : '',
       skills: (()=>{ try{ const s=typeof emp.skills==='string'? JSON.parse(emp.skills): emp.skills; return Array.isArray(s)? s.join(', '): '' } catch{ return '' }})(),
+      photoUrl: emp.photoUrl || '',
     });
     // trigger linked fetch
     if (emp.branchId) fetchDepartments(emp.branchId);
@@ -550,6 +570,16 @@ export default function PeoplePage() {
                 {renderRoleSelect(form.role || '', (v)=> setForm({...form, role:v}))}
                 {renderBranchSelect(form.branchId, (v)=> { setForm({...form, branchId: v, departmentId: ''}); })}
                 {renderDeptSelect(form.departmentId, (v)=> setForm({...form, departmentId: v}), form.branchId)}
+                <label className="text-sm font-medium md:col-span-2">Passport Photo (visible to superadmin/management)
+                  <div className="flex items-center gap-3 mt-1">
+                    <img src={form.photoUrl || editing?.photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${editing?.employeeCode}`} className="w-16 h-16 rounded-xl object-cover border bg-slate-100" alt="passport"/>
+                    <label className="flex-1 glass rounded-xl px-3 py-2 text-sm flex items-center gap-2 cursor-pointer hover:bg-white">
+                      <Camera size={14}/>{photoUploading ? 'Uploading…' : 'Upload jpg/png/webp 5MB'}
+                      <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e)=>handlePhotoUpload(e, editing.id)} className="hidden" disabled={photoUploading}/>
+                    </label>
+                  </div>
+                  <span className="text-xs text-slate-500">Employee can upload own, HR/Admin can view all • Secured QR uses this photo on ID card</span>
+                </label>
                 <label className="text-sm font-medium md:col-span-2">Skills (comma separated)
                   <input value={form.skills} onChange={e=>setForm({...form, skills:e.target.value})} placeholder="HRIS, Compliance, Payroll" className="w-full mt-1 px-3 py-2.5 rounded-xl border"/>
                 </label>
