@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseInterceptors, UploadedFile, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBody, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { OrganizationsService } from './organizations.service';
 import { Roles, RequirePermissions } from '../../common/guards/rbac.guard';
 import { Public } from '../../common/guards/jwt-auth.guard';
@@ -9,11 +9,11 @@ import { Public } from '../../common/guards/jwt-auth.guard';
 @Controller('organizations')
 export class OrganizationsController {
   constructor(private svc: OrganizationsService) {}
-  @Public() @Post() create(@Body() dto: any) { return this.svc.create(dto); }
-  @Public() @Get('check-acronym') checkAcronym(@Query('acronym') acronym: string) { return this.svc.checkAcronym(acronym || ''); }
-  @Get() @Roles('super_admin','org_admin') list() { return this.svc.listAll(); }
-  @Get(':id') @RequirePermissions('employee:read') get(@Param('id') id: string) { return this.svc.findOne(id); }
-  @Patch(':id') @Roles('org_admin','super_admin') @RequirePermissions('employee:*') update(@Param('id') id: string, @Body() dto: any) { return this.svc.update(id, dto); }
+  @Public() @Post() @ApiOperation({summary:'Register organization'}) @ApiBody({ schema:{ type:'object', required:['name','acronym','adminEmail','adminPassword'], properties:{ name:{type:'string', example:'Sample Org Ltd'}, acronym:{type:'string', example:'SAMPLE'}, adminEmail:{type:'string', example:'sample.admin@example.com'}, adminPassword:{type:'string', example:'Sample@123'}, industryTemplate:{type:'string', example:'generic'}, country:{type:'string', example:'NG'} }}}) create(@Body() dto: any) { return this.svc.create(dto); }
+  @Public() @Get('check-acronym') @ApiQuery({name:'acronym', type:String, example:'SAMPLE'}) checkAcronym(@Query('acronym') acronym: string) { return this.svc.checkAcronym(acronym || ''); }
+  @Get() @Roles('super_admin','org_admin') @ApiOperation({summary:'List organizations'}) list() { return this.svc.listAll(); }
+  @Get(':id') @RequirePermissions('employee:read') @ApiParam({name:'id', type:String}) get(@Param('id') id: string) { return this.svc.findOne(id); }
+  @Patch(':id') @Roles('org_admin','super_admin') @RequirePermissions('employee:*') @ApiParam({name:'id', type:String}) @ApiBody({ schema:{ type:'object', properties:{ name:{type:'string', example:'Sample Org Updated'}, logoUrl:{type:'string', example:'https://example.com/logo.png'}, primaryColor:{type:'string', example:'#0F172A'} }}}) update(@Param('id') id: string, @Body() dto: any) { return this.svc.update(id, dto); }
   @Get(':id/config') @RequirePermissions('employee:read') config(@Param('id') id: string) { return this.svc.getConfig(id); }
   @Get(':id/branding') @RequirePermissions('employee:read') branding(@Param('id') id: string) { return this.svc.getBranding(id); }
   @Patch(':id/branding') @Roles('org_admin','super_admin') @RequirePermissions('employee:*') updateBranding(@Param('id') id: string, @Body() dto: any) { return this.svc.updateBranding(id, dto); }
