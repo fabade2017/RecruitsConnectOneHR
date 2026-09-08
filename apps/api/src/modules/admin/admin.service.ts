@@ -254,15 +254,19 @@ export class AdminService {
             data: { organizationId: org.id, companyGroupId, planId, status: 'active', billingCycle: billingCycle || 'monthly' }
           });
           results.push(sub);
+          await this.prisma.organization.update({ where: { id: org.id }, data: { status: 'active', isActive: true } as any }).catch(()=>{});
         }
       }
       return { group: group.name, assigned: results.length, subscriptions: results };
     }
 
     // Single org assignment
-    return this.prisma.organizationSubscription.create({
+    const sub = await this.prisma.organizationSubscription.create({
       data: { organizationId, planId, status: 'active', billingCycle: billingCycle || 'monthly' }
     });
+    // Activate organization (grant access) on first approval
+    await this.prisma.organization.update({ where: { id: organizationId }, data: { status: 'active', isActive: true } as any }).catch(()=>{});
+    return sub;
   }
 
   async updateSubscription(id: string, dto: any) {

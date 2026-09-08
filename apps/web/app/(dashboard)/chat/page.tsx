@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getApiUrl, getAuthHeaders } from '../../../lib/api';
 import { io, Socket } from 'socket.io-client';
-import { Send, Search, Users, MessageCircle, Plus, X, Check, CheckCheck, MoreVertical, Trash2, LogOut, Edit3, UserPlus, ArrowLeft } from 'lucide-react';
+import { Send, Search, Users, MessageCircle, Plus, X, Check, CheckCheck, MoreVertical, Trash2, LogOut, Edit3, UserPlus, ArrowLeft, Smile, Paperclip, FileText, Image as ImageIcon } from 'lucide-react';
 
 type User = { id: string; email: string; role: string; employee?: any };
 type Conversation = {
@@ -13,7 +13,10 @@ type Conversation = {
 type Message = {
   id: string; conversationId: string; senderId: string; content: string; createdAt: string;
   sender?: User; isEdited?: boolean; isDeleted?: boolean; replyToId?: string; replyTo?: any;
+  messageType?: string; attachments?: string | any[]; expiresAt?: string | null;
 };
+
+const EMOJIS = ['😀','😂','😍','🥰','😊','👍','👏','🙏','❤️','🔥','🎉','✨','😎','🤔','😢','😡','👌','💯','✅','⭐','🚀','💼','📎','🙌'];
 
 function getToken() { if (typeof window === 'undefined') return null; return localStorage.getItem('onehr_token'); }
 function getUser() { try { return JSON.parse(localStorage.getItem('onehr_user')||'null'); } catch { return null; } }
@@ -42,8 +45,11 @@ export default function ChatPage() {
   const [showConvMenu, setShowConvMenu] = useState(false);
   const [editGroupName, setEditGroupName] = useState('');
   const [unreadTotal, setUnreadTotal] = useState(0);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [fileUploading, setFileUploading] = useState(false);
   const socketRef = useRef<Socket|null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const me = getUser();
   const meId = me?.id || me?.sub || '';
 
@@ -233,6 +239,52 @@ export default function ChatPage() {
     setSelected(null); fetchConvs();
   };
 
+  const parseAttachments = (m: Message) => {
+    if (!m.attachments) return [] as any[];
+    try {
+      const arr = typeof m.attachments === 'string' ? JSON.parse(m.attachments as string) : m.attachments;
+      return Array.isArray(arr) ? arr : [];
+    } catch { return []; }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selected) return;
+    if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
+    setFileUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      if (msgInput.trim()) form.append('content', msgInput.trim());
+      const res = await fetch(`${api}/chat/conversations/${selected}/files`, {
+        method: 'POST',
+        headers: { ...authHeaders() } as any,
+        body: form,
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || 'Upload failed');
+      }
+      const msg = await res.json();
+      setMessages(prev => [...prev, msg]);
+      setMsgInput('');
+      setShowEmoji(false);
+      setTimeout(()=> listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior:'smooth'}), 50);
+      // notify via socket already handled by server, but refresh conv preview
+      setConvs(prev=> prev.map(c=> c.id===selected? {...c, lastMessagePreview: `[File] ${file.name}`.slice(0,120), lastMessageAt: new Date().toISOString()}:c));
+    } catch (err:any) {
+      alert(err.message || 'File upload failed');
+    } finally {
+      setFileUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const insertEmoji = (emoji: string) => {
+    setMsgInput(prev => prev + emoji);
+    setShowEmoji(false);
+  };
+
   const selConv = convs.find(c=>c.id===selected);
   const typingForSel = selected ? (typingUsers[selected]||[]) : [];
 
@@ -351,14 +403,43 @@ export default function ChatPage() {
               {messages.map(m=>{
                 const isMe = m.senderId===meId;
                 const isTmp = m.id.startsWith('tmp-');
+                const atts = parseAttachments(m);
+                const isExpired = m.expiresAt && new Date(m.expiresAt).getTime() < Date.now();
+                const hasFile = atts.length>0 && !isExpired && !atts[0]?.expired;
+                const isImage = hasFile && atts[0]?.type?.startsWith('image/');
                 return (
                   <div key={m.id} className={`flex ${isMe?'justify-end':'justify-start'} group`}>
                     <div className={`max-w-[72%] rounded-2xl px-3 py-2 shadow-sm relative ${isMe?'bg-emerald-500 text-white rounded-br-sm':'bg-white border border-slate-200 rounded-bl-sm'} ${m.isDeleted?'opacity-60 italic':''} ${isTmp?'opacity-70':''}`}>
                       {!isMe && selConv?.type==='group' && <div className="text-[11px] font-semibold opacity-70 mb-0.5">{m.sender?.email?.split('@')[0]}</div>}
+                      {/* attachments */}
+                      {hasFile && (
+                        <div className="mb-2 space-y-2">
+                          {atts.map((a:any, idx:number)=> (
+                            a.expired ? <div key={idx} className="text-xs italic opacity-70">📎 File expired after 7 days</div> :
+                            isImage ? (
+                              <a key={idx} href={a.url} target="_blank" rel="noopener noreferrer" className="block">
+                                <img src={a.url} alt={a.name} className="max-w-full rounded-xl max-h-[240px] object-contain border border-white/20" />
+                                <div className="text-xs mt-1 truncate flex items-center gap-1"><ImageIcon size={12}/>{a.name} <span className="opacity-60">• {(a.size/1024).toFixed(1)}KB • expires {a.expiresAt ? new Date(a.expiresAt).toLocaleDateString() : ''}</span></div>
+                              </a>
+                            ) : (
+                              <a key={idx} href={a.url} download={a.name} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 p-2 rounded-xl ${isMe?'bg-white/20':'bg-slate-50 border'} hover:opacity-90`}>
+                                <FileText size={18} className={isMe?'text-white':'text-slate-600'} />
+                                <div className="min-w-0">
+                                  <div className="text-sm truncate font-medium">{a.name}</div>
+                                  <div className="text-xs opacity-60">{(a.size/1024).toFixed(1)}KB • {a.type} • expires {a.expiresAt ? new Date(a.expiresAt).toLocaleDateString() : '7d'}</div>
+                                </div>
+                              </a>
+                            )
+                          ))}
+                          {isExpired && <div className="text-xs italic opacity-70">Expired</div>}
+                        </div>
+                      )}
+                      {!hasFile && atts[0]?.expired && <div className="text-xs italic mb-1 opacity-70">📎 File expired after 7 days</div>}
                       <div className="text-sm whitespace-pre-wrap break-words">{m.content}</div>
                       <div className={`flex items-center gap-1 mt-1 text-[10px] ${isMe?'text-white/80':'text-slate-400'}`}>
                         <span>{new Date(m.createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
                         {m.isEdited && <span>• edited</span>}
+                        {hasFile && !isExpired && <span>• auto-deletes in 7d</span>}
                         {isMe && <span className="ml-1">{isTmp? <span className="opacity-60">○</span> : <CheckCheck size={12}/>}</span>}
                         {isMe && !m.isDeleted && <button onClick={()=>deleteMsg(m.id)} className="opacity-0 group-hover:opacity-100 ml-2 hover:text-red-200"><Trash2 size={12}/></button>}
                       </div>
@@ -376,19 +457,36 @@ export default function ChatPage() {
             </div>
 
             {/* input */}
-            <div className="p-3 border-t bg-white flex gap-2 items-end shrink-0">
-              <textarea
-                value={msgInput}
-                onChange={e=>handleTyping(e.target.value)}
-                onKeyDown={e=>{
-                  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
-                  if(e.key==='Escape') setMsgInput('');
-                }}
-                placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
-                rows={1}
-                className="flex-1 resize-none max-h-[120px] min-h-[44px] rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 bg-slate-50 focus:bg-white"
-              />
-              <button onClick={send} disabled={!msgInput.trim()} className="w-11 h-11 rounded-full bg-emerald-500 text-white flex items-center justify-center hover:bg-emerald-600 disabled:opacity-40 shrink-0"><Send size={18}/></button>
+            <div className="p-3 border-t bg-white shrink-0 relative">
+              {showEmoji && (
+                <div className="absolute bottom-full left-3 mb-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 w-[280px] z-20">
+                  <div className="text-xs font-semibold text-slate-600 mb-2">Emojis</div>
+                  <div className="grid grid-cols-8 gap-1">
+                    {EMOJIS.map(e=> <button key={e} onClick={()=>insertEmoji(e)} className="w-8 h-8 rounded-lg hover:bg-slate-100 text-lg flex items-center justify-center">{e}</button>)}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-2">Files auto-delete after 7 days</div>
+                </div>
+              )}
+              <div className="flex gap-2 items-end">
+                <button onClick={()=>setShowEmoji(v=>!v)} className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 border ${showEmoji?'bg-slate-900 text-white border-slate-900':'bg-white border-slate-200 hover:bg-slate-50'}`} title="Emoji"><Smile size={18}/></button>
+                <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" />
+                <button onClick={()=>fileInputRef.current?.click()} disabled={fileUploading} className="w-11 h-11 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0 hover:bg-slate-50 disabled:opacity-40" title="Attach file (7d expiry)"><Paperclip size={18}/></button>
+                <textarea
+                  value={msgInput}
+                  onChange={e=>handleTyping(e.target.value)}
+                  onKeyDown={e=>{
+                    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+                    if(e.key==='Escape') setMsgInput('');
+                  }}
+                  placeholder="Type a message… (Enter to send, Shift+Enter for newline) • Emojis 😀 • Files 📎"
+                  rows={1}
+                  className="flex-1 resize-none max-h-[120px] min-h-[44px] rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 bg-slate-50 focus:bg-white"
+                />
+                <button onClick={send} disabled={!msgInput.trim() || fileUploading} className="w-11 h-11 rounded-full bg-emerald-500 text-white flex items-center justify-center hover:bg-emerald-600 disabled:opacity-40 shrink-0">
+                  {fileUploading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <Send size={18}/>}
+                </button>
+              </div>
+              {fileUploading && <div className="text-xs text-slate-500 mt-2">Uploading file… will expire in 7 days</div>}
             </div>
           </>
         )}

@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChatController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
 const swagger_1 = require("@nestjs/swagger");
 const chat_service_1 = require("./chat.service");
 const chat_gateway_1 = require("./chat.gateway");
@@ -59,6 +60,15 @@ let ChatController = class ChatController {
         const msg = await this.svc.sendMessage(req.orgId, id, req.user.sub, dto);
         this.gateway.notifyNewMessage(id, msg).catch(() => { });
         return msg;
+    }
+    async uploadFile(req, id, file, body) {
+        const msg = await this.svc.uploadFile(req.orgId, id, req.user.sub, file, body?.content || body?.caption);
+        this.gateway.notifyNewMessage(id, msg).catch(() => { });
+        return msg;
+    }
+    async cleanupFiles(req) {
+        // Triggered by cron (or manually) — cleans files older than 7 days
+        return this.svc.cleanupExpiredFiles();
     }
     async editMessage(req, id, messageId, dto) {
         const msg = await this.svc.editMessage(req.orgId, id, messageId, req.user.sub, dto.content);
@@ -170,6 +180,26 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, dto_1.SendMessageDto]),
     __metadata("design:returntype", Promise)
 ], ChatController.prototype, "sendMessage", null);
+__decorate([
+    (0, common_1.Post)('conversations/:id/files'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.UploadedFile)()),
+    __param(3, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], ChatController.prototype, "uploadFile", null);
+__decorate([
+    (0, common_1.Post)('cleanup/files'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], ChatController.prototype, "cleanupFiles", null);
 __decorate([
     (0, common_1.Patch)('conversations/:id/messages/:messageId'),
     (0, rbac_guard_1.RequirePermissions)('employee:read'),

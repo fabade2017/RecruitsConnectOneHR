@@ -10,6 +10,7 @@ import { Public } from '../../common/guards/jwt-auth.guard';
 export class OrganizationsController {
   constructor(private svc: OrganizationsService) {}
   @Public() @Post() create(@Body() dto: any) { return this.svc.create(dto); }
+  @Public() @Get('check-acronym') checkAcronym(@Query('acronym') acronym: string) { return this.svc.checkAcronym(acronym || ''); }
   @Get() @Roles('super_admin','org_admin') list() { return this.svc.listAll(); }
   @Get(':id') @RequirePermissions('employee:read') get(@Param('id') id: string) { return this.svc.findOne(id); }
   @Patch(':id') @Roles('org_admin','super_admin') @RequirePermissions('employee:*') update(@Param('id') id: string, @Body() dto: any) { return this.svc.update(id, dto); }

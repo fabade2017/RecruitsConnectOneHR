@@ -32,12 +32,30 @@ export class AuthService {
   }
 
   async login(email: string, password: string, orgAcronym?: string) {
-    const user = await this.prisma.user.findFirst({ where: { email } });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!email || !password) throw new UnauthorizedException('Email and password required');
+    if (!orgAcronym || !orgAcronym.trim()) throw new UnauthorizedException('Organization acronym required');
+    const ac = orgAcronym.trim().toUpperCase();
+    // Acronym must exist
+    const orgByAcronym = await this.prisma.organization.findUnique({ where: { acronym: ac } });
+    if (!orgByAcronym) throw new UnauthorizedException('Invalid organization acronym');
+    // Find user by email AND organization (acronym scopes the tenant) — prevents cross-org email collision confusion
+    const user = await this.prisma.user.findFirst({ where: { email, organizationId: orgByAcronym.id } });
+    if (!user) throw new UnauthorizedException('Invalid credentials for this organization');
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
-    const org = await this.prisma.organization.findUnique({ where: { id: user.organizationId } });
-    if (orgAcronym && org?.acronym !== orgAcronym) throw new UnauthorizedException('Organization mismatch');
+    const org = orgByAcronym;
+    // Gate: org must be approved/active unless super_admin
+    if (user.role !== 'super_admin') {
+      if ((org as any).status === 'pending' || (org as any).isActive === false) {
+        // Check if super_admin has granted via active subscription
+        const sub = await this.prisma.organizationSubscription.findFirst({ where: { organizationId: org.id, status: 'active' } });
+        if (!sub) throw new UnauthorizedException('Organization pending approval by Super Admin. You will be notified once activated.');
+        // auto-activate if subscription exists but status still pending (self-heal)
+        if ((org as any).status !== 'active') {
+          await this.prisma.organization.update({ where: { id: org.id }, data: { status: 'active', isActive: true } as any }).catch(()=>{});
+        }
+      }
+    }
     const employee = await this.prisma.employee.findUnique({ where: { userId: user.id }, select: { id: true } });
     const permissions = await this.resolvePermissions(user);
 

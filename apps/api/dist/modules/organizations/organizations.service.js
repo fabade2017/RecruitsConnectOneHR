@@ -122,19 +122,34 @@ let OrganizationsService = class OrganizationsService {
     listAll() {
         return this.prisma.organization.findMany({ orderBy: { createdAt: 'desc' }, include: { _count: { select: { employees: true, branches: true, users: true } } } });
     }
+    async checkAcronym(acronym) {
+        const ac = (acronym || '').toUpperCase().trim();
+        if (!ac)
+            return { available: false, message: 'Acronym required' };
+        if (ac.length < 2 || ac.length > 10)
+            return { available: false, message: 'Acronym must be 2-10 chars' };
+        const exists = await this.prisma.organization.findUnique({ where: { acronym: ac } });
+        return exists ? { available: false, message: 'Acronym already taken' } : { available: true, message: 'Acronym available' };
+    }
     async create(dto) {
         const acronym = (dto.acronym || '').toUpperCase().trim();
         if (!acronym)
             throw new common_1.ConflictException('Acronym required');
+        if (acronym.length < 2 || acronym.length > 10)
+            throw new common_1.ConflictException('Acronym must be 2-10 characters');
+        if (!/^[A-Z0-9_-]+$/.test(acronym))
+            throw new common_1.ConflictException('Acronym must be alphanumeric (A-Z, 0-9, -, _)');
         const exists = await this.prisma.organization.findUnique({ where: { acronym } });
         if (exists)
-            throw new common_1.ConflictException('Acronym already exists');
+            throw new common_1.ConflictException('Acronym already exists — choose another');
         const org = await this.prisma.organization.create({
             data: {
                 name: dto.name,
                 acronym,
                 industryTemplate: dto.industryTemplate || 'generic',
                 config: JSON.stringify({ workdays: ['mon', 'tue', 'wed', 'thu', 'fri'], grace_period_minutes: 10 }),
+                status: 'pending',
+                isActive: false,
             },
         });
         await this.prisma.attendancePolicy.create({

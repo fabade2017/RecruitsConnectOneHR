@@ -25,6 +25,8 @@ model Organization {
   createdAt            DateTime                   @default(now()) @map("created_at")
   updatedAt            DateTime                   @updatedAt @map("updated_at")
   companyGroupId       String?                    @map("company_group_id")
+  status               String                     @default("pending") // pending | active | suspended
+  isActive             Boolean                    @default(false) @map("is_active")
   assets               Asset[]
   attendanceEvents     AttendanceEvent[]
   attendanceExceptions AttendanceException[]
@@ -1058,6 +1060,7 @@ model Message {
   replyToId      String?      @map("reply_to_id")
   isEdited       Boolean      @default(false) @map("is_edited")
   isDeleted      Boolean      @default(false) @map("is_deleted")
+  expiresAt      DateTime?    @map("expires_at") // for file attachments auto-delete after 7 days
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

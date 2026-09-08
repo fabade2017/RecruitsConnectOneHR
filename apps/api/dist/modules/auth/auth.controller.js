@@ -23,7 +23,8 @@ let AuthController = class AuthController {
         this.auth = auth;
     }
     login(body) {
-        return this.auth.login(body.email, body.password, body.org_acronym);
+        const ac = body.org_acronym || body.acronym || body.organizationAcronym;
+        return this.auth.login(body.email, body.password, ac);
     }
     refresh(body) {
         return this.auth.refresh(body.refresh_token);
@@ -39,7 +40,7 @@ exports.AuthController = AuthController;
 __decorate([
     (0, jwt_auth_guard_1.Public)(),
     (0, common_1.Post)('login'),
-    (0, swagger_1.ApiOperation)({ summary: 'Login' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Login - requires email, password and organization acronym' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),

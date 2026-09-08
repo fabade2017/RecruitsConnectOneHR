@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
@@ -70,6 +71,22 @@ export class ChatController {
     const msg = await this.svc.sendMessage(req.orgId, id, req.user.sub, dto);
     this.gateway.notifyNewMessage(id, msg).catch(()=>{});
     return msg;
+  }
+
+  @Post('conversations/:id/files')
+  @RequirePermissions('employee:read')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(@Req() req: any, @Param('id') id: string, @UploadedFile() file: any, @Body() body: any) {
+    const msg = await this.svc.uploadFile(req.orgId, id, req.user.sub, file, body?.content || body?.caption);
+    this.gateway.notifyNewMessage(id, msg).catch(()=>{});
+    return msg;
+  }
+
+  @Post('cleanup/files')
+  @RequirePermissions('employee:read')
+  async cleanupFiles(@Req() req: any) {
+    // Triggered by cron (or manually) — cleans files older than 7 days
+    return this.svc.cleanupExpiredFiles();
   }
 
   @Patch('conversations/:id/messages/:messageId')

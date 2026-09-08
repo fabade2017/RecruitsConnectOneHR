@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 export default function LoginPage() {
   const [email, setEmail] = useState('admin@recruitconnect.ng');
   const [password, setPassword] = useState('Admin@123');
+  const [acronym, setAcronym] = useState('RC');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showClockPopup, setShowClockPopup] = useState(false);
@@ -14,11 +15,12 @@ export default function LoginPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!acronym.trim()) return setError('Organization acronym is required');
     setLoading(true); setError('');
     try {
       const res = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, org_acronym: acronym.trim().toUpperCase(), acronym: acronym.trim().toUpperCase() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Login failed');
@@ -57,9 +59,11 @@ export default function LoginPage() {
         <div>
           <h2 className="text-lg font-bold">Sign in</h2>
           <p className="text-sm text-slate-500">HR Management — Sign in</p>
-          <p className="text-xs text-slate-400 mt-1">Try: admin@recruitconnect.ng / Admin@123 (org_admin)</p>
+          <p className="text-xs text-slate-400 mt-1">Try: RC / admin@recruitconnect.ng / Admin@123 — Acronym + email + password</p>
         </div>
         {error && <div className="bg-red-50 text-red-700 text-sm p-3 rounded">{error}</div>}
+        <input className="w-full border rounded px-3 py-2 font-mono" placeholder="Organization Acronym (e.g. RC)" value={acronym} onChange={e=>setAcronym(e.target.value.toUpperCase())} required />
+        <p className="text-xs text-slate-400 -mt-2">Acronym is required for tenant isolation. Check your welcome email.</p>
         <input className="w-full border rounded px-3 py-2" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} required />
         <input className="w-full border rounded px-3 py-2" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} required />
         <button disabled={loading} className="w-full bg-slate-900 text-white py-2 rounded hover:bg-slate-800 disabled:opacity-50">

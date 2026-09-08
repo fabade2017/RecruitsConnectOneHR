@@ -10,9 +10,10 @@ export class AuthController {
 
   @Public()
   @Post('login')
-  @ApiOperation({ summary: 'Login' })
-  login(@Body() body: { email: string; password: string; org_acronym?: string }) {
-    return this.auth.login(body.email, body.password, body.org_acronym);
+  @ApiOperation({ summary: 'Login - requires email, password and organization acronym' })
+  login(@Body() body: { email: string; password: string; org_acronym?: string; acronym?: string; organizationAcronym?: string }) {
+    const ac = body.org_acronym || body.acronym || body.organizationAcronym;
+    return this.auth.login(body.email, body.password, ac);
   }
 
   @Public()

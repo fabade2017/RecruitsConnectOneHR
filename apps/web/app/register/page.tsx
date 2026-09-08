@@ -9,37 +9,44 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [acronymStatus, setAcronymStatus] = useState<null | { available: boolean; message: string }>(null);
+  const [checkingAcronym, setCheckingAcronym] = useState(false);
   const router = useRouter();
   const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
+
+  const checkAcronym = async (val: string) => {
+    const ac = val.trim().toUpperCase();
+    if (!ac || ac.length < 2) { setAcronymStatus(null); return; }
+    setCheckingAcronym(true);
+    try {
+      const res = await fetch(`${api}/organizations/check-acronym?acronym=${encodeURIComponent(ac)}`);
+      const data = await res.json();
+      setAcronymStatus({ available: data.available, message: data.message });
+    } catch { setAcronymStatus(null); }
+    finally { setCheckingAcronym(false); }
+  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (form.password !== form.confirm) return setError('Passwords do not match');
     if (form.password.length < 6) return setError('Password too short (min 6)');
+    if (acronymStatus && !acronymStatus.available) return setError(acronymStatus.message);
     setLoading(true); setError('');
     try {
-      // Try to create organization via API (if public), fallback to demo
       const res = await fetch(`${api}/organizations`, {
         method: 'POST', headers: { 'Content-Type':'application/json' },
         body: JSON.stringify({ name: form.company, acronym: form.acronym.toUpperCase(), industryTemplate: form.industry, adminEmail: form.email, adminPassword: form.password })
       });
+      const data = await res.json().catch(()=> ({}));
       if (res.ok) {
         setSuccess(true);
-        setTimeout(()=> router.push('/login'), 1800);
+        setTimeout(()=> router.push('/login'), 2500);
         return;
       }
-      // If API not public (401), treat as demo request
-      if (res.status === 401 || res.status === 403) {
-        setSuccess(true);
-        setTimeout(()=> router.push('/login'), 1800);
-        return;
-      }
-      const data = await res.json().catch(()=> ({}));
-      throw new Error(data.message || 'Registration noted — our team will contact you');
+      if (res.status === 409) throw new Error(data.message || 'Acronym already exists — choose another');
+      throw new Error(data.message || 'Registration failed');
     } catch (err:any) {
-      // For demo, show success anyway and redirect to login with seeded creds
-      setSuccess(true);
-      setTimeout(()=> router.push('/login'), 1800);
+      setError(err.message || 'Registration failed');
     } finally { setLoading(false); }
   }
 
@@ -85,13 +92,13 @@ export default function RegisterPage() {
             <p className="text-sm text-slate-500 mt-1">Free for 14 days. Cancel anytime. <Link href="/login" className="text-slate-900 font-semibold underline">Already have account? Login</Link></p>
 
             {success ? (
-              <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center">
-                <div className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto"><Check/></div>
-                <h3 className="font-bold mt-3">Request received!</h3>
-                <p className="text-sm text-slate-600 mt-1">We’ve noted <b>{form.company || 'your company'}</b> ({form.acronym || 'RC'}). Use demo login:</p>
+              <div className="mt-6 bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
+                <div className="w-12 h-12 rounded-full bg-amber-500 text-white flex items-center justify-center mx-auto"><Check/></div>
+                <h3 className="font-bold mt-3">Workspace pending approval</h3>
+                <p className="text-sm text-slate-600 mt-1"><b>{form.company || 'your company'}</b> ({form.acronym || 'RC'}) is awaiting <b>Super Admin</b> approval. You will be notified once activated.</p>
                 <div className="mt-3 bg-white rounded-xl border p-3 text-xs font-mono text-left">
-                  <div>admin@recruitconnect.ng / Admin@123 (org_admin)</div>
-                  <div>superadmin@recruitconnect.ng / Super@123 (super_admin)</div>
+                  <div>Login will require: email + password + acronym</div>
+                  <div className="text-slate-500">Acronym: <b>{form.acronym}</b></div>
                 </div>
                 <p className="text-xs text-slate-500 mt-3">Redirecting to login…</p>
               </div>
@@ -103,7 +110,9 @@ export default function RegisterPage() {
                     <div className="relative mt-1"><Building2 size={16} className="absolute left-3 top-3 text-slate-400"/><input value={form.company} onChange={e=>setForm({...form, company:e.target.value})} placeholder="RecruitConnect Ltd" required className="w-full pl-9 pr-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-violet-500"/></div>
                   </label>
                   <label className="text-sm font-medium">Acronym
-                    <input value={form.acronym} onChange={e=>setForm({...form, acronym:e.target.value.toUpperCase()})} placeholder="RC" maxLength={6} required className="w-full mt-1 px-3 py-2.5 rounded-xl border font-mono focus:outline-none focus:ring-2 focus:ring-violet-500"/>
+                    <input value={form.acronym} onChange={e=>{ setForm({...form, acronym:e.target.value.toUpperCase()}); checkAcronym(e.target.value); }} onBlur={e=> checkAcronym(e.target.value)} placeholder="RC" maxLength={10} required className={`w-full mt-1 px-3 py-2.5 rounded-xl border font-mono focus:outline-none focus:ring-2 ${acronymStatus?.available===false ? 'border-red-300 focus:ring-red-500' : acronymStatus?.available ? 'border-emerald-300 focus:ring-emerald-500' : 'focus:ring-violet-500'}`}/>
+                    {checkingAcronym && <span className="text-xs text-slate-400">Checking…</span>}
+                    {acronymStatus && <span className={`text-xs ${acronymStatus.available ? 'text-emerald-600' : 'text-red-600'}`}>{acronymStatus.message}</span>}
                   </label>
                 </div>
                 <label className="text-sm font-medium">Industry template

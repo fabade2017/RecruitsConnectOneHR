@@ -70,15 +70,36 @@ let AuthService = class AuthService {
         return getSystemPermissions(user.role);
     }
     async login(email, password, orgAcronym) {
-        const user = await this.prisma.user.findFirst({ where: { email } });
+        if (!email || !password)
+            throw new common_1.UnauthorizedException('Email and password required');
+        if (!orgAcronym || !orgAcronym.trim())
+            throw new common_1.UnauthorizedException('Organization acronym required');
+        const ac = orgAcronym.trim().toUpperCase();
+        // Acronym must exist
+        const orgByAcronym = await this.prisma.organization.findUnique({ where: { acronym: ac } });
+        if (!orgByAcronym)
+            throw new common_1.UnauthorizedException('Invalid organization acronym');
+        // Find user by email AND organization (acronym scopes the tenant) — prevents cross-org email collision confusion
+        const user = await this.prisma.user.findFirst({ where: { email, organizationId: orgByAcronym.id } });
         if (!user)
-            throw new common_1.UnauthorizedException('Invalid credentials');
+            throw new common_1.UnauthorizedException('Invalid credentials for this organization');
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid)
             throw new common_1.UnauthorizedException('Invalid credentials');
-        const org = await this.prisma.organization.findUnique({ where: { id: user.organizationId } });
-        if (orgAcronym && org?.acronym !== orgAcronym)
-            throw new common_1.UnauthorizedException('Organization mismatch');
+        const org = orgByAcronym;
+        // Gate: org must be approved/active unless super_admin
+        if (user.role !== 'super_admin') {
+            if (org.status === 'pending' || org.isActive === false) {
+                // Check if super_admin has granted via active subscription
+                const sub = await this.prisma.organizationSubscription.findFirst({ where: { organizationId: org.id, status: 'active' } });
+                if (!sub)
+                    throw new common_1.UnauthorizedException('Organization pending approval by Super Admin. You will be notified once activated.');
+                // auto-activate if subscription exists but status still pending (self-heal)
+                if (org.status !== 'active') {
+                    await this.prisma.organization.update({ where: { id: org.id }, data: { status: 'active', isActive: true } }).catch(() => { });
+                }
+            }
+        }
         const employee = await this.prisma.employee.findUnique({ where: { userId: user.id }, select: { id: true } });
         const permissions = await this.resolvePermissions(user);
         const payload = { sub: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, org_acronym: org?.acronym, employeeId: employee?.id || null, permissions };

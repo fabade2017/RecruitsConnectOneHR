@@ -25,6 +25,7 @@ let OrganizationsController = class OrganizationsController {
         this.svc = svc;
     }
     create(dto) { return this.svc.create(dto); }
+    checkAcronym(acronym) { return this.svc.checkAcronym(acronym || ''); }
     list() { return this.svc.listAll(); }
     get(id) { return this.svc.findOne(id); }
     update(id, dto) { return this.svc.update(id, dto); }
@@ -44,6 +45,14 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "create", null);
+__decorate([
+    (0, jwt_auth_guard_1.Public)(),
+    (0, common_1.Get)('check-acronym'),
+    __param(0, (0, common_1.Query)('acronym')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], OrganizationsController.prototype, "checkAcronym", null);
 __decorate([
     (0, common_1.Get)(),
     (0, rbac_guard_1.Roles)('super_admin', 'org_admin'),

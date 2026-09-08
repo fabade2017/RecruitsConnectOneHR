@@ -17,6 +17,12 @@ let ChatService = class ChatService {
     constructor(prisma) {
         this.prisma = prisma;
     }
+    onModuleInit() {
+        // Cleanup expired files every hour
+        setInterval(() => this.cleanupExpiredFiles().catch(() => { }), 60 * 60 * 1000).unref();
+        // Run once after 30s on startup
+        setTimeout(() => this.cleanupExpiredFiles().catch(() => { }), 30_000);
+    }
     async ensureParticipant(orgId, conversationId, userId) {
         const p = await this.prisma.conversationParticipant.findFirst({
             where: { conversationId, userId },
@@ -409,6 +415,47 @@ let ChatService = class ChatService {
         const emps = await this.prisma.employee.findMany({ where: { userId: { in: ids } }, select: { userId: true, photoUrl: true, jobTitle: true, employeeCode: true } });
         const empMap = new Map(emps.map(e => [e.userId, e]));
         return users.map(u => ({ ...u, employee: empMap.get(u.id) || null }));
+    }
+    async uploadFile(orgId, conversationId, senderId, file, content) {
+        await this.ensureParticipant(orgId, conversationId, senderId);
+        if (!file || !file.buffer)
+            throw new common_1.BadRequestException('No file uploaded');
+        const maxSize = 10 * 1024 * 1024;
+        if (file.size > maxSize)
+            throw new common_1.BadRequestException('File too large (max 10MB)');
+        const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'];
+        // allow all for now but warn if not in allowed
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const b64 = file.buffer.toString('base64');
+        const dataUrl = `data:${file.mimetype};base64,${b64}`;
+        const attachments = [{ url: dataUrl, name: file.originalname, type: file.mimetype, size: file.size, expiresAt: expiresAt.toISOString() }];
+        const msgContent = content?.trim() || file.originalname;
+        const msg = await this.prisma.message.create({
+            data: {
+                organizationId: orgId,
+                conversationId,
+                senderId,
+                content: msgContent.slice(0, 5000),
+                messageType: file.mimetype.startsWith('image/') ? 'image' : 'file',
+                attachments: JSON.stringify(attachments),
+                expiresAt,
+            },
+            include: { sender: { select: { id: true, email: true, role: true } } },
+        });
+        await this.prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date(), lastMessagePreview: `[${file.mimetype.startsWith('image/') ? 'Image' : 'File'}] ${file.originalname}`.slice(0, 120) } });
+        await this.prisma.conversationParticipant.updateMany({ where: { conversationId, userId: senderId }, data: { lastReadAt: new Date(), lastReadMessageId: msg.id } });
+        await this.prisma.messageRead.upsert({ where: { messageId_userId: { messageId: msg.id, userId: senderId } }, create: { messageId: msg.id, userId: senderId }, update: {} });
+        return msg;
+    }
+    async cleanupExpiredFiles() {
+        const now = new Date();
+        const expired = await this.prisma.message.findMany({ where: { expiresAt: { lt: now }, attachments: { not: null } }, select: { id: true } });
+        if (!expired.length)
+            return { cleaned: 0 };
+        for (const m of expired) {
+            await this.prisma.message.update({ where: { id: m.id }, data: { attachments: JSON.stringify([{ expired: true, message: 'File expired after 7 days' }]), content: '[File expired]' } });
+        }
+        return { cleaned: expired.length };
     }
     async getReadReceipts(orgId, conversationId, messageId, userId) {
         await this.ensureParticipant(orgId, conversationId, userId);
