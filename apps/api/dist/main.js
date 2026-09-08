@@ -117,23 +117,21 @@ async function bootstrap() {
         transform: true,
         transformOptions: { enableImplicitConversion: true },
     }));
-    // Swagger only in non-production or if explicitly enabled
-    if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true') {
-        try {
-            const config = new swagger_1.DocumentBuilder()
-                .setTitle('OneHR API')
-                .setDescription('RecruitConnect OneHR™ - Workforce Operating System (RBAC hardened)')
-                .setVersion('1.0')
-                .addBearerAuth()
-                .addApiKey({ type: 'apiKey', in: 'header', name: 'X-Organization-Id' }, 'tenant')
-                .build();
-            const document = swagger_1.SwaggerModule.createDocument(app, config);
-            swagger_1.SwaggerModule.setup('api/docs', app, document);
-            console.log('Swagger enabled at /api/docs');
-        }
-        catch (e) {
-            console.warn('Swagger setup failed (non-blocking):', e.message);
-        }
+    // Swagger — always enabled (was gated by NODE_ENV/ENABLE_SWAGGER, now on for /v1/api/docs)
+    try {
+        const config = new swagger_1.DocumentBuilder()
+            .setTitle('OneHR API')
+            .setDescription('RecruitConnect OneHR™ - Workforce Operating System (RBAC hardened)')
+            .setVersion('1.0')
+            .addBearerAuth()
+            .addApiKey({ type: 'apiKey', in: 'header', name: 'X-Organization-Id' }, 'tenant')
+            .build();
+        const document = swagger_1.SwaggerModule.createDocument(app, config);
+        swagger_1.SwaggerModule.setup('api/docs', app, document);
+        console.log('Swagger enabled at /v1/api/docs (also /api/docs)');
+    }
+    catch (e) {
+        console.warn('Swagger setup failed (non-blocking):', e.message);
     }
     //const port = process.env.PORT_API ? parseInt(process.env.PORT_API, 10) : 3001;
     const port = parseInt(process.env.PORT || process.env.PORT_API || '3001', 10);
