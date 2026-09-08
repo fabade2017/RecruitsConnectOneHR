@@ -34,8 +34,16 @@ export class EmployeesService {
     const seq = String(count + 1).padStart(6, '0');
     const employeeCode = `${org.acronym}-${seq}`;
     const qrCode = await QRCode.toDataURL(employeeCode);
+    // handle DOB
+    let dob: Date | undefined = undefined;
+    const dobRaw = dto.date_of_birth || dto.dob || dto.birth_date || dto.dateOfBirth;
+    if (dobRaw) {
+      const d = new Date(dobRaw);
+      if (!isNaN(d.getTime())) dob = d;
+    }
+    let employee: any;
     try {
-      return await this.prisma.employee.create({
+      employee = await this.prisma.employee.create({
         data: {
           organizationId: orgId, employeeCode, qrCode,
           departmentId: dto.department_id, branchId: dto.branch_id,
@@ -43,6 +51,7 @@ export class EmployeesService {
           employmentType: dto.employment_type || 'permanent',
           workArrangement: dto.work_arrangement || 'office',
           hireDate: dto.hire_date ? new Date(dto.hire_date) : undefined,
+          dateOfBirth: dob,
           skills: JSON.stringify(dto.skills || []),
         },
       });
@@ -50,6 +59,22 @@ export class EmployeesService {
       if (e.code === 'P2002') throw new ConflictException('Employee code conflict, retry');
       throw e;
     }
+    // Auto-create user if email provided — default password Acronym+MMYYYY+DD
+    if (dto.email || dto.adminEmail) {
+      const email = dto.email || dto.adminEmail;
+      const exists = await this.prisma.user.findFirst({ where: { email, organizationId: orgId } });
+      if (!exists) {
+        const dobDay = dob ? String(dob.getDate()).padStart(2,'0') : '00';
+        const now = new Date();
+        const pwd = `${org.acronym}${String(now.getMonth()+1).padStart(2,'0')}${now.getFullYear()}${dobDay}`;
+        const hash = await bcrypt.hash(pwd, 10);
+        await this.prisma.user.create({ data: { organizationId: orgId, email, passwordHash: hash, role: dto.role || 'employee', mustChangePassword: true } });
+        // Return employee with password hint for superadmin template (not stored plain elsewhere)
+        (employee as any).generatedPassword = pwd;
+        (employee as any).loginEmail = email;
+      }
+    }
+    return employee;
   }
 
   async list(orgId: string, query: any, user?: any) {
@@ -206,10 +231,10 @@ export class EmployeesService {
   }
 
   bulkTemplate(orgId: string) {
-    const header = 'job_title,grade,department,branch,employment_type,work_arrangement,hire_date,skills,phone,email';
+    const header = 'job_title,grade,department,branch,employment_type,work_arrangement,hire_date,dob,skills,phone,email';
     const example = [
-      'Software Engineer,L2,Engineering,Lagos Head Office,permanent,office,2024-01-15,"React,Node",08012345678,eng1@company.com',
-      'HR Officer,H2,Human Resources,Lagos Head Office,permanent,hybrid,2024-02-01,"HRIS,Payroll",08087654321,hr@company.com',
+      'Software Engineer,L2,Engineering,Lagos Head Office,permanent,office,2024-01-15,1995-06-15,"React,Node",08012345678,eng1@company.com',
+      'HR Officer,H2,Human Resources,Lagos Head Office,permanent,hybrid,2024-02-01,1990-12-02,"HRIS,Payroll",08087654321,hr@company.com',
     ].join('\n');
     return { header, example, csv: `${header}\n${example}\n`, count: 300, note: 'Upload CSV with header above. department/branch by name (will auto-create if not found). skills comma-separated in quotes. Max 500 rows per bulk.' };
   }
@@ -285,8 +310,8 @@ export class EmployeesService {
     setList(5, grades);
     setList(6, statuses);
 
-    // Header
-    const headers = ['job_title*','grade','department','branch','employment_type','work_arrangement','hire_date','skills','phone','email'];
+    // Header — dob added for password generation (Acronym+MMYYYY+DD)
+    const headers = ['job_title*','grade','department','branch','employment_type','work_arrangement','hire_date','dob','skills','phone','email'];
     const headerRow = ws.addRow(headers);
     headerRow.eachCell((cell: any) => {
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -302,13 +327,14 @@ export class EmployeesService {
       { header: 'employment_type', key: 'employment_type', width: 16 },
       { header: 'work_arrangement', key: 'work_arrangement', width: 16 },
       { header: 'hire_date', key: 'hire_date', width: 14 },
+      { header: 'dob', key: 'dob', width: 14 },
       { header: 'skills', key: 'skills', width: 22 },
       { header: 'phone', key: 'phone', width: 16 },
       { header: 'email', key: 'email', width: 24 },
     ];
-    // Example rows
+    // Example rows — dob used for default password e.g., JSO12202602 (Acronym+MMYYYY+DD)
     const examples = [
-      ['Software Engineer','L2','Engineering','Lagos Head Office','permanent','office','2024-01-15','React, Node','08012345678','eng1@company.com'],
+      ['Software Engineer','L2','Engineering','Lagos Head Office','permanent','office','2024-01-15','1995-06-15','React, Node','08012345678','eng1@company.com'],
       ['HR Officer','H2','Human Resources','Lagos Head Office','permanent','hybrid','2024-02-01','HRIS, Payroll','08087654321','hr@company.com'],
     ];
     examples.forEach(r => {
@@ -395,12 +421,21 @@ export class EmployeesService {
     const deptByName = new Map(depts.map(d=>[d.name.toLowerCase(), d.id]));
     const branchByName = new Map(branches.map(b=>[b.name.toLowerCase(), b.id]));
 
+    // Fetch org acronym for password generation
+    const orgForPwd = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { acronym: true } });
+    const acronymForPwd = orgForPwd?.acronym || 'ORG';
+    const nowForPwd = new Date();
+    const mmForPwd = String(nowForPwd.getMonth()+1).padStart(2,'0');
+    const yyyyForPwd = String(nowForPwd.getFullYear());
+
     const results: any[] = [];
     const errors: any[] = [];
+    const credentials: any[] = []; // for superadmin email template
     for (let idx=0; idx<list.length; idx++) {
       const row = list[idx];
       try {
         // Map CSV header variants to service DTO
+        const dobRaw = row.dob || row.date_of_birth || row.dateOfBirth || row.birth_date || row.birthDate || row.DOB;
         const payload:any = {
           job_title: row.job_title || row.jobTitle || row.title || `Employee ${idx+1}`,
           grade: row.grade || 'L1',
@@ -409,6 +444,8 @@ export class EmployeesService {
           employment_type: row.employment_type || row.employmentType || 'permanent',
           work_arrangement: row.work_arrangement || row.workArrangement || 'office',
           hire_date: row.hire_date || row.hireDate || new Date().toISOString().slice(0,10),
+          date_of_birth: dobRaw || undefined,
+          dob: dobRaw || undefined,
           skills: row.skills ? (typeof row.skills === 'string' ? row.skills.split(',').map((s:string)=>s.trim()).filter(Boolean) : row.skills) : [],
           // Optional: create user if email provided
           email: row.email || row.adminEmail || undefined,
@@ -426,21 +463,16 @@ export class EmployeesService {
           payload.branch_id = createdB.id;
         }
         const created = await this.create(orgId, payload, user);
-        results.push({ index: idx, employeeCode: created.employeeCode, id: created.id });
-        // Optionally create user if email provided and not exists
-        if (payload.email) {
-          try {
-            const exists = await this.prisma.user.findFirst({ where: { email: payload.email, organizationId: orgId } });
-            if (!exists) {
-              const hash = await bcrypt.hash('Employee@123', 10);
-              await this.prisma.user.create({ data: { organizationId: orgId, email: payload.email, passwordHash: hash, role: 'employee' } });
-            }
-          } catch {}
+        const pwd = (created as any).generatedPassword;
+        const emailForCred = (created as any).loginEmail || payload.email;
+        results.push({ index: idx, employeeCode: created.employeeCode, id: created.id, email: emailForCred || null, hasLogin: !!emailForCred });
+        if (emailForCred && pwd) {
+          credentials.push({ index: idx, employeeCode: created.employeeCode, email: emailForCred, password: pwd, dob: payload.date_of_birth || payload.dob, phone: payload.phone });
         }
       } catch (e:any) {
         errors.push({ index: idx, error: e.message, row });
       }
     }
-    return { total: list.length, success: results.length, failed: errors.length, results, errors };
+    return { total: list.length, success: results.length, failed: errors.length, results, errors, credentials, message: credentials.length ? `Created ${results.length} employees. ${credentials.length} logins generated with default password Acronym+MMYYYY+DD (must change on first login).` : `Created ${results.length} employees.` };
   }
 }

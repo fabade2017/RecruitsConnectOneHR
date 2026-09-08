@@ -65,6 +65,10 @@ export default function FaceEnrollPage() {
 
   const snap = async () => {
     if (!videoRef.current) return;
+    if (!faceModelReady) {
+      setError('Face model still loading — please wait a moment and retry');
+      return;
+    }
     const v = videoRef.current;
     const c = document.createElement('canvas');
     c.width = v.videoWidth; c.height = v.videoHeight;
@@ -79,17 +83,19 @@ export default function FaceEnrollPage() {
       const { getDescriptorFromCanvas, descriptorToArray } = await import('../../../lib/face');
       const d = await getDescriptorFromCanvas(c);
       if (d) { desc = descriptorToArray(d); }
-    } catch {}
-    if (!desc && faceModelReady) {
-      // No face detected by model — warn but still allow (will fallback to string compare)
-      console.warn('No descriptor found for this snap — will use fallback');
+    } catch (e) { console.warn('descriptor fail', e); }
+    if (!desc) {
+      setError('No face detected clearly — ensure good lighting, face centered, and retry. Descriptor required for intelligent matching.');
+      return;
     }
     setCaptures([...captures, b64]);
-    if (desc) setDescriptors(prev=> [...prev, desc!]);
+    setDescriptors(prev=> [...prev, desc!]);
+    setError('');
   };
 
   const upload = async () => {
     if (captures.length < 1) return setError('Capture at least 1 face image');
+    if (descriptors.length !== captures.length) return setError(`Need descriptor for each snap (${descriptors.length}/${captures.length} captured) — retake with face centered and good lighting`);
     if (!consent) return setError('Consent required');
     setSaving(true); setError('');
     try {
@@ -102,8 +108,13 @@ export default function FaceEnrollPage() {
         const e = await res.json().catch(()=>({message:'Upload failed'}));
         throw new Error(e.message);
       }
-      alert('Face enrolled successfully! Clock-in will now compare live snap with these images for fraud detection.');
-      router.push('/attendance');
+      const data = await res.json().catch(()=>({}));
+      // Refresh enrolled status
+      const refreshed = await fetch(`${api}/employees/${id}/face-profile`, { headers: auth() }).then(r=>r.json()).catch(()=>null);
+      if (refreshed) setEnrolled(refreshed);
+      setCaptures([]); setDescriptors([]);
+      alert(`Face enrolled ${data.enrolled || captures.length} images with descriptors! Clock-in will now do intelligent biometric matching (Euclidean <0.40).`);
+      // Stay on page to show updated enrolled count, user can go to attendance when ready
     } catch (e:any) { setError(e.message); } finally { setSaving(false); }
   };
 
@@ -140,9 +151,10 @@ export default function FaceEnrollPage() {
               <div className="absolute top-3 left-3 bg-black/60 text-white rounded-full px-3 py-1 text-xs">{faceDetected ? '● Face detected' : '○ Searching…'}</div>
             </div>
             <div className="mt-3 flex gap-2">
-              <button onClick={snap} disabled={!faceDetected || captures.length>=3} className="flex-1 bg-slate-900 text-white rounded-xl py-2.5 font-semibold disabled:opacity-40 flex items-center justify-center gap-2"><Camera size={16}/> Snap {captures.length+1}/3</button>
-              <button onClick={()=>setCaptures([])} className="glass rounded-xl px-4 py-2.5"><RefreshCw size={16}/></button>
+              <button onClick={snap} disabled={!faceDetected || captures.length>=3 || !faceModelReady} className="flex-1 bg-slate-900 text-white rounded-xl py-2.5 font-semibold disabled:opacity-40 flex items-center justify-center gap-2"><Camera size={16}/> Snap {captures.length+1}/3 {!faceModelReady && '(loading model...)'} </button>
+              <button onClick={()=>{setCaptures([]); setDescriptors([]);}} className="glass rounded-xl px-4 py-2.5"><RefreshCw size={16}/></button>
             </div>
+            {!faceModelReady && <div className="text-xs text-amber-600 mt-1">Face model loading… please wait before capturing</div>}
             <p className="text-xs text-slate-500 mt-2 text-center">Move slightly between snaps: front, left, right. Motion 0.8–12% required for liveness.</p>
             {error && <div className="mt-3 bg-red-50 text-red-700 text-sm p-2 rounded">{error}</div>}
           </GlassCard>
@@ -158,7 +170,7 @@ export default function FaceEnrollPage() {
             </div>
             {captures.length>0 && (
               <div className="mt-3 space-y-2">
-                {captures.map((c,i)=> <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-xl p-2 text-xs"><img src={c} alt="" className="w-10 h-10 rounded-lg object-cover"/><span className="truncate flex-1">{c.slice(0,30)}…</span><button onClick={()=> setCaptures(captures.filter((_,idx)=>idx!==i))} className="text-red-600"><X size={14}/></button></div>)}
+                {captures.map((c,i)=> <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-xl p-2 text-xs"><img src={c} alt="" className="w-10 h-10 rounded-lg object-cover"/><span className="truncate flex-1">Snap {i+1} • {descriptors[i] ? '✓ descriptor' : '○ no descriptor'}</span><button onClick={()=> { setCaptures(captures.filter((_,idx)=>idx!==i)); setDescriptors(descriptors.filter((_,idx)=>idx!==i)); }} className="text-red-600"><X size={14}/></button></div>)}
               </div>
             )}
             <button onClick={upload} disabled={saving || captures.length===0} className="mt-4 w-full bg-emerald-600 text-white rounded-xl py-3 font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"><ShieldCheck size={16}/>{saving ? 'Uploading…' : `Upload & Enroll ${captures.length} face(s)`}</button>

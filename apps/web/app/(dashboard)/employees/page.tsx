@@ -24,7 +24,7 @@ export default function PeoplePage() {
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [addForm, setAddForm] = useState({ jobTitle:'', grade:'L1', workArrangement:'office', employmentType:'permanent', status:'active', departmentId:'', branchId:'', skills:'', role:'' });
+  const [addForm, setAddForm] = useState({ jobTitle:'', grade:'L1', workArrangement:'office', employmentType:'permanent', status:'active', departmentId:'', branchId:'', skills:'', role:'', email:'', phone:'', dob:'', hireDate: new Date().toISOString().slice(0,10) });
   const [showBulk, setShowBulk] = useState(false);
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkPreview, setBulkPreview] = useState<any[]>([]);
@@ -218,6 +218,7 @@ export default function PeoplePage() {
 
   const handleAdd = async () => {
     if (!addForm.jobTitle) return alert('Job title required');
+    if (addForm.email && !addForm.email.includes('@')) return alert('Invalid email');
     setSaving(true);
     try {
       const payload:any = {
@@ -227,8 +228,12 @@ export default function PeoplePage() {
         branch_id: addForm.branchId || undefined,
         work_arrangement: addForm.workArrangement,
         employment_type: addForm.employmentType,
-        hire_date: new Date().toISOString(),
+        hire_date: addForm.hireDate || new Date().toISOString(),
+        date_of_birth: addForm.dob || undefined,
+        dob: addForm.dob || undefined,
         skills: addForm.skills ? addForm.skills.split(',').map((s:string)=>s.trim()).filter(Boolean) : [],
+        email: addForm.email || undefined,
+        phone: addForm.phone || undefined,
       };
       if (addForm.role) payload.role = addForm.role;
       const res = await fetch(`${api}/employees`, {
@@ -240,8 +245,18 @@ export default function PeoplePage() {
         const err = await res.json().catch(()=>({message:'Create failed'}));
         throw new Error(err.message || 'Create failed');
       }
+      const data = await res.json().catch(()=>({}));
+      // If email was provided, backend may have created user with default password - show it
+      if (addForm.email && data?.employee) {
+        // Fetch org acronym for password hint - we can compute client-side as Acad+MMYYYY+DD
+        const acronym = data.employee.employeeCode?.split('-')[0] || 'ORG';
+        const dobDay = addForm.dob ? String(new Date(addForm.dob).getDate()).padStart(2,'0') : '00';
+        const now = new Date();
+        const pwd = `${acronym}${String(now.getMonth()+1).padStart(2,'0')}${now.getFullYear()}${dobDay}`;
+        alert(`Employee ${data.employee.employeeCode} created.\nLogin: ${addForm.email}\nDefault password: ${pwd}\n(Must change on first login)`);
+      }
       setShowAdd(false);
-      setAddForm({ jobTitle:'', grade:'L1', workArrangement:'office', employmentType:'permanent', status:'active', departmentId:'', branchId:'', skills:'', role:'' });
+      setAddForm({ jobTitle:'', grade:'L1', workArrangement:'office', employmentType:'permanent', status:'active', departmentId:'', branchId:'', skills:'', role:'', email:'', phone:'', dob:'', hireDate: new Date().toISOString().slice(0,10) });
       loadAll();
     } catch (e:any) { alert(e.message); } finally { setSaving(false); }
   };
@@ -523,6 +538,18 @@ export default function PeoplePage() {
                 <label className="text-sm font-medium">Grade
                   <input value={addForm.grade} onChange={e=>setAddForm({...addForm, grade:e.target.value})} placeholder="L2" className="w-full mt-1 px-3 py-2.5 rounded-xl border"/>
                 </label>
+                <label className="text-sm font-medium">Work Email *
+                  <input type="email" value={addForm.email} onChange={e=>setAddForm({...addForm, email:e.target.value})} placeholder="eng1@company.com" className="w-full mt-1 px-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-violet-500"/>
+                </label>
+                <label className="text-sm font-medium">Phone
+                  <input value={addForm.phone} onChange={e=>setAddForm({...addForm, phone:e.target.value})} placeholder="08012345678" className="w-full mt-1 px-3 py-2.5 rounded-xl border"/>
+                </label>
+                <label className="text-sm font-medium">Date of Birth *
+                  <input type="date" value={addForm.dob} onChange={e=>setAddForm({...addForm, dob:e.target.value})} className="w-full mt-1 px-3 py-2.5 rounded-xl border"/>
+                </label>
+                <label className="text-sm font-medium">Hire Date
+                  <input type="date" value={addForm.hireDate} onChange={e=>setAddForm({...addForm, hireDate:e.target.value})} className="w-full mt-1 px-3 py-2.5 rounded-xl border"/>
+                </label>
                 <label className="text-sm font-medium">Work Arrangement
                   <select value={addForm.workArrangement} onChange={e=>setAddForm({...addForm, workArrangement:e.target.value})} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white">
                     <option value="office">office</option><option value="remote">remote</option><option value="hybrid">hybrid</option><option value="field">field</option><option value="shift">shift</option>
@@ -539,6 +566,10 @@ export default function PeoplePage() {
                 <label className="text-sm font-medium md:col-span-2">Skills (comma separated)
                   <input value={addForm.skills} onChange={e=>setAddForm({...addForm, skills:e.target.value})} placeholder="React, Node, HRIS" className="w-full mt-1 px-3 py-2.5 rounded-xl border"/>
                 </label>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs">
+                <div className="font-semibold">Default password: Acronym + MM + YYYY + DD (DOB day)</div>
+                <div className="text-slate-600">e.g., JSO12202602 for JSO, Dec 2026, DOB 02 — must change on first login. Email will be used for login with acronym.</div>
               </div>
               <div className="flex gap-3 pt-2">
                 <button onClick={()=>setShowAdd(false)} className="flex-1 glass rounded-xl py-2.5 font-semibold">Cancel</button>

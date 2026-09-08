@@ -118,6 +118,7 @@ model User {
   role           String          @default("employee")
   customRoleId   String?         @map("custom_role_id")
   mfaEnabled     Boolean         @default(false) @map("mfa_enabled")
+  mustChangePassword Boolean     @default(false) @map("must_change_password")
   lastLoginAt    DateTime?       @map("last_login_at")
   createdAt      DateTime        @default(now()) @map("created_at")
   employee       Employee?
@@ -150,6 +151,7 @@ model Employee {
   status              String                @default("active")
   hireDate            DateTime?             @map("hire_date") @db.Date
   probationEndDate    DateTime?             @map("probation_end_date") @db.Date
+  dateOfBirth         DateTime?             @map("date_of_birth") @db.Date
   skills              String                @default("[]")
   metadata            String                @default("{}")
   consentFace         Boolean               @default(false) @map("consent_face")

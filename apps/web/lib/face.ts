@@ -7,27 +7,31 @@ export async function loadFaceModels() {
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
     const faceapi = await import('@vladmandic/face-api');
-    // Use CDN weights — works without local public/models
-    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@latest/model';
-    // Fallback CDN if first fails
+    // Try local public/models first (most reliable, no CDN CORS), then CDN fallbacks
+    const LOCAL = '/models';
+    const CDN = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
     const FALLBACK = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+    const tryLoad = async (url: string) => {
+      await Promise.all([
+        faceapi.nets.ssdMobilenetv1.loadFromUri(url),
+        faceapi.nets.faceLandmark68Net.loadFromUri(url),
+        faceapi.nets.faceRecognitionNet.loadFromUri(url),
+      ]);
+    };
     try {
-      await Promise.all([
-        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-      ]);
+      await tryLoad(LOCAL);
       modelsLoaded = true;
-      console.log('face-api models loaded from', MODEL_URL);
-    } catch (e) {
-      console.warn('primary model CDN failed, trying fallback', e);
-      await Promise.all([
-        faceapi.nets.ssdMobilenetv1.loadFromUri(FALLBACK),
-        faceapi.nets.faceLandmark68Net.loadFromUri(FALLBACK),
-        faceapi.nets.faceRecognitionNet.loadFromUri(FALLBACK),
-      ]);
+      console.log('face-api models loaded from', LOCAL);
+      return;
+    } catch (e) { console.warn('local models failed, trying CDN', e); }
+    try {
+      await tryLoad(CDN);
       modelsLoaded = true;
-    }
+      console.log('face-api models loaded from', CDN);
+      return;
+    } catch (e) { console.warn('CDN failed, trying fallback', e); }
+    await tryLoad(FALLBACK);
+    modelsLoaded = true;
   })();
   return loadPromise;
 }

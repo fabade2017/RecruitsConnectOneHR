@@ -59,11 +59,12 @@ export class AuthService {
     const employee = await this.prisma.employee.findUnique({ where: { userId: user.id }, select: { id: true } });
     const permissions = await this.resolvePermissions(user);
 
-    const payload = { sub: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, org_acronym: org?.acronym, employeeId: employee?.id || null, permissions };
+    const mustChangePassword = (user as any).mustChangePassword || false;
+    const payload = { sub: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, org_acronym: org?.acronym, employeeId: employee?.id || null, permissions, mustChangePassword };
     const access_token = jwt.sign(payload, (process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev') as string, { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any } as any);
     const refresh_token = jwt.sign({ sub: user.id, type: 'refresh' }, (process.env.JWT_REFRESH_SECRET || 'change-me-refresh-32-chars-minimum') as string, { expiresIn: '7d' } as any);
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-    return { access_token, refresh_token, user: { id: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, permissions } };
+    return { access_token, refresh_token, user: { id: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, permissions, mustChangePassword } };
   }
 
   async me(userId: string) {
