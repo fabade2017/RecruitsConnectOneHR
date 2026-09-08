@@ -23,7 +23,7 @@ let AdminController = class AdminController {
         this.svc = svc;
     }
     // ===== Roles =====
-    roles(orgId) { return this.svc.listRoles(orgId); }
+    roles(req, orgId) { return this.svc.listRoles(orgId || req.user?.org_id || req.user?.orgId); }
     createRole(dto, req) { return this.svc.createRole(dto, req.user); }
     updateRole(id, dto) { return this.svc.updateRole(id, dto); }
     deleteRole(id) { return this.svc.deleteRole(id); }
@@ -70,11 +70,13 @@ let AdminController = class AdminController {
 exports.AdminController = AdminController;
 __decorate([
     (0, common_1.Get)('roles'),
-    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
-    (0, swagger_1.ApiOperation)({ summary: 'List all roles (super_admin can create/assign)' }),
-    __param(0, (0, common_1.Query)('organizationId')),
+    (0, rbac_guard_1.Roles)('super_admin', 'org_admin', 'hr_admin'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    (0, swagger_1.ApiOperation)({ summary: 'List all roles (super_admin can create/assign, org_admin can list own)' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)('organizationId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "roles", null);
 __decorate([

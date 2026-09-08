@@ -12,9 +12,10 @@ export class AdminController {
 
   // ===== Roles =====
   @Get('roles')
-  @RequirePermissions('admin:manage')
-  @ApiOperation({ summary: 'List all roles (super_admin can create/assign)' })
-  roles(@Query('organizationId') orgId?: string) { return this.svc.listRoles(orgId); }
+  @Roles('super_admin','org_admin','hr_admin')
+  @RequirePermissions('employee:read')
+  @ApiOperation({ summary: 'List all roles (super_admin can create/assign, org_admin can list own)' })
+  roles(@Req() req:any, @Query('organizationId') orgId?: string) { return this.svc.listRoles(orgId || req.user?.org_id || req.user?.orgId); }
 
   @Post('roles')
   @RequirePermissions('admin:manage')

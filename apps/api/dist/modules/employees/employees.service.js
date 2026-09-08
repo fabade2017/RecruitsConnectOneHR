@@ -137,7 +137,7 @@ let EmployeesService = class EmployeesService {
             const ids = [ownId, ...team.map(t => t.id)].filter(Boolean);
             where.id = { in: ids };
         }
-        return this.prisma.employee.findMany({ where, take: Math.min(parseInt(query.limit || '20'), 100), skip: query.cursor ? 1 : 0, orderBy: { createdAt: 'desc' } });
+        return this.prisma.employee.findMany({ where, take: Math.min(parseInt(query.limit || '20'), 100), skip: query.cursor ? 1 : 0, orderBy: { createdAt: 'desc' }, include: { user: { select: { id: true, email: true, phone: true, role: true } }, department: true, branch: true } });
     }
     async findOne(orgId, id, user) {
         const emp = await this.prisma.employee.findFirst({ where: { id, organizationId: orgId }, include: { department: true, branch: true, manager: true } });
@@ -180,8 +180,60 @@ let EmployeesService = class EmployeesService {
             if (emp?.id !== ownId && emp?.managerId !== ownId)
                 throw new common_1.ForbiddenException('Manager can only update team');
         }
+        // Handle email/phone/role -> User table, DOB -> Employee
+        const userUpdates = {};
+        if (dto.email !== undefined)
+            userUpdates.email = dto.email;
+        if (dto.phone !== undefined)
+            userUpdates.phone = dto.phone;
+        if (dto.role !== undefined)
+            userUpdates.role = dto.role;
+        if (Object.keys(userUpdates).length) {
+            const empForUser = await this.prisma.employee.findUnique({ where: { id }, select: { userId: true } });
+            if (empForUser?.userId) {
+                // Check email uniqueness within org
+                if (userUpdates.email) {
+                    const exists = await this.prisma.user.findFirst({ where: { email: userUpdates.email, organizationId: orgId, id: { not: empForUser.userId } } });
+                    if (exists)
+                        throw new common_1.ConflictException('Email already exists in organization');
+                }
+                await this.prisma.user.update({ where: { id: empForUser.userId }, data: userUpdates }).catch(() => { });
+            }
+            else if (dto.email) {
+                // No user yet — create one with default password
+                const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { acronym: true } });
+                const dobRaw = dto.dob || dto.date_of_birth || dto.birth_date;
+                let dobDay = '00';
+                if (dobRaw) {
+                    const d = new Date(dobRaw);
+                    if (!isNaN(d.getTime()))
+                        dobDay = String(d.getDate()).padStart(2, '0');
+                }
+                const now = new Date();
+                const pwd = `${org?.acronym || 'ORG'}${String(now.getMonth() + 1).padStart(2, '0')}${now.getFullYear()}${dobDay}`;
+                const hash = await bcrypt.hash(pwd, 10);
+                const newUser = await this.prisma.user.create({ data: { organizationId: orgId, email: dto.email, phone: dto.phone, passwordHash: hash, role: 'employee', mustChangePassword: true } });
+                // Link employee to new user
+                await this.prisma.employee.update({ where: { id }, data: { userId: newUser.id } }).catch(() => { });
+            }
+        }
         // Map frontend snake_case to prisma camelCase + stringify JSON fields
         const map = {};
+        // Handle DOB
+        if (dto.dob !== undefined)
+            dto.date_of_birth = dto.dob;
+        if (dto.date_of_birth !== undefined) {
+            const d = dto.date_of_birth ? new Date(dto.date_of_birth) : null;
+            if (d && !isNaN(d.getTime()))
+                map['dateOfBirth'] = d;
+            else if (!dto.date_of_birth)
+                map['dateOfBirth'] = null;
+        }
+        if (dto.birth_date !== undefined) {
+            const d = new Date(dto.birth_date);
+            if (!isNaN(d.getTime()))
+                map['dateOfBirth'] = d;
+        }
         if (dto.job_title !== undefined)
             map.jobTitle = dto.job_title;
         if (dto.jobTitle !== undefined)
@@ -218,14 +270,23 @@ let EmployeesService = class EmployeesService {
             map.hireDate = dto.hire_date ? new Date(dto.hire_date) : null;
         if (dto.hireDate !== undefined)
             map.hireDate = dto.hireDate ? new Date(dto.hireDate) : null;
+        if (dto.date_of_birth !== undefined && !map['dateOfBirth']) {
+            const d = new Date(dto.date_of_birth);
+            if (!isNaN(d.getTime()))
+                map.dateOfBirth = d;
+        }
         // copy any other direct fields
-        for (const k of ['jobTitle', 'grade', 'departmentId', 'branchId', 'managerId', 'employmentType', 'workArrangement', 'status', 'photoUrl', 'skills']) {
+        for (const k of ['jobTitle', 'grade', 'departmentId', 'branchId', 'managerId', 'employmentType', 'workArrangement', 'status', 'photoUrl', 'skills', 'dateOfBirth']) {
             if (dto[k] !== undefined && map[k] === undefined)
                 map[k] = dto[k];
         }
-        if (Object.keys(map).length === 0)
+        if (Object.keys(map).length === 0 && Object.keys(userUpdates).length === 0)
             throw new common_1.ConflictException('No fields to update');
-        return this.prisma.employee.update({ where: { id }, data: map });
+        if (Object.keys(map).length) {
+            return this.prisma.employee.update({ where: { id }, data: map });
+        }
+        // Only user was updated
+        return this.prisma.employee.findUnique({ where: { id } });
     }
     async timeline(orgId, id, date, user) {
         // timeline is attendance:read — employee can only view self
@@ -550,12 +611,45 @@ let EmployeesService = class EmployeesService {
                     branchByName.set(String(row.branch).toLowerCase(), createdB.id);
                     payload.branch_id = createdB.id;
                 }
-                const created = await this.create(orgId, payload, user);
+                // Upsert: if employee with same email already exists, update it (so edited Excel updates DB)
+                let created;
+                let isUpdate = false;
+                if (payload.email) {
+                    const existingUser = await this.prisma.user.findFirst({ where: { email: payload.email, organizationId: orgId } });
+                    if (existingUser) {
+                        const existingEmp = await this.prisma.employee.findFirst({ where: { userId: existingUser.id, organizationId: orgId } });
+                        if (existingEmp) {
+                            // Update existing employee with new data
+                            created = await this.update(orgId, existingEmp.id, payload, user);
+                            // Also ensure user password is regenerated if DOB provided (for upsert)
+                            // Note: update handles email/phone/DOB, but we need to return generatedPassword for template
+                            // Generate pwd as per spec for display
+                            const dobRawForPwd = payload.date_of_birth || payload.dob;
+                            let dobDayForPwd = '00';
+                            if (dobRawForPwd) {
+                                const d = new Date(dobRawForPwd);
+                                if (!isNaN(d.getTime()))
+                                    dobDayForPwd = String(d.getDate()).padStart(2, '0');
+                            }
+                            const pwdForUpdate = `${acronymForPwd}${mmForPwd}${yyyyForPwd}${dobDayForPwd}`;
+                            created.generatedPassword = pwdForUpdate;
+                            created.loginEmail = payload.email;
+                            isUpdate = true;
+                        }
+                    }
+                }
+                if (!isUpdate) {
+                    created = await this.create(orgId, payload, user);
+                }
                 const pwd = created.generatedPassword;
                 const emailForCred = created.loginEmail || payload.email;
-                results.push({ index: idx, employeeCode: created.employeeCode, id: created.id, email: emailForCred || null, hasLogin: !!emailForCred });
+                results.push({ index: idx, employeeCode: created.employeeCode, id: created.id, email: emailForCred || null, hasLogin: !!emailForCred, updated: isUpdate });
                 if (emailForCred && pwd) {
-                    credentials.push({ index: idx, employeeCode: created.employeeCode, email: emailForCred, password: pwd, dob: payload.date_of_birth || payload.dob, phone: payload.phone });
+                    credentials.push({ index: idx, employeeCode: created.employeeCode, email: emailForCred, password: pwd, dob: payload.date_of_birth || payload.dob, phone: payload.phone, updated: isUpdate });
+                }
+                else if (emailForCred) {
+                    // For updates where pwd not generated (existing user), still provide email for template but note password unchanged
+                    credentials.push({ index: idx, employeeCode: created.employeeCode, email: emailForCred, password: '(unchanged - see previous bulk)', dob: payload.date_of_birth || payload.dob, phone: payload.phone, updated: isUpdate });
                 }
             }
             catch (e) {
