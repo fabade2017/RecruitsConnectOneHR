@@ -12,6 +12,7 @@ export class AttendanceController {
   @Post('break/start') @RequirePermissions('attendance:clock') breakStart(@Req() req: any, @Body() dto: any) { return this.svc.breakStart(req.orgId, req.user.sub, dto); }
   @Post('break/end') @RequirePermissions('attendance:clock') breakEnd(@Req() req: any, @Body() dto: any) { return this.svc.breakEnd(req.orgId, req.user.sub, dto); }
   @Get('sessions') @RequirePermissions('attendance:read') sessions(@Req() req: any, @Query() q: any) { return this.svc.sessions(req.orgId, q, req.user); }
+  @Get('map') @RequirePermissions('attendance:read') map(@Req() req: any, @Query() q: any) { return this.svc.mapData(req.orgId, q, req.user); }
   @Get('command-center') @Roles('hr_admin','org_admin','hr_manager','manager','executive','super_admin') @RequirePermissions('attendance:read') commandCenter(@Req() req: any) { return this.svc.commandCenter(req.orgId, req.user); }
   @Get('exceptions') @Roles('hr_admin','org_admin','super_admin') @RequirePermissions('attendance:*') exceptions(@Req() req: any, @Query() q: any) { return this.svc.exceptionsList(req.orgId, q); }
   @Patch('exceptions/:id') @Roles('hr_admin','org_admin','super_admin') @RequirePermissions('attendance:*') resolve(@Req() req: any, @Param('id') id: string, @Body() dto: any) { return this.svc.resolveException(req.orgId, id, dto); }

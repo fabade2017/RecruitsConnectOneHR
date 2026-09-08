@@ -27,6 +27,7 @@ let AttendanceController = class AttendanceController {
     breakStart(req, dto) { return this.svc.breakStart(req.orgId, req.user.sub, dto); }
     breakEnd(req, dto) { return this.svc.breakEnd(req.orgId, req.user.sub, dto); }
     sessions(req, q) { return this.svc.sessions(req.orgId, q, req.user); }
+    map(req, q) { return this.svc.mapData(req.orgId, q, req.user); }
     commandCenter(req) { return this.svc.commandCenter(req.orgId, req.user); }
     exceptions(req, q) { return this.svc.exceptionsList(req.orgId, q); }
     resolve(req, id, dto) { return this.svc.resolveException(req.orgId, id, dto); }
@@ -81,6 +82,15 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], AttendanceController.prototype, "sessions", null);
+__decorate([
+    (0, common_1.Get)('map'),
+    (0, rbac_guard_1.RequirePermissions)('attendance:read'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], AttendanceController.prototype, "map", null);
 __decorate([
     (0, common_1.Get)('command-center'),
     (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'hr_manager', 'manager', 'executive', 'super_admin'),

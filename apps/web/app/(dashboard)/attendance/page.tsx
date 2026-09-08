@@ -3,6 +3,8 @@ import { useEffect, useState, useRef } from 'react';
 import { GlassCard, Pill } from '../../../components/ui/GlassCard';
 import { StatCard } from '../../../components/ui/StatCard';
 import { Clock, Timer, AlertTriangle, CalendarCheck, MapPin, Fingerprint, QrCode, Smartphone, Building2, Camera, Eye, ShieldCheck, Activity, X, Check, RefreshCw } from 'lucide-react';
+import dynamic from 'next/dynamic';
+const AttendanceMap = dynamic(() => import('../../../components/AttendanceMap'), { ssr: false });
 
 function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean; onClose: () => void; onCapture: (base64: string, meta: any) => void; action: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -185,6 +187,8 @@ export default function AttendancePage() {
   const [faceModal, setFaceModal] = useState<{ open: boolean; action: string } | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [adminTime, setAdminTime] = useState<{ [id:string]: string }>({});
+  const [mapData, setMapData] = useState<{ points:any[]; branches:any[]; total:number } | null>(null);
+  const [showMap, setShowMap] = useState(false);
   const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
 
   const load = () => {
@@ -196,6 +200,9 @@ export default function AttendancePage() {
     } catch {}
     fetch(`${api}/attendance/sessions?limit=20`, { headers: { Authorization: `Bearer ${t}` } }).then(r=>r.json()).then(d=> setSessions(Array.isArray(d)?d:[])).catch(()=>{});
     fetch(`${api}/attendance/exceptions`, { headers: { Authorization: `Bearer ${t}` } }).then(r=>r.json()).then(d=> setExceptions(Array.isArray(d)?d:[])).catch(()=>{});
+    // Map data — today
+    const today = new Date().toISOString().slice(0,10);
+    fetch(`${api}/attendance/map?date=${today}`, { headers: { Authorization: `Bearer ${t}` } }).then(r=>r.json()).then(d=> { if (d?.points) setMapData(d); }).catch(()=>{});
     // Superadmin missing clock-outs
     fetch(`${api}/attendance/admin/missing`, { headers: { Authorization: `Bearer ${t}` } }).then(r=>r.json()).then(d=> { if (Array.isArray(d)) setMissing(d); }).catch(()=>{});
   };
@@ -308,6 +315,28 @@ export default function AttendancePage() {
         <StatCard title="Sessions Today" value={String(sessions.length)} sub="Work Sessions §5" icon={Timer} accent="from-sky-500 to-blue-600" />
         <StatCard title="Overtime" value="41" sub="23m avg" icon={CalendarCheck} accent="from-violet-500 to-purple-600" />
       </div>
+
+      <GlassCard>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold flex items-center gap-2"><MapPin size={16}/> Live Location Map • {mapData?.total ?? 0} GPS points today</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 hidden md:inline">Real GPS on each clock • Branches as blue circles</span>
+            <button onClick={()=>setShowMap(v=>!v)} className={`px-4 py-1.5 rounded-full text-sm font-medium ${showMap?'bg-slate-900 text-white':'glass'}`}>{showMap?'Hide Map':'Show Map'}</button>
+          </div>
+        </div>
+        {showMap && (
+          <div className="mt-3">
+            {mapData && mapData.total>0 ? <AttendanceMap points={mapData.points} branches={mapData.branches} /> : mapData ? <div className="h-[300px] bg-slate-50 rounded-xl flex flex-col items-center justify-center text-slate-500 p-6 text-center"><MapPin size={24} className="mb-2 opacity-50"/>No GPS points today — clock in with location enabled to see markers.<div className="text-xs mt-1">Branch geofences shown as blue circles (200m). Out-of-geofence flagged as <code>out_of_geofence</code>.</div></div> : <div className="h-[300px] bg-slate-100 rounded-xl flex items-center justify-center text-slate-500">Loading map…</div>}
+            {mapData && mapData.points.length>0 && (
+              <div className="mt-2 text-xs text-slate-500 flex flex-wrap gap-2">
+                <span className="glass rounded-full px-2 py-1"><span className="w-2 h-2 bg-emerald-500 rounded-full inline-block mr-1"/> Clock-in/out markers</span>
+                <span className="glass rounded-full px-2 py-1"><span className="w-2 h-2 bg-sky-500 rounded-full inline-block mr-1"/> Branch • {mapData.branches.filter((b:any)=>b.latitude).length} geofenced</span>
+                <span>Zoom & click markers for employee + GPS ±accuracy</span>
+              </div>
+            )}
+          </div>
+        )}
+      </GlassCard>
 
       <GlassCard>
         <div className="flex items-center justify-between">

@@ -360,4 +360,41 @@ export class AttendanceService {
     if (query.employee_id) where.employeeId = query.employee_id;
     return this.prisma.workSession.findMany({ where, take: 50, orderBy: { date: 'desc' }, include: { employee: true } });
   }
+
+  async mapData(orgId: string, query: any, user?: any) {
+    const dateStr = query.date || new Date().toISOString().slice(0,10);
+    const date = new Date(dateStr);
+    const where:any = { organizationId: orgId, timestamp: { gte: new Date(dateStr), lt: new Date(new Date(dateStr).getTime()+86400000) }, location: { not: null } };
+    if (query.employee_id) where.employeeId = query.employee_id;
+    // RBAC
+    if (user?.role === 'employee') {
+      const emp = await this.prisma.employee.findUnique({ where: { userId: user.sub } });
+      if (emp) where.employeeId = emp.id;
+    } else if (user?.role === 'manager') {
+      const own = await this.prisma.employee.findUnique({ where: { userId: user.sub } });
+      if (own && !query.employee_id) {
+        const team = await this.prisma.employee.findMany({ where: { organizationId: orgId, managerId: own.id }, select:{id:true}});
+        where.employeeId = { in: [own.id, ...team.map(t=>t.id)] };
+      }
+    }
+    const events = await this.prisma.attendanceEvent.findMany({
+      where,
+      take: 200,
+      orderBy: { timestamp: 'desc' },
+      include: { employee: { select:{ id:true, employeeCode:true, jobTitle:true, branchId:true } } },
+    });
+    const branches = await this.prisma.branch.findMany({ where:{ organizationId: orgId } });
+    // Parse locations
+    const points = events.map(e=>{
+      let loc:any=null;
+      try { loc = e.location ? JSON.parse(e.location) : null; } catch { loc=null; }
+      if (!loc && e.location && e.location.includes(',')) { const [lat,lng]=e.location.split(',').map(Number); loc={latitude:lat, longitude:lng}; }
+      return {
+        id: e.id, employeeId: e.employeeId, employeeCode: e.employee?.employeeCode, jobTitle: e.employee?.jobTitle,
+        eventType: e.eventType, timestamp: e.timestamp, verificationMethod: e.verificationMethod,
+        location: loc, rawLocation: e.location, ipAddress: e.ipAddress,
+      };
+    }).filter(p=> p.location && p.location.latitude != null && p.location.longitude != null);
+    return { date: dateStr, branches: branches.map(b=> ({ id:b.id, name:b.name, latitude:b.latitude, longitude:b.longitude, gpsRadius:b.gpsRadius, address:b.address })), points, total: points.length };
+  }
 }
