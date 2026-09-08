@@ -25,13 +25,13 @@ async function bootstrap() {
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', 1);
 
-  // Basic security headers (helmet-like without extra dep)
+  // Basic security headers (helmet-like without extra dep) — allow GPS/camera for attendance face + geolocation
   app.use((req: any, res: any, next: any) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    res.setHeader('Permissions-Policy', 'geolocation=(self), microphone=(self), camera=(self)');
     if (process.env.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     next();
   });
