@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { Public } from '../../common/guards/jwt-auth.guard';
 
@@ -11,6 +11,19 @@ export class AuthController {
   @Public()
   @Post('login')
   @ApiOperation({ summary: 'Login - requires email, password and organization acronym' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['email','password','acronym'],
+      properties: {
+        email: { type: 'string', example: 'superadmin@recruitconnect.ng' },
+        password: { type: 'string', example: 'Test@123' },
+        acronym: { type: 'string', example: 'RC', description: 'Organization acronym (also accepts org_acronym / organizationAcronym)' },
+        org_acronym: { type: 'string', example: 'RC' },
+        organizationAcronym: { type: 'string', example: 'RC' },
+      },
+    },
+  })
   login(@Body() body: { email: string; password: string; org_acronym?: string; acronym?: string; organizationAcronym?: string }) {
     const ac = body.org_acronym || body.acronym || body.organizationAcronym;
     return this.auth.login(body.email, body.password, ac);
@@ -18,6 +31,7 @@ export class AuthController {
 
   @Public()
   @Post('refresh')
+  @ApiBody({ schema: { type:'object', required:['refresh_token'], properties:{ refresh_token:{type:'string', example:'eyJ...'} } } })
   refresh(@Body() body: { refresh_token: string }) {
     return this.auth.refresh(body.refresh_token);
   }
