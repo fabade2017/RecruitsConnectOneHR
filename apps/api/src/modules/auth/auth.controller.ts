@@ -16,11 +16,11 @@ export class AuthController {
       type: 'object',
       required: ['email','password','acronym'],
       properties: {
-        email: { type: 'string', example: 'superadmin@recruitconnect.ng' },
-        password: { type: 'string', example: 'Test@123' },
-        acronym: { type: 'string', example: 'RC', description: 'Organization acronym (also accepts org_acronym / organizationAcronym)' },
-        org_acronym: { type: 'string', example: 'RC' },
-        organizationAcronym: { type: 'string', example: 'RC' },
+        email: { type: 'string', example: 'sample.admin@example.com' },
+        password: { type: 'string', example: 'Sample@123' },
+        acronym: { type: 'string', example: 'SAMPLE', description: 'Organization acronym (also accepts org_acronym / organizationAcronym)' },
+        org_acronym: { type: 'string', example: 'SAMPLE' },
+        organizationAcronym: { type: 'string', example: 'SAMPLE' },
       },
     },
   })
