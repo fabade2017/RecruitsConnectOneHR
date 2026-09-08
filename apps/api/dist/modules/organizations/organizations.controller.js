@@ -40,6 +40,21 @@ let OrganizationsController = class OrganizationsController {
             throw new (require('@nestjs/common').ForbiddenException)('Can only view own organization subscription');
         return this.svc.getSubscription(id);
     }
+    requestRenewal(id, req) {
+        if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id)
+            throw new (require('@nestjs/common').ForbiddenException)('Can only renew own organization');
+        return this.svc.requestRenewal(id, req.user.sub);
+    }
+    renewals(id, req) {
+        if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id)
+            throw new (require('@nestjs/common').ForbiddenException)('Can only view own renewals');
+        return this.svc.listRenewals(id);
+    }
+    getRenewal(id, renewalId, req) {
+        if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id)
+            throw new (require('@nestjs/common').ForbiddenException)('Can only view own renewal');
+        return this.svc.getRenewal(renewalId, id);
+    }
     health(id, date) { return this.svc.healthScore(id, date); }
 };
 exports.OrganizationsController = OrganizationsController;
@@ -141,6 +156,34 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "subscription", null);
+__decorate([
+    (0, common_1.Post)(':id/renew'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], OrganizationsController.prototype, "requestRenewal", null);
+__decorate([
+    (0, common_1.Get)(':id/renewals'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], OrganizationsController.prototype, "renewals", null);
+__decorate([
+    (0, common_1.Get)(':id/renewals/:renewalId'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('renewalId')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", void 0)
+], OrganizationsController.prototype, "getRenewal", null);
 __decorate([
     (0, common_1.Get)(':id/health-score'),
     (0, rbac_guard_1.Roles)('executive', 'org_admin', 'hr_admin', 'super_admin'),

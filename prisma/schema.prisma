@@ -67,6 +67,7 @@ model Organization {
   permissions          Permission[]               @relation("OrgPermissions")
   conversations        Conversation[]
   messages             Message[]
+  renewals             SubscriptionRenewal[]
 
   @@map("organizations")
 }
@@ -952,7 +953,7 @@ model SubscriptionPlan {
   description   String?
   price         Decimal                    @db.Decimal(12, 2)
   currency      String                     @default("NGN")
-  billingCycle  String                     @default("monthly")
+  billingCycle  String                     @default("yearly")
   maxEmployees  Int                        @default(50) @map("max_employees")
   maxBranches   Int                        @default(3) @map("max_branches")
   isActive      Boolean                    @default(true) @map("is_active")
@@ -961,6 +962,7 @@ model SubscriptionPlan {
   updatedAt     DateTime                   @updatedAt @map("updated_at")
   subscriptions OrganizationSubscription[]
   modules       PlanModule[]
+  renewals      SubscriptionRenewal[]
 
   @@map("subscription_plans")
 }
@@ -1003,18 +1005,46 @@ model OrganizationSubscription {
   status         String           @default("active")
   startDate      DateTime         @default(now()) @map("start_date")
   endDate        DateTime?        @map("end_date")
-  billingCycle   String           @default("monthly") @map("billing_cycle")
+  billingCycle   String           @default("yearly") @map("billing_cycle")
   autoRenew      Boolean          @default(true) @map("auto_renew")
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
   companyGroup   CompanyGroup?    @relation(fields: [companyGroupId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   plan           SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  renewals       SubscriptionRenewal[]
 
   @@unique([organizationId, planId])
   @@index([organizationId])
   @@index([companyGroupId])
   @@map("organization_subscriptions")
+}
+
+model SubscriptionRenewal {
+  id               String               @id @default(uuid())
+  organizationId   String               @map("organization_id")
+  planId           String               @map("plan_id")
+  subscriptionId   String?              @map("subscription_id")
+  status           String               @default("pending") // pending | approved | rejected | expired
+  requestedAt      DateTime             @default(now()) @map("requested_at")
+  approvedAt       DateTime?            @map("approved_at")
+  previousEndDate  DateTime?            @map("previous_end_date")
+  newEndDate       DateTime?            @map("new_end_date")
+  amount           Decimal              @db.Decimal(12,2)
+  receiptNumber    String?              @unique @map("receipt_number")
+  receiptUrl       String?              @map("receipt_url")
+  requestedBy      String?              @map("requested_by")
+  approvedBy       String?              @map("approved_by")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan             SubscriptionPlan     @relation(fields: [planId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subscription     OrganizationSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([planId])
+  @@map("subscription_renewals")
 }
 
 model OnboardingProgress {

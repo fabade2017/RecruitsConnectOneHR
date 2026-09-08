@@ -323,12 +323,14 @@ let AdminService = class AdminService {
             const group = await this.prisma.companyGroup.findUnique({ where: { id: companyGroupId }, include: { organizations: true } });
             if (!group)
                 throw new common_1.NotFoundException('Group not found');
+            const yearlyEnd = new Date();
+            yearlyEnd.setFullYear(yearlyEnd.getFullYear() + 1);
             const results = [];
             for (const org of group.organizations) {
                 const existing = await this.prisma.organizationSubscription.findFirst({ where: { organizationId: org.id, planId } });
                 if (!existing) {
                     const sub = await this.prisma.organizationSubscription.create({
-                        data: { organizationId: org.id, companyGroupId, planId, status: 'active', billingCycle: billingCycle || 'monthly' }
+                        data: { organizationId: org.id, companyGroupId, planId, status: 'active', billingCycle: billingCycle || 'yearly', endDate: yearlyEnd }
                     });
                     results.push(sub);
                     await this.prisma.organization.update({ where: { id: org.id }, data: { status: 'active', isActive: true } }).catch(() => { });
@@ -336,9 +338,11 @@ let AdminService = class AdminService {
             }
             return { group: group.name, assigned: results.length, subscriptions: results };
         }
-        // Single org assignment
+        // Single org assignment — yearly
+        const yearlyEnd = new Date();
+        yearlyEnd.setFullYear(yearlyEnd.getFullYear() + 1);
         const sub = await this.prisma.organizationSubscription.create({
-            data: { organizationId, planId, status: 'active', billingCycle: billingCycle || 'monthly' }
+            data: { organizationId, planId, status: 'active', billingCycle: billingCycle || 'yearly', endDate: yearlyEnd }
         });
         // Activate organization (grant access) on first approval
         await this.prisma.organization.update({ where: { id: organizationId }, data: { status: 'active', isActive: true } }).catch(() => { });
@@ -370,6 +374,76 @@ let AdminService = class AdminService {
                 subscriptions: { include: { plan: true } },
             },
         });
+    }
+    // ===== Renewals (yearly) =====
+    listRenewals(status) {
+        const where = {};
+        if (status)
+            where.status = status;
+        return this.prisma.subscriptionRenewal.findMany({ where, orderBy: { createdAt: 'desc' }, include: { organization: true, plan: true } });
+    }
+    async approveRenewal(renewalId, approverId) {
+        const renewal = await this.prisma.subscriptionRenewal.findUnique({ where: { id: renewalId }, include: { organization: true, plan: true } });
+        if (!renewal)
+            throw new common_1.NotFoundException('Renewal not found');
+        if (renewal.status !== 'pending')
+            throw new common_1.ConflictException('Renewal not pending');
+        const sub = await this.prisma.organizationSubscription.findFirst({ where: { id: renewal.subscriptionId || undefined, organizationId: renewal.organizationId, status: 'active' } });
+        if (!sub)
+            throw new common_1.NotFoundException('Active subscription not found');
+        const newEndDate = renewal.newEndDate || new Date(new Date(sub.endDate || new Date()).setFullYear(new Date(sub.endDate || new Date()).getFullYear() + 1));
+        // Update subscription endDate
+        await this.prisma.organizationSubscription.update({ where: { id: sub.id }, data: { endDate: newEndDate, status: 'active' } });
+        // Generate receipt
+        const receiptNumber = `RCPT-${new Date().getFullYear()}-${renewal.id.slice(0, 8).toUpperCase()}`;
+        const receiptUrl = `receipts/${receiptNumber}.pdf`; // placeholder — frontend can generate PDF from data
+        const updated = await this.prisma.subscriptionRenewal.update({
+            where: { id: renewalId },
+            data: { status: 'approved', approvedAt: new Date(), approvedBy: approverId, newEndDate, receiptNumber, receiptUrl },
+        });
+        // Notify organization (in-app notification)
+        try {
+            await this.prisma.notification.create({
+                data: {
+                    organizationId: renewal.organizationId,
+                    userId: null,
+                    channel: 'in_app',
+                    template: 'subscription_renewed',
+                    payload: JSON.stringify({ renewalId, receiptNumber, amount: renewal.amount, newEndDate, plan: renewal.plan.name }),
+                    status: 'pending',
+                },
+            });
+        }
+        catch { }
+        // Also extend organization isActive
+        await this.prisma.organization.update({ where: { id: renewal.organizationId }, data: { isActive: true, status: 'active' } }).catch(() => { });
+        return { renewal: updated, subscription: await this.prisma.organizationSubscription.findUnique({ where: { id: sub.id } }), receiptNumber, receiptUrl };
+    }
+    async rejectRenewal(renewalId, approverId, reason) {
+        const renewal = await this.prisma.subscriptionRenewal.findUnique({ where: { id: renewalId } });
+        if (!renewal)
+            throw new common_1.NotFoundException('Renewal not found');
+        if (renewal.status !== 'pending')
+            throw new common_1.ConflictException('Renewal not pending');
+        return this.prisma.subscriptionRenewal.update({ where: { id: renewalId }, data: { status: 'rejected', approvedBy: approverId } });
+    }
+    async getRenewalReceipt(renewalId) {
+        const r = await this.prisma.subscriptionRenewal.findUnique({ where: { id: renewalId }, include: { organization: true, plan: true } });
+        if (!r)
+            throw new common_1.NotFoundException('Renewal not found');
+        if (!r.receiptNumber)
+            throw new common_1.NotFoundException('Receipt not yet generated — awaiting approval');
+        return {
+            receiptNumber: r.receiptNumber,
+            receiptUrl: r.receiptUrl,
+            organization: r.organization,
+            plan: r.plan,
+            amount: r.amount,
+            previousEndDate: r.previousEndDate,
+            newEndDate: r.newEndDate,
+            approvedAt: r.approvedAt,
+            status: r.status,
+        };
     }
 };
 exports.AdminService = AdminService;

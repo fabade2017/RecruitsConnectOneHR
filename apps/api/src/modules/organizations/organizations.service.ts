@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 
@@ -92,7 +92,52 @@ export class OrganizationsService {
       totalPrice: Number(sub.plan.price) + modulesWithPrice.reduce((s,m)=>s+ (m.effectivePrice as number),0),
       disabledModules,
       allCatalog,
+      // expiry helpers
+      expiresAt: sub.endDate,
+      daysLeft: sub.endDate ? Math.ceil((new Date(sub.endDate).getTime() - Date.now())/86400000) : null,
     };
+  }
+
+  async requestRenewal(organizationId: string, userId?: string) {
+    const sub = await this.prisma.organizationSubscription.findFirst({ where: { organizationId, status: 'active' }, orderBy: { createdAt: 'desc' } });
+    if (!sub) throw new NotFoundException('No active subscription to renew');
+    // Prevent duplicate pending
+    const pending = await this.prisma.subscriptionRenewal.findFirst({ where: { organizationId, status: 'pending' } });
+    if (pending) throw new ConflictException('Renewal already pending — awaiting Super Admin approval');
+    const plan = await this.prisma.subscriptionPlan.findUnique({ where: { id: sub.planId }, include: { modules: true } });
+    if (!plan) throw new NotFoundException('Plan not found');
+    const catalog = await this.prisma.moduleCatalog.findMany({ where: { key: { in: plan.modules.map(m=>m.moduleKey) } } });
+    const catMap = new Map(catalog.map(c=>[c.key,c]));
+    const totalModule = plan.modules.reduce((s,m)=> s + (m.price != null ? Number(m.price) : (catMap.get(m.moduleKey)? Number(catMap.get(m.moduleKey)!.basePrice):0)),0);
+    const amount = Number(plan.price) + totalModule;
+    const previousEndDate = sub.endDate || new Date();
+    const newEndDate = new Date(previousEndDate);
+    newEndDate.setFullYear(newEndDate.getFullYear()+1);
+    const renewal = await this.prisma.subscriptionRenewal.create({
+      data: {
+        organizationId,
+        planId: plan.id,
+        subscriptionId: sub.id,
+        previousEndDate,
+        newEndDate,
+        amount,
+        status: 'pending',
+        requestedBy: userId,
+      } as any,
+    });
+    return renewal;
+  }
+
+  async listRenewals(organizationId: string) {
+    return this.prisma.subscriptionRenewal.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' }, include: { plan: true } });
+  }
+
+  async getRenewal(renewalId: string, organizationId?: string) {
+    const where:any={ id: renewalId };
+    if (organizationId) where.organizationId = organizationId;
+    const r = await this.prisma.subscriptionRenewal.findFirst({ where, include: { plan: true, organization: true } });
+    if (!r) throw new NotFoundException('Renewal not found');
+    return r;
   }
 
   async checkAcronym(acronym: string) {

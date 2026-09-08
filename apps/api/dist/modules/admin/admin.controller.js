@@ -60,6 +60,11 @@ let AdminController = class AdminController {
     updateSubscription(id, dto) { return this.svc.updateSubscription(id, dto); }
     cancelSubscription(id) { return this.svc.cancelSubscription(id); }
     checkAccess(orgId, moduleKey) { return this.svc.checkModuleAccess(orgId, moduleKey); }
+    // ===== Renewals (yearly) =====
+    renewals(status) { return this.svc.listRenewals(status); }
+    approveRenewal(id, req) { return this.svc.approveRenewal(id, req.user.sub); }
+    rejectRenewal(id, req, dto) { return this.svc.rejectRenewal(id, req.user.sub, dto.reason); }
+    renewalReceipt(id) { return this.svc.getRenewalReceipt(id); }
     organizations() { return this.svc.listOrganizations(); }
 };
 exports.AdminController = AdminController;
@@ -341,6 +346,41 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "checkAccess", null);
+__decorate([
+    (0, common_1.Get)('renewals'),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    __param(0, (0, common_1.Query)('status')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "renewals", null);
+__decorate([
+    (0, common_1.Post)('renewals/:id/approve'),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "approveRenewal", null);
+__decorate([
+    (0, common_1.Post)('renewals/:id/reject'),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "rejectRenewal", null);
+__decorate([
+    (0, common_1.Get)('renewals/:id/receipt'),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "renewalReceipt", null);
 __decorate([
     (0, common_1.Get)('organizations'),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),

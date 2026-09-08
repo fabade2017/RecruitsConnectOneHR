@@ -27,5 +27,26 @@ export class OrganizationsController {
     return this.svc.getSubscription(id);
   }
 
+  @Post(':id/renew')
+  @RequirePermissions('employee:read')
+  requestRenewal(@Param('id') id: string, @Req() req: any) {
+    if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id) throw new (require('@nestjs/common').ForbiddenException)('Can only renew own organization');
+    return this.svc.requestRenewal(id, req.user.sub);
+  }
+
+  @Get(':id/renewals')
+  @RequirePermissions('employee:read')
+  renewals(@Param('id') id: string, @Req() req: any) {
+    if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id) throw new (require('@nestjs/common').ForbiddenException)('Can only view own renewals');
+    return this.svc.listRenewals(id);
+  }
+
+  @Get(':id/renewals/:renewalId')
+  @RequirePermissions('employee:read')
+  getRenewal(@Param('id') id: string, @Param('renewalId') renewalId: string, @Req() req: any) {
+    if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id) throw new (require('@nestjs/common').ForbiddenException)('Can only view own renewal');
+    return this.svc.getRenewal(renewalId, id);
+  }
+
   @Get(':id/health-score') @Roles('executive','org_admin','hr_admin','super_admin') @RequirePermissions('analytics:read') health(@Param('id') id: string, @Query('date') date: string) { return this.svc.healthScore(id, date); }
 }

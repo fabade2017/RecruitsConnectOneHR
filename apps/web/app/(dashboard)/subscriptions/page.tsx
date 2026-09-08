@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { GlassCard, Pill } from '../../../components/ui/GlassCard';
-import { CreditCard, Package, Check, X, DollarSign, Shield, AlertTriangle, Lock } from 'lucide-react';
+import { CreditCard, Package, Check, X, DollarSign, Shield, AlertTriangle, Lock, Calendar, Clock, RefreshCw, Receipt, Bell } from 'lucide-react';
 import { getApiUrl, getAuthHeaders } from '../../../lib/api';
 
 export default function SubscriptionsPage() {
@@ -9,19 +9,49 @@ export default function SubscriptionsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [renewals, setRenewals] = useState<any[]>([]);
+  const [renewing, setRenewing] = useState(false);
+  const [orgId, setOrgId] = useState<string>('');
 
-  useEffect(()=>{
+  const load = async () => {
     const token = localStorage.getItem('onehr_token');
     const user = JSON.parse(localStorage.getItem('onehr_user')||'{}');
-    const orgId = user.org_id || user.organizationId;
-    if (!orgId) { setError('Missing organization context'); setLoading(false); return; }
-    fetch(`${api}/organizations/${orgId}/subscription`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r=> r.json().then(j=> ({ok:r.ok, j})))
-      .then(({ok,j})=>{
-        if (!ok) throw new Error(j.message || 'Failed to load');
-        setData(j);
-      }).catch((e:any)=> setError(e.message)).finally(()=> setLoading(false));
-  },[]);
+    const oid = user.org_id || user.organizationId;
+    setOrgId(oid);
+    if (!oid) { setError('Missing organization context'); setLoading(false); return; }
+    try {
+      const res = await fetch(`${api}/organizations/${oid}/subscription`, { headers: { Authorization: `Bearer ${token}` } });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.message || 'Failed to load');
+      setData(j);
+      // also load renewals
+      const rRes = await fetch(`${api}/organizations/${oid}/renewals`, { headers: { Authorization: `Bearer ${token}` } });
+      if (rRes.ok) { const rj = await rRes.json(); setRenewals(Array.isArray(rj)?rj:[]); }
+    } catch (e:any) { setError(e.message); } finally { setLoading(false); }
+  };
+
+  useEffect(()=>{ load(); },[]);
+
+  const requestRenewal = async () => {
+    if (!orgId) return;
+    if (!confirm('Request yearly renewal? Super Admin will approve and you will receive receipt + notification.')) return;
+    setRenewing(true);
+    try {
+      const token = localStorage.getItem('onehr_token');
+      const res = await fetch(`${api}/organizations/${orgId}/renew`, { method:'POST', headers: { Authorization: `Bearer ${token}` } });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.message || 'Renewal failed');
+      alert(`Renewal requested! Amount ₦${Number(j.amount).toLocaleString()} — pending Super Admin approval. New expiry: ${new Date(j.newEndDate).toLocaleString()}`);
+      load();
+    } catch (e:any) { alert(e.message); } finally { setRenewing(false); }
+  };
+
+  const downloadReceipt = (r:any) => {
+    const content = `RECEIPT\n${r.receiptNumber}\nOrg: ${data?.subscription?.organization?.name || orgId}\nPlan: ${r.plan?.name || data?.plan?.name}\nAmount: ₦${Number(r.amount).toLocaleString()}\nPeriod: ${new Date(r.previousEndDate).toLocaleDateString()} → ${new Date(r.newEndDate).toLocaleDateString()}\nApproved: ${r.approvedAt ? new Date(r.approvedAt).toLocaleString(): ''}\nStatus: ${r.status}\n`;
+    const blob = new Blob([content], { type:'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=`${r.receiptNumber}.txt`; a.click(); URL.revokeObjectURL(url);
+  };
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading subscription…</div>;
   if (error) return <div className="p-8 bg-red-50 border border-red-200 rounded-xl text-red-700">{error} <a href="/admin" className="underline">Super Admin → Organizations</a> to assign plan</div>;
@@ -41,15 +71,67 @@ export default function SubscriptionsPage() {
   const totalModule = data.totalModulePrice || 0;
   const total = data.totalPrice || 0;
 
+  const expiresAt = data.subscription?.endDate ? new Date(data.subscription.endDate) : null;
+  const daysLeft = data.daysLeft ?? (expiresAt ? Math.ceil((expiresAt.getTime() - Date.now())/86400000) : null);
+  const pendingRenewal = renewals.find((r:any)=> r.status==='pending');
+  const lastApproved = renewals.find((r:any)=> r.status==='approved');
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><CreditCard className="text-slate-900"/> Subscription <span className="text-slate-500 font-normal">— {data.subscription.organization?.name}</span></h1>
-          <p className="text-sm text-slate-500">Modules with individual pricing. Disabled modules are blocked (403).</p>
+          <p className="text-sm text-slate-500">Yearly billing • Modules with individual pricing. Disabled modules are blocked (403).</p>
         </div>
         <Pill tone="emerald">Active • {plan.name}</Pill>
       </div>
+
+      {/* Expiry & Renewal */}
+      <GlassCard className={daysLeft!=null && daysLeft<30 ? 'border-amber-300 bg-amber-50/30' : daysLeft!=null && daysLeft<0 ? 'border-red-300 bg-red-50/30' : ''}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-bold flex items-center gap-2"><Calendar size={16}/> Subscription Period • Yearly</h3>
+            <div className="mt-1 text-sm flex flex-wrap gap-3">
+              <span className="flex items-center gap-1"><Clock size={14}/> Started: <b>{new Date(data.subscription.startDate).toLocaleString()}</b></span>
+              <span className="flex items-center gap-1"><Calendar size={14}/> Expires: <b className={daysLeft!=null && daysLeft<7 ? 'text-red-600' : daysLeft!=null && daysLeft<30 ? 'text-amber-600' : ''}>{expiresAt ? expiresAt.toLocaleString() : '—'}</b> {daysLeft!=null && <Pill tone={daysLeft<0?'red':daysLeft<30?'amber':'emerald'}>{daysLeft<0?`${Math.abs(daysLeft)} days overdue`: `${daysLeft} days left`}</Pill>}</span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Billing: {plan.billingCycle} • Next renewal extends 1 year to {expiresAt ? new Date(new Date(expiresAt).setFullYear(expiresAt.getFullYear()+1)).toLocaleDateString() : '—'}</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {pendingRenewal ? (
+              <div className="bg-amber-100 border border-amber-300 rounded-xl px-4 py-2 text-sm">
+                <div className="font-semibold flex items-center gap-2"><Bell size={14}/> Renewal pending</div>
+                <div className="text-xs">Requested {new Date(pendingRenewal.requestedAt).toLocaleString()} • Amount ₦{Number(pendingRenewal.amount).toLocaleString()} • Awaiting Super Admin</div>
+                <div className="text-xs text-slate-600">New expiry: {pendingRenewal.newEndDate ? new Date(pendingRenewal.newEndDate).toLocaleString() : '—'}</div>
+              </div>
+            ) : (
+              <button onClick={requestRenewal} disabled={renewing} className="bg-slate-900 text-white rounded-xl px-6 py-3 font-semibold hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2">
+                <RefreshCw size={16} className={renewing?'animate-spin':''}/>{renewing?'Requesting…':'Renew for 1 Year'} • ₦{Number(total).toLocaleString()}
+              </button>
+            )}
+            {lastApproved && <button onClick={()=>downloadReceipt(lastApproved)} className="text-xs text-center underline flex items-center justify-center gap-1"><Receipt size={12}/> Download last receipt {lastApproved.receiptNumber}</button>}
+          </div>
+        </div>
+        {renewals.length>0 && (
+          <div className="mt-4 border-t pt-3">
+            <h4 className="text-sm font-semibold">Renewal history</h4>
+            <div className="mt-2 space-y-2 max-h-[200px] overflow-auto">
+              {renewals.map((r:any)=> (
+                <div key={r.id} className="flex items-center justify-between border rounded-xl px-3 py-2 text-xs bg-white">
+                  <div>
+                    <div className="font-mono font-semibold">{r.receiptNumber || r.id.slice(0,8)} • {r.status} {r.status==='pending' && <Pill tone="amber">pending</Pill>} {r.status==='approved' && <Pill tone="emerald">approved</Pill>}</div>
+                    <div className="text-slate-500">Prev: {r.previousEndDate ? new Date(r.previousEndDate).toLocaleString() : '—'} → New: {r.newEndDate ? new Date(r.newEndDate).toLocaleString() : '—'} • ₦{Number(r.amount).toLocaleString()}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    {r.status==='approved' && r.receiptNumber && <button onClick={()=>downloadReceipt(r)} className="glass rounded-full px-3 py-1 text-xs flex items-center gap-1"><Receipt size={12}/> Receipt</button>}
+                    {r.status==='approved' && <span className="text-emerald-600 text-xs flex items-center gap-1"><Bell size={12}/> Notified</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </GlassCard>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <GlassCard className="lg:col-span-2">

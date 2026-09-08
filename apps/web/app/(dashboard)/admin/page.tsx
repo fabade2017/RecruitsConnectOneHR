@@ -2,12 +2,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { GlassCard, Pill } from '../../../components/ui/GlassCard';
-import { Shield, Users, Building2, CreditCard, Plus, Trash2, Edit2, Check, X, Layers, Sparkles, Search, DollarSign, Package, Eye, EyeOff } from 'lucide-react';
+import { Shield, Users, Building2, CreditCard, Plus, Trash2, Edit2, Check, X, Layers, Sparkles, Search, DollarSign, Package, Eye, EyeOff, RefreshCw, Receipt, Bell, Calendar, Clock } from 'lucide-react';
 import { getApiUrl, getAuthHeaders, parseApiList } from '../../../lib/api';
 
 export default function SuperAdminPage() {
   const api = getApiUrl();
-  const [active, setActive] = useState<'roles'|'groups'|'plans'|'orgs'|'modules'>('roles');
+  const [active, setActive] = useState<'roles'|'groups'|'plans'|'orgs'|'modules'|'renewals'>('roles');
   const [roles, setRoles] = useState<any[]>([]);
   const [perms, setPerms] = useState<any[]>([]);
   const [groupedPerms, setGroupedPerms] = useState<Record<string,any[]>>({});
@@ -27,6 +27,7 @@ export default function SuperAdminPage() {
   const [newModule, setNewModule] = useState({ key:'', name:'', description:'', basePrice:5000, category:'add_on' });
   const [editingPrices, setEditingPrices] = useState<Record<string, Record<string, number>>>({}); // planId -> moduleKey -> price
   const [assigningPlan, setAssigningPlan] = useState<string|null>(null);
+  const [renewals, setRenewals] = useState<any[]>([]);
 
   const auth = () => getAuthHeaders() as any;
 
@@ -46,13 +47,14 @@ export default function SuperAdminPage() {
       throw new Error(`Failed ${res.status} on ${url}`);
     };
     try {
-      const [r, g, pl, o, cat, pricing] = await Promise.all([
+      const [r, g, pl, o, cat, pricing, ren] = await Promise.all([
         safeJson(`${api}/admin/roles`),
         safeJson(`${api}/admin/groups`),
         safeJson(`${api}/admin/plans`),
         safeJson(`${api}/admin/organizations`, `${api}/organizations`),
         safeJson(`${api}/admin/module-catalog`).catch(()=>[]),
         safeJson(`${api}/admin/plans/pricing`).catch(()=>[]),
+        safeJson(`${api}/admin/renewals`).catch(()=>[]),
       ]);
       setRoles(Array.isArray(r)?r:parseApiList(r));
       setGroups(Array.isArray(g)?g:parseApiList(g));
@@ -60,6 +62,7 @@ export default function SuperAdminPage() {
       setOrgs(Array.isArray(o)?o:parseApiList(o));
       setCatalog(Array.isArray(cat)?cat:parseApiList(cat));
       setPlansPricing(Array.isArray(pricing)?pricing:pricing?.length?pricing:[]);
+      setRenewals(Array.isArray(ren)?ren:parseApiList(ren));
     } catch (e:any) {
       setPermsError(e.message || 'Failed to load admin data');
     }
@@ -184,11 +187,12 @@ export default function SuperAdminPage() {
           ['roles','Roles',Shield],
           ['modules','Modules & Pricing',Package],
           ['plans','Subscriptions',CreditCard],
+          ['renewals','Renewals',RefreshCw],
           ['groups','Company Groups',Building2],
           ['orgs','Organizations',Users],
         ].map(([k,label,Icon]: any) => (
           <button key={k} onClick={()=>setActive(k as any)} className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${active===k ? 'bg-slate-900 text-white' : 'glass'}`}>
-            <Icon size={16}/>{label} {k==='orgs' && `(${orgs.length})`} {k==='modules' && `(${catalog.length})`}
+            <Icon size={16}/>{label} {k==='orgs' && `(${orgs.length})`} {k==='modules' && `(${catalog.length})`} {k==='renewals' && `(${renewals.filter((r:any)=>r.status==='pending').length})`}
           </button>
         ))}
       </div>
@@ -431,6 +435,64 @@ export default function SuperAdminPage() {
               <button onClick={createPlan} className="bg-slate-900 text-white rounded-xl px-4 py-2 text-sm">Create Plan</button>
             </div>
             <p className="text-xs text-slate-500 mt-2">Plans bundle modules; org sees `₦ base + sum(module prices)` and blocked if module not picked. Check <code>GET /v1/admin/organizations/:orgId/modules/:key/access</code>.</p>
+          </GlassCard>
+        </div>
+      )}
+
+      {active==='renewals' && (
+        <div className="space-y-4">
+          <GlassCard>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold flex items-center gap-2"><RefreshCw size={16}/> Renewal Requests — Yearly <Pill tone="blue">{renewals.filter((r:any)=>r.status==='pending').length} pending</Pill></h3>
+              <button onClick={load} className="text-xs glass rounded-full px-3 py-1">Refresh</button>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Org → <code>POST /v1/organizations/:id/renew</code> → pending → Super Admin → <code>POST /v1/admin/renewals/:id/approve</code> extends 1 year, generates receipt, notifies org.</p>
+            <div className="mt-3 overflow-auto max-h-[520px]">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs"><tr><th className="text-left p-2">Org</th><th className="p-2">Plan</th><th className="p-2">Amount</th><th className="p-2">Prev Expiry</th><th className="p-2">New Expiry</th><th className="p-2">Status</th><th className="p-2">Requested</th><th className="p-2">Actions</th></tr></thead>
+                <tbody className="divide-y">
+                  {renewals.map((r:any)=> (
+                    <tr key={r.id} className="hover:bg-slate-50/50">
+                      <td className="p-2"><div className="font-semibold">{r.organization?.name || r.organizationId.slice(0,8)}</div><div className="text-xs font-mono">{r.organization?.acronym || ''}</div></td>
+                      <td className="p-2 text-xs"><Pill tone="slate">{r.plan?.name || r.planId.slice(0,8)}</Pill></td>
+                      <td className="p-2 font-mono text-xs">₦{Number(r.amount).toLocaleString()}</td>
+                      <td className="p-2 text-xs">{r.previousEndDate ? new Date(r.previousEndDate).toLocaleString() : '—'}</td>
+                      <td className="p-2 text-xs">{r.newEndDate ? new Date(r.newEndDate).toLocaleString() : '—'}</td>
+                      <td className="p-2"><Pill tone={r.status==='pending'?'amber':r.status==='approved'?'emerald':'red'}>{r.status}</Pill></td>
+                      <td className="p-2 text-xs">{r.requestedAt ? new Date(r.requestedAt).toLocaleString() : new Date(r.createdAt).toLocaleString()}</td>
+                      <td className="p-2 flex gap-1">
+                        {r.status==='pending' && (
+                          <>
+                            <button onClick={async()=>{
+                              const h=auth();
+                              const res=await fetch(`${api}/admin/renewals/${r.id}/approve`, { method:'POST', headers:h });
+                              if(res.ok){ const j=await res.json(); alert(`Approved! Receipt ${j.receiptNumber} • New expiry ${new Date(j.renewal.newEndDate).toLocaleString()} • Org notified`); load(); } else { const e=await res.json().catch(()=>({message:'Failed'})); alert(e.message); }
+                            }} className="bg-emerald-600 text-white rounded-full px-3 py-1 text-xs flex items-center gap-1"><Check size={12}/> Approve</button>
+                            <button onClick={async()=>{
+                              if(!confirm('Reject renewal?')) return;
+                              const h=auth();
+                              const res=await fetch(`${api}/admin/renewals/${r.id}/reject`, { method:'POST', headers:{...h, 'Content-Type':'application/json'}, body: JSON.stringify({}) });
+                              if(res.ok) load(); else alert('Failed');
+                            }} className="bg-white border rounded-full px-3 py-1 text-xs">Reject</button>
+                          </>
+                        )}
+                        {r.status==='approved' && r.receiptNumber && (
+                          <button onClick={async()=>{
+                            const h=auth();
+                            const res=await fetch(`${api}/admin/renewals/${r.id}/receipt`, { headers:h });
+                            const j=await res.json();
+                            const content=`RECEIPT\n${j.receiptNumber}\nOrg: ${j.organization?.name} (${j.organization?.acronym})\nPlan: ${j.plan?.name}\nAmount: ₦${Number(j.amount).toLocaleString()}\nPeriod: ${new Date(j.previousEndDate).toLocaleDateString()} → ${new Date(j.newEndDate).toLocaleDateString()}\nApproved: ${new Date(j.approvedAt).toLocaleString()}\n`;
+                            const blob=new Blob([content],{type:'text/plain'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`${j.receiptNumber}.txt`; a.click(); URL.revokeObjectURL(url);
+                          }} className="glass rounded-full px-3 py-1 text-xs flex items-center gap-1"><Receipt size={12}/> Receipt</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {renewals.length===0 && <tr><td colSpan={8} className="p-8 text-center text-slate-500">No renewal requests — orgs click Renew in Subscription page</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-3 bg-slate-50/50 text-xs text-slate-500">Yearly renewal adds 1 year to <code>endDate</code> (e.g. 2026→2027) and generates <code>RCPT-YYYY-XXXX</code> receipt + in-app notification.</div>
           </GlassCard>
         </div>
       )}

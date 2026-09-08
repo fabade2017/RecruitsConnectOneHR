@@ -153,6 +153,23 @@ export class AdminController {
   @RequirePermissions('admin:manage')
   checkAccess(@Param('orgId') orgId: string, @Param('moduleKey') moduleKey: string) { return this.svc.checkModuleAccess(orgId, moduleKey); }
 
+  // ===== Renewals (yearly) =====
+  @Get('renewals')
+  @RequirePermissions('admin:manage')
+  renewals(@Query('status') status?: string) { return this.svc.listRenewals(status); }
+
+  @Post('renewals/:id/approve')
+  @RequirePermissions('admin:manage')
+  approveRenewal(@Param('id') id: string, @Req() req: any) { return this.svc.approveRenewal(id, req.user.sub); }
+
+  @Post('renewals/:id/reject')
+  @RequirePermissions('admin:manage')
+  rejectRenewal(@Param('id') id: string, @Req() req: any, @Body() dto: any) { return this.svc.rejectRenewal(id, req.user.sub, dto.reason); }
+
+  @Get('renewals/:id/receipt')
+  @RequirePermissions('admin:manage')
+  renewalReceipt(@Param('id') id: string) { return this.svc.getRenewalReceipt(id); }
+
   @Get('organizations')
   @RequirePermissions('admin:manage')
   organizations() { return this.svc.listOrganizations(); }
