@@ -179,6 +179,10 @@ export default function PeoplePage() {
       employmentType: emp.employmentType || 'permanent',
       status: emp.status || 'active',
       role: emp.user?.role || emp.role || '',
+      email: emp.user?.email || emp.email || '',
+      phone: emp.user?.phone || emp.phone || '',
+      dob: emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString().slice(0,10) : '',
+      hireDate: emp.hireDate ? new Date(emp.hireDate).toISOString().slice(0,10) : '',
       skills: (()=>{ try{ const s=typeof emp.skills==='string'? JSON.parse(emp.skills): emp.skills; return Array.isArray(s)? s.join(', '): '' } catch{ return '' }})(),
     });
     // trigger linked fetch
@@ -198,6 +202,11 @@ export default function PeoplePage() {
         employmentType: form.employmentType,
         status: form.status,
         skills: form.skills ? form.skills.split(',').map((s:string)=>s.trim()).filter(Boolean) : [],
+        email: form.email || undefined,
+        phone: form.phone || undefined,
+        dob: form.dob || undefined,
+        date_of_birth: form.dob || undefined,
+        hire_date: form.hireDate || undefined,
       };
       if (form.role) payload.role = form.role;
       const res = await fetch(`${api}/employees/${editing.id}`, {
@@ -454,7 +463,14 @@ export default function PeoplePage() {
                       <button onClick={()=>openEdit(e)} className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-800"><Edit2 size={14}/></button>
                     </div>
                     <div className="text-[11px] text-center mt-1">
-                      {(()=>{ try{ const arr = e.faceProfileRef ? JSON.parse(e.faceProfileRef) : []; return arr.length ? <span className="text-emerald-600">● Face {arr.length}/3</span> : <span className="text-amber-600">○ No face</span> } catch{ return <span className="text-slate-400">—</span> }})()}
+                      {(()=>{ try{
+                        const parsed = e.faceProfileRef ? JSON.parse(e.faceProfileRef) : null;
+                        let count = 0; let hasDesc = false;
+                        if (Array.isArray(parsed)) { count = parsed.length; }
+                        else if (parsed && Array.isArray(parsed.images)) { count = parsed.images.length; hasDesc = Array.isArray(parsed.descriptors) && parsed.descriptors.length>0; }
+                        if (count) return <span className="text-emerald-600">● Face {count}/3 {hasDesc ? '✓' : ''}</span>;
+                        return <span className="text-amber-600">○ No face</span>;
+                      } catch{ return <span className="text-slate-400">—</span> }})()}
                     </div>
                   </td>
                 </tr>
@@ -486,6 +502,18 @@ export default function PeoplePage() {
                 </label>
                 <label className="text-sm font-medium">Grade
                   <input value={form.grade} onChange={e=>setForm({...form, grade:e.target.value})} placeholder="M3 / L1" className="w-full mt-1 px-3 py-2.5 rounded-xl border"/>
+                </label>
+                <label className="text-sm font-medium">Work Email
+                  <input type="email" value={form.email || ''} onChange={e=>setForm({...form, email:e.target.value})} placeholder="you@company.com" className="w-full mt-1 px-3 py-2.5 rounded-xl border"/>
+                </label>
+                <label className="text-sm font-medium">Phone
+                  <input value={form.phone || ''} onChange={e=>setForm({...form, phone:e.target.value})} placeholder="08012345678" className="w-full mt-1 px-3 py-2.5 rounded-xl border"/>
+                </label>
+                <label className="text-sm font-medium">Date of Birth
+                  <input type="date" value={form.dob || ''} onChange={e=>setForm({...form, dob:e.target.value})} className="w-full mt-1 px-3 py-2.5 rounded-xl border"/>
+                </label>
+                <label className="text-sm font-medium">Hire Date
+                  <input type="date" value={form.hireDate || ''} onChange={e=>setForm({...form, hireDate:e.target.value})} className="w-full mt-1 px-3 py-2.5 rounded-xl border"/>
                 </label>
                 <label className="text-sm font-medium">Work Arrangement
                   <select value={form.workArrangement} onChange={e=>setForm({...form, workArrangement:e.target.value})} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white">

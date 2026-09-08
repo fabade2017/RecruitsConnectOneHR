@@ -95,7 +95,7 @@ export default function FaceEnrollPage() {
 
   const upload = async () => {
     if (captures.length < 1) return setError('Capture at least 1 face image');
-    if (descriptors.length !== captures.length) return setError(`Need descriptor for each snap (${descriptors.length}/${captures.length} captured) — retake with face centered and good lighting`);
+    if (faceModelReady && descriptors.length===0) return setError('No face descriptors captured — ensure good lighting, face centered, and retry. Model ready but no face detected.');
     if (!consent) return setError('Consent required');
     setSaving(true); setError('');
     try {
