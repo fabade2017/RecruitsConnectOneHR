@@ -264,14 +264,18 @@ export default function SuperAdminPage() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-xs"><tr><th className="text-left p-2">Role</th><th className="p-2">Slug</th><th className="p-2">Perms</th><th className="p-2">System</th></tr></thead>
                 <tbody className="divide-y">
-                  {roles.map((r:any)=> (
+                  {roles.map((r:any)=> {
+                    let permsArr:any[]=[];
+                    try { permsArr = Array.isArray(r.permissions) ? r.permissions : JSON.parse(r.permissions || '[]'); } catch { permsArr = []; }
+                    if (!Array.isArray(permsArr)) permsArr=[];
+                    return (
                     <tr key={r.id} className="hover:bg-slate-50/50">
                       <td className="p-2"><div className="font-semibold">{r.name}</div><div className="text-xs text-slate-500">{r.description}</div></td>
                       <td className="p-2 font-mono text-xs">{r.slug}</td>
-                      <td className="p-2 text-xs">{r.permissions?.length || 0} • {r.permissions?.slice(0,2).join(', ')}</td>
+                      <td className="p-2 text-xs">{permsArr.length} • {permsArr.slice(0,2).join(', ')}</td>
                       <td className="p-2"><Pill tone={r.isSystem?'slate':'emerald'}>{r.isSystem?'system':'custom'}</Pill></td>
                     </tr>
-                  ))}
+                  );})}
                 </tbody>
               </table>
             </div>
