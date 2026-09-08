@@ -445,7 +445,7 @@ export default function PeoplePage() {
         <div className="overflow-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50/70 text-xs tracking-widest text-slate-500">
-              <tr><th className="text-left p-3">EMPLOYEE</th><th className="text-left p-3">ID / QR</th><th className="text-left p-3">DEPT / BRANCH</th><th className="text-left p-3">ROLE / GRADE</th><th className="text-left p-3">WORK MODE</th><th className="text-left p-3">STATUS</th><th className="text-right p-3">ACTIONS</th></tr>
+              <tr><th className="text-left p-3">EMPLOYEE</th><th className="text-left p-3">ID / QR</th><th className="text-left p-3">DEPT / BRANCH</th><th className="text-left p-3">JOB TITLE / GRADE</th><th className="text-left p-3">WORK MODE</th><th className="text-left p-3">STATUS</th><th className="text-right p-3">ACTIONS</th></tr>
             </thead>
             <tbody className="divide-y">
               {loading ? <tr><td colSpan={7} className="p-8 text-center text-slate-500">Loading…</td></tr> :
