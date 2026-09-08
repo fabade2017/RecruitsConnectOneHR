@@ -235,8 +235,9 @@ let EmployeesService = class EmployeesService {
             if (ownId !== id)
                 throw new common_1.ForbiddenException('Employees can only enroll own face');
         }
-        // dto: { images: string[] (base64), consent: boolean }
+        // dto: { images: string[] (base64), descriptors?: number[][], consent: boolean }
         const images = dto.images || (dto.faceProfileRef ? [dto.faceProfileRef] : (dto.image ? [dto.image] : []));
+        const descriptors = dto.descriptors || [];
         if (!images.length)
             throw new common_1.ConflictException('No face images provided');
         if (images.length > 5)
@@ -245,7 +246,12 @@ let EmployeesService = class EmployeesService {
         for (const img of images)
             if (!img.startsWith('data:image'))
                 throw new common_1.ConflictException('Invalid image format');
-        const toStore = JSON.stringify(images.map(s => s.slice(0, 8000))); // store truncated for demo (first 8k chars hash)
+        // Store both images (truncated) and descriptors for intelligent matching (Euclidean <0.4)
+        const toStore = JSON.stringify({
+            images: images.map(s => s.slice(0, 8000)),
+            descriptors: descriptors.filter(d => Array.isArray(d) && d.length === 128).slice(0, 5),
+            updatedAt: new Date().toISOString(),
+        });
         const updated = await this.prisma.employee.update({
             where: { id },
             data: { faceProfileRef: toStore, consentFace: dto.consent !== false },
@@ -253,7 +259,7 @@ let EmployeesService = class EmployeesService {
         await this.prisma.consentLog.create({
             data: { employeeId: id, type: 'face', granted: true, version: '1.0', ip: dto.ip || null },
         }).catch(() => { });
-        return { employeeId: id, enrolled: images.length, faceProfileRef: toStore, consentFace: true };
+        return { employeeId: id, enrolled: images.length, faceProfileRef: toStore, consentFace: true, descriptors: descriptors.length };
     }
     async getFaceProfile(orgId, id, user) {
         const emp = await this.prisma.employee.findFirst({ where: { id, organizationId: orgId }, select: { id: true, employeeCode: true, faceProfileRef: true, consentFace: true, photoUrl: true } });
@@ -265,12 +271,20 @@ let EmployeesService = class EmployeesService {
                 throw new common_1.ForbiddenException('Access denied');
         }
         let count = 0;
+        let hasDescriptor = false;
         try {
-            const arr = emp.faceProfileRef ? JSON.parse(emp.faceProfileRef) : [];
-            count = Array.isArray(arr) ? arr.length : 0;
+            const parsed = emp.faceProfileRef ? JSON.parse(emp.faceProfileRef) : null;
+            if (Array.isArray(parsed))
+                count = parsed.length;
+            else if (parsed && Array.isArray(parsed.images)) {
+                count = parsed.images.length;
+                hasDescriptor = Array.isArray(parsed.descriptors) && parsed.descriptors.length > 0;
+            }
+            else if (parsed && typeof parsed === 'object')
+                count = 0;
         }
         catch { }
-        return { employeeId: emp.id, employeeCode: emp.employeeCode, enrolled: count > 0, count, consentFace: emp.consentFace, hasPhoto: !!emp.photoUrl };
+        return { employeeId: emp.id, employeeCode: emp.employeeCode, enrolled: count > 0, count, hasDescriptor, consentFace: emp.consentFace, hasPhoto: !!emp.photoUrl };
     }
     bulkTemplate(orgId) {
         const header = 'job_title,grade,department,branch,employment_type,work_arrangement,hire_date,skills,phone,email';

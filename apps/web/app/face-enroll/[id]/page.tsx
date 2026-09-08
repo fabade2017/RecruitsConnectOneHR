@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { GlassCard, Pill } from '../../../components/ui/GlassCard';
 import { Camera, Check, X, AlertTriangle, ShieldCheck, ArrowLeft, RefreshCw, Eye } from 'lucide-react';
+import { loadFaceModels, getDescriptorFromCanvas, descriptorToArray } from '../../../lib/face';
 
 export default function FaceEnrollPage() {
   const params = useParams() as { id: string };
@@ -13,12 +14,14 @@ export default function FaceEnrollPage() {
   const [employee, setEmployee] = useState<any>(null);
   const [enrolled, setEnrolled] = useState<any>(null);
   const [captures, setCaptures] = useState<string[]>([]);
+  const [descriptors, setDescriptors] = useState<number[][]>([]);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [faceDetected, setFaceDetected] = useState(false);
   const [consent, setConsent] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [faceModelReady, setFaceModelReady] = useState(false);
 
   const auth = () => ({ Authorization: `Bearer ${localStorage.getItem('onehr_token')}` });
 
@@ -29,6 +32,7 @@ export default function FaceEnrollPage() {
     fetch(`${api}/employees/${id}/face-profile`, { headers: auth() }).then(r=>r.json()).then(setEnrolled).catch(()=>{});
   }, [id]);
 
+  useEffect(() => { loadFaceModels().then(()=> setFaceModelReady(true)).catch(()=> setFaceModelReady(false)); }, []);
   useEffect(() => {
     let s: MediaStream | null = null;
     (async () => {
@@ -57,7 +61,7 @@ export default function FaceEnrollPage() {
     return () => { if (s) s.getTracks().forEach(t=>t.stop()); };
   }, []);
 
-  const snap = () => {
+  const snap = async () => {
     if (!videoRef.current) return;
     const v = videoRef.current;
     const c = document.createElement('canvas');
@@ -67,7 +71,18 @@ export default function FaceEnrollPage() {
     ctx.drawImage(v, 0, 0);
     const b64 = c.toDataURL('image/jpeg', 0.85);
     if (captures.length >= 3) return alert('Max 3 images');
+    // Generate descriptor for intelligent matching
+    let desc: number[] | null = null;
+    try {
+      const d = await getDescriptorFromCanvas(c);
+      if (d) { desc = descriptorToArray(d); }
+    } catch {}
+    if (!desc && faceModelReady) {
+      // No face detected by model — warn but still allow (will fallback to string compare)
+      console.warn('No descriptor found for this snap — will use fallback');
+    }
     setCaptures([...captures, b64]);
+    if (desc) setDescriptors(prev=> [...prev, desc!]);
   };
 
   const upload = async () => {
@@ -78,7 +93,7 @@ export default function FaceEnrollPage() {
       const res = await fetch(`${api}/employees/${id}/face-profile`, {
         method: 'POST',
         headers: { 'Content-Type':'application/json', ...auth() },
-        body: JSON.stringify({ images: captures, consent: true })
+        body: JSON.stringify({ images: captures, descriptors, consent: true })
       });
       if (!res.ok) {
         const e = await res.json().catch(()=>({message:'Upload failed'}));

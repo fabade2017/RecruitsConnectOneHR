@@ -23,6 +23,9 @@ function normalizeLocation(dto:any): { str: string | null, obj: any | null, lat:
   // store as JSON string
   return { str: JSON.stringify(obj), obj, lat: lat!=null?Number(lat):null, lng: lng!=null?Number(lng):null, accuracy: accuracy!=null?Number(accuracy):null };
 }
+function euclidean(a:number[], b:number[]): number {
+  let sum=0; for(let i=0;i<a.length;i++) sum+=(a[i]-b[i])**2; return Math.sqrt(sum);
+}
 
 @Injectable()
 export class AttendanceService {
@@ -74,30 +77,56 @@ export class AttendanceService {
           data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: m < 0.5 ? 'high' : 'medium', details: JSON.stringify({ reason: 'liveness_failed', motion: m, liveness, faceDetected: dto.face_meta.faceDetected }) },
         });
       }
-      // Compare live face with enrolled faceProfileRef (if exists)
+      // Intelligent face comparison — descriptor (Euclidean) if available, fallback to slice
       if (employee.faceProfileRef) {
         try {
-          const enrolled: string[] = JSON.parse(employee.faceProfileRef as any);
-          const liveSlice = (dto.face_snapshot_base64 || '').slice(22, 522); // skip data:image prefix
-          let bestScore = 0;
-          for (const ref of enrolled) {
-            const refSlice = ref.slice(22, 522);
-            let matches = 0;
-            const len = Math.min(liveSlice.length, refSlice.length, 500);
-            for (let i=0;i<len;i++) if (liveSlice[i]===refSlice[i]) matches++;
-            const score = len ? (matches/len)*100 : 0;
-            if (score > bestScore) bestScore = score;
-          }
-          const confidence = Math.round(bestScore);
-          // Update event confidence with comparison
-          if (bestScore < 60) {
-            await this.prisma.attendanceException.create({
-              data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'duplicate_face', severity: 'critical', details: JSON.stringify({ reason: 'face_mismatch', confidence, expected: 'enrolled', liveMotion: m }) },
-            });
-          } else if (bestScore < 80) {
-            await this.prisma.attendanceException.create({
-              data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'low_face_similarity', confidence }) },
-            });
+          const parsed:any = JSON.parse(employee.faceProfileRef as any);
+          let enrolledImages:string[] = [];
+          let enrolledDescriptors:number[][] = [];
+          if (Array.isArray(parsed)) enrolledImages = parsed;
+          else if (parsed && Array.isArray(parsed.images)) { enrolledImages = parsed.images; enrolledDescriptors = parsed.descriptors || []; }
+          const liveDescriptor:number[] | null = dto.faceDescriptor || dto.descriptor || dto.face_descriptor || dto.face_meta?.descriptor || null;
+          // Descriptor path — true biometric
+          if (enrolledDescriptors.length && liveDescriptor && Array.isArray(liveDescriptor) && liveDescriptor.length===128) {
+            let bestDistance = Infinity;
+            for (const refDesc of enrolledDescriptors) {
+              if (!Array.isArray(refDesc) || refDesc.length!==128) continue;
+              const d = euclidean(liveDescriptor, refDesc);
+              if (d < bestDistance) bestDistance = d;
+            }
+            const confidence = Math.max(0, Math.round((1 - Math.min(bestDistance,1)) * 100));
+            // Update verificationScore on session with descriptor confidence
+            await this.prisma.workSession.update({ where:{ id: session.id }, data:{ verificationScore: confidence }}).catch(()=>{});
+            if (bestDistance > 0.6) {
+              await this.prisma.attendanceException.create({
+                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'duplicate_face', severity: 'critical', details: JSON.stringify({ reason: 'face_mismatch_descriptor', distance: Number(bestDistance.toFixed(4)), confidence, threshold: 0.6, expected: 'enrolled', liveMotion: m }) },
+              });
+            } else if (bestDistance > 0.4) {
+              await this.prisma.attendanceException.create({
+                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'low_face_similarity_descriptor', distance: Number(bestDistance.toFixed(4)), confidence, threshold: 0.4 }) },
+              });
+            }
+          } else {
+            // Fallback — truncated base64 slice compare (legacy)
+            const liveSlice = (dto.face_snapshot_base64 || '').slice(22, 522);
+            let bestScore = 0;
+            for (const ref of enrolledImages) {
+              const refSlice = (ref as string).slice(22, 522);
+              let matches = 0; const len = Math.min(liveSlice.length, refSlice.length, 500);
+              for (let i=0;i<len;i++) if (liveSlice[i]===refSlice[i]) matches++;
+              const score = len ? (matches/len)*100 : 0;
+              if (score > bestScore) bestScore = score;
+            }
+            const confidence = Math.round(bestScore);
+            if (bestScore < 60) {
+              await this.prisma.attendanceException.create({
+                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'duplicate_face', severity: 'critical', details: JSON.stringify({ reason: 'face_mismatch', confidence, method:'fallback_slice', expected: 'enrolled', liveMotion: m }) },
+              });
+            } else if (bestScore < 80) {
+              await this.prisma.attendanceException.create({
+                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'low_face_similarity', confidence, method:'fallback_slice' }) },
+              });
+            }
           }
         } catch {}
       } else {

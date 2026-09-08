@@ -165,13 +165,19 @@ export class EmployeesService {
       const ownId = await this.resolveEmployeeIdFromUser(user);
       if (ownId !== id) throw new ForbiddenException('Employees can only enroll own face');
     }
-    // dto: { images: string[] (base64), consent: boolean }
+    // dto: { images: string[] (base64), descriptors?: number[][], consent: boolean }
     const images: string[] = dto.images || (dto.faceProfileRef ? [dto.faceProfileRef] : (dto.image ? [dto.image] : []));
+    const descriptors: number[][] = dto.descriptors || [];
     if (!images.length) throw new ConflictException('No face images provided');
     if (images.length > 5) throw new ConflictException('Max 5 images');
     // Basic validation: must be data:image
     for (const img of images) if (!img.startsWith('data:image')) throw new ConflictException('Invalid image format');
-    const toStore = JSON.stringify(images.map(s => s.slice(0, 8000))); // store truncated for demo (first 8k chars hash)
+    // Store both images (truncated) and descriptors for intelligent matching (Euclidean <0.4)
+    const toStore = JSON.stringify({
+      images: images.map(s => s.slice(0, 8000)),
+      descriptors: descriptors.filter(d=> Array.isArray(d) && d.length===128).slice(0,5),
+      updatedAt: new Date().toISOString(),
+    });
     const updated = await this.prisma.employee.update({
       where: { id },
       data: { faceProfileRef: toStore, consentFace: dto.consent !== false },
@@ -179,7 +185,7 @@ export class EmployeesService {
     await this.prisma.consentLog.create({
       data: { employeeId: id, type: 'face', granted: true, version: '1.0', ip: dto.ip || null } as any,
     }).catch(()=>{});
-    return { employeeId: id, enrolled: images.length, faceProfileRef: toStore, consentFace: true };
+    return { employeeId: id, enrolled: images.length, faceProfileRef: toStore, consentFace: true, descriptors: descriptors.length };
   }
 
   async getFaceProfile(orgId: string, id: string, user?: any) {
@@ -189,9 +195,14 @@ export class EmployeesService {
       const ownId = await this.resolveEmployeeIdFromUser(user);
       if (ownId !== id) throw new ForbiddenException('Access denied');
     }
-    let count = 0;
-    try { const arr = emp.faceProfileRef ? JSON.parse(emp.faceProfileRef as any) : []; count = Array.isArray(arr) ? arr.length : 0; } catch {}
-    return { employeeId: emp.id, employeeCode: emp.employeeCode, enrolled: count > 0, count, consentFace: emp.consentFace, hasPhoto: !!emp.photoUrl };
+    let count = 0; let hasDescriptor=false;
+    try {
+      const parsed = emp.faceProfileRef ? JSON.parse(emp.faceProfileRef as any) : null;
+      if (Array.isArray(parsed)) count = parsed.length;
+      else if (parsed && Array.isArray(parsed.images)) { count = parsed.images.length; hasDescriptor = Array.isArray(parsed.descriptors) && parsed.descriptors.length>0; }
+      else if (parsed && typeof parsed === 'object') count = 0;
+    } catch {}
+    return { employeeId: emp.id, employeeCode: emp.employeeCode, enrolled: count > 0, count, hasDescriptor, consentFace: emp.consentFace, hasPhoto: !!emp.photoUrl };
   }
 
   bulkTemplate(orgId: string) {
