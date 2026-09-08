@@ -384,12 +384,29 @@ export default function PeoplePage() {
 
   const renderRoleSelect = (value:string, onChange:(v:string)=>void) => {
     if (roles.length===0 && !roleState.loading && roleState.error) return null; // hide if no permission
+    const SYSTEM_ROLES = [
+      { slug:'super_admin', name:'Super Admin' },
+      { slug:'org_admin', name:'Org Admin' },
+      { slug:'hr_admin', name:'HR Admin' },
+      { slug:'hr_manager', name:'HR Manager' },
+      { slug:'manager', name:'Manager' },
+      { slug:'employee', name:'Employee' },
+      { slug:'executive', name:'Executive' },
+      { slug:'auditor', name:'Auditor' },
+    ];
+    const mergedRoles = (() => {
+      const map = new Map(roles.map((r:any)=> [r.slug, r]));
+      for (const s of SYSTEM_ROLES) if (!map.has(s.slug)) map.set(s.slug, { id:`sys-${s.slug}`, slug:s.slug, name:s.name });
+      // ensure current value is present even if custom
+      if (value && !map.has(value)) map.set(value, { id:`cur-${value}`, slug:value, name:value });
+      return Array.from(map.values());
+    })();
     return (
       <label className="text-sm font-medium">Role
         <select value={value} onChange={e=>onChange(e.target.value)} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50" disabled={roleState.loading}>
           <option value="">{roleState.loading ? 'Loading roles…' : '— No role change —'}</option>
           {roleState.loading && <option disabled>Loading…</option>}
-          {roles.map((r:any)=> <option key={r.id} value={r.slug}>{r.name} ({r.slug})</option>)}
+          {mergedRoles.map((r:any)=> <option key={r.id} value={r.slug}>{r.name} ({r.slug})</option>)}
         </select>
         {roleState.loading && <span className="text-xs text-slate-400">Loading roles…</span>}
         {roleState.error && <span className="text-xs text-slate-400 block">Roles unavailable ({roleState.error.slice(0,60)})</span>}
