@@ -58,7 +58,7 @@ export class EmployeesService {
       throw new ConflictException('Invalid QR: ' + e.message);
     }
   }
-
+ 
   async uploadPhoto(orgId: string, employeeId: string, file: any, user?: any): Promise<any> {
     const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, organizationId: orgId } });
     if (!emp) throw new NotFoundException('Employee not found');
