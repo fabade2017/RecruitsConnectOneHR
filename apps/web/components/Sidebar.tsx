@@ -4,10 +4,21 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, UserPlus, Clock, CalendarCheck, Timer, Briefcase, Wallet, TrendingUp, GraduationCap, Heart, ShieldCheck, FileText, Boxes, ArrowUpCircle, UserMinus, Users2, Scale, Headset, BarChart3, Brain, Workflow, Plug, Settings,
-  MapPin, AlertTriangle, Building2, ChevronLeft, ChevronRight, LogOut, Sparkles, Layers, MessageCircle, CreditCard, HelpCircle, BookOpen
+  MapPin, AlertTriangle, Building2, ChevronLeft, ChevronRight, ChevronDown, LogOut, Sparkles, Layers, MessageCircle, CreditCard, HelpCircle, BookOpen
 } from 'lucide-react';
 
 type NavSection = { title: string; items: { href: string; label: string; icon: any; badge?: string; roles?: string[]; perms?: string[]; module?: string }[] };
+
+const SECTION_ICONS: Record<string, any> = {
+  'OVERVIEW': LayoutDashboard,
+  'MANAGE PEOPLE': Users,
+  'MANAGE WORK': Briefcase,
+  'MEASURE': BarChart3,
+  'PREDICT': Brain,
+  'SYSTEM': Settings,
+  'SUPER ADMIN': ShieldCheck,
+  'HELP': HelpCircle,
+};
 
 const NAV: NavSection[] = [
   { title: 'OVERVIEW', items: [
@@ -69,12 +80,18 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(true);
   const [user, setUser] = useState<any>(null);
+  // Sub-menus collapsed under main menu — only headers visible, click to expand
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
 
   // Persist collapsed state; default collapsed = true per requirements
   useEffect(() => {
     try {
       const saved = localStorage.getItem('onehr_sidebar_collapsed');
       if (saved !== null) setCollapsed(saved === 'true');
+      const savedOpen = localStorage.getItem('onehr_sidebar_open');
+      if (savedOpen) {
+        try { setOpenSections(new Set(JSON.parse(savedOpen))); } catch {}
+      }
     } catch {}
   }, []);
   const toggleCollapsed = () => {
@@ -84,6 +101,29 @@ export default function Sidebar() {
       return nv;
     });
   };
+  const toggleSection = (title: string) => {
+    setOpenSections(prev => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      try { localStorage.setItem('onehr_sidebar_open', JSON.stringify(Array.from(next))); } catch {}
+      return next;
+    });
+  };
+  // Auto-open section that contains active route (so deep-link lands expanded)
+  useEffect(() => {
+    for (const sec of NAV) {
+      if (sec.items.some(i => pathname === i.href || pathname.startsWith(i.href + '/'))) {
+        setOpenSections(prev => {
+          if (prev.has(sec.title)) return prev;
+          const next = new Set(prev);
+          next.add(sec.title);
+          try { localStorage.setItem('onehr_sidebar_open', JSON.stringify(Array.from(next))); } catch {}
+          return next;
+        });
+      }
+    }
+  }, [pathname]);
   const [branding, setBranding] = useState<any>(null);
   const [chatUnread, setChatUnread] = useState<number>(0);
   const [allowedModules, setAllowedModules] = useState<Set<string> | null>(null);
@@ -183,35 +223,66 @@ export default function Sidebar() {
             {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto py-4 px-2 space-y-6 scrollbar-thin">
-          {NAV.map(sec => (
-            <div key={sec.title}>
-              {!collapsed && <div className="px-3 mb-2 text-[10px] tracking-[0.14em] font-semibold text-white/50">{sec.title}</div>}
-              <div className="space-y-1">
-                {sec.items.filter(i => visible(i.roles, i.perms, i.module)).map(item => {
-                  const Icon = item.icon;
-                  const active = pathname === item.href || pathname.startsWith(item.href + '/');
-                  const isChat = item.href === '/chat';
-                  const chatBadge = isChat && chatUnread > 0 ? String(chatUnread > 99 ? '99+' : chatUnread) : null;
-                  const badge = chatBadge || item.badge;
-                  const badgeClass = isChat && chatBadge ? 'bg-emerald-500 text-white' : 'bg-white/15';
-                  return (
-                    <Link key={item.href+item.label} href={item.href}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${active ? 'bg-white text-slate-900 shadow-[0_4px_16px_rgba(255,255,255,0.15)]' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
-                      title={collapsed ? `${item.label}${chatBadge ? ` (${chatBadge})` : ''}` : undefined}
-                    >
-                      <span className="relative">
-                        <Icon size={18} className={active ? 'text-slate-900' : 'text-white/80'} />
-                        {collapsed && chatBadge && <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 text-[10px] leading-none rounded-full bg-red-500 text-white flex items-center justify-center font-bold">{chatBadge}</span>}
-                      </span>
-                      {!collapsed && <span className="truncate font-medium">{item.label}</span>}
-                      {!collapsed && badge && <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full ${badgeClass} ${active && !isChat ? 'bg-slate-900 text-white' : ''}`}>{badge}</span>}
-                    </Link>
-                  );
-                })}
-              </div>
+        <div className="flex-1 overflow-y-auto py-3 px-2 space-y-3 scrollbar-thin">
+          {NAV.map(sec => {
+            const visibleItems = sec.items.filter(i => visible(i.roles, i.perms, i.module));
+            if (visibleItems.length === 0) return null;
+            const isOpen = openSections.has(sec.title);
+            const SectionIcon = SECTION_ICONS[sec.title] || Layers;
+            // section badge: show if any child has badge/unread
+            const sectionHasBadge = visibleItems.some(i => i.badge) || (sec.title === 'OVERVIEW' && chatUnread > 0);
+            const sectionBadge = sec.title === 'OVERVIEW' && chatUnread > 0 ? String(chatUnread > 99 ? '99+' : chatUnread) : null;
+            const activeInSection = visibleItems.some(i => pathname === i.href || pathname.startsWith(i.href + '/'));
+            return (
+            <div key={sec.title} className={`${activeInSection && !isOpen ? 'rounded-xl bg-white/5' : ''}`}>
+              <button
+                onClick={() => toggleSection(sec.title)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all ${isOpen ? 'bg-white/10 text-white' : 'text-white/60 hover:text-white hover:bg-white/10'} ${collapsed ? 'justify-center px-2' : ''}`}
+                title={collapsed ? `${sec.title} — click to ${isOpen ? 'collapse' : 'expand'}` : undefined}
+                aria-expanded={isOpen}
+              >
+                <span className="relative shrink-0">
+                  <SectionIcon size={18} className={isOpen ? 'text-white' : 'text-white/70'} />
+                  {collapsed && sectionBadge && <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] px-1 text-[9px] leading-none rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold">{sectionBadge}</span>}
+                  {collapsed && !sectionBadge && sectionHasBadge && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400" />}
+                </span>
+                {!collapsed && <span className="truncate text-[11px] tracking-[0.14em]">{sec.title}</span>}
+                {!collapsed && (
+                  <span className="ml-auto flex items-center gap-2">
+                    {sectionBadge && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500 text-white">{sectionBadge}</span>}
+                    <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : 'rotate-0'} text-white/50`} />
+                  </span>
+                )}
+                {collapsed && <ChevronDown size={12} className={`hidden transition-transform ${isOpen ? 'rotate-180' : ''} text-white/40`} />}
+              </button>
+              {isOpen && (
+                <div className={`mt-1 space-y-1 ${!collapsed ? 'ml-1 pl-2 border-l border-white/10' : ''}`}>
+                  {visibleItems.map(item => {
+                    const Icon = item.icon;
+                    const active = pathname === item.href || pathname.startsWith(item.href + '/');
+                    const isChat = item.href === '/chat';
+                    const chatBadge = isChat && chatUnread > 0 ? String(chatUnread > 99 ? '99+' : chatUnread) : null;
+                    const badge = chatBadge || item.badge;
+                    const badgeClass = isChat && chatBadge ? 'bg-emerald-500 text-white' : 'bg-white/15';
+                    return (
+                      <Link key={item.href+item.label} href={item.href}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all ${active ? 'bg-white text-slate-900 shadow-[0_4px_16px_rgba(255,255,255,0.15)]' : 'text-white/70 hover:text-white hover:bg-white/10'} ${collapsed ? 'justify-center' : ''}`}
+                        title={collapsed ? `${item.label}${chatBadge ? ` (${chatBadge})` : ''}` : undefined}
+                      >
+                        <span className="relative shrink-0">
+                          <Icon size={collapsed ? 18 : 16} className={active ? 'text-slate-900' : 'text-white/80'} />
+                          {collapsed && chatBadge && <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 text-[10px] leading-none rounded-full bg-red-500 text-white flex items-center justify-center font-bold">{chatBadge}</span>}
+                        </span>
+                        {!collapsed && <span className="truncate font-medium text-[13px]">{item.label}</span>}
+                        {!collapsed && badge && <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full ${badgeClass} ${active && !isChat ? 'bg-slate-900 text-white' : ''}`}>{badge}</span>}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
         <div className="p-3 border-t border-white/10">
           <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${collapsed ? 'justify-center' : ''}`}>
