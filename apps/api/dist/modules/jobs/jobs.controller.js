@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const jobs_service_1 = require("./jobs.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let JobsController = class JobsController {
     svc;
     constructor(svc) {
@@ -114,6 +115,7 @@ __decorate([
 ], JobsController.prototype, "updateApp", null);
 exports.JobsController = JobsController = __decorate([
     (0, swagger_1.ApiTags)('jobs'),
+    (0, module_guard_1.RequireModule)('recruitment'),
     (0, common_1.Controller)('jobs'),
     __metadata("design:paramtypes", [jobs_service_1.JobsService])
 ], JobsController);

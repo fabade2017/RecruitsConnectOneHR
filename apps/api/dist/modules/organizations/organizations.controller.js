@@ -18,6 +18,7 @@ const platform_express_1 = require("@nestjs/platform-express");
 const swagger_1 = require("@nestjs/swagger");
 const organizations_service_1 = require("./organizations.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 let OrganizationsController = class OrganizationsController {
     svc;
@@ -61,6 +62,8 @@ exports.OrganizationsController = OrganizationsController;
 __decorate([
     (0, jwt_auth_guard_1.Public)(),
     (0, common_1.Post)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Register organization' }),
+    (0, swagger_1.ApiBody)({ schema: { type: 'object', required: ['name', 'acronym', 'adminEmail', 'adminPassword'], properties: { name: { type: 'string', example: 'Sample Org Ltd' }, acronym: { type: 'string', example: 'SAMPLE' }, adminEmail: { type: 'string', example: 'sample.admin@example.com' }, adminPassword: { type: 'string', example: 'Sample@123' }, industryTemplate: { type: 'string', example: 'generic' }, country: { type: 'string', example: 'NG' } } } }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -69,6 +72,7 @@ __decorate([
 __decorate([
     (0, jwt_auth_guard_1.Public)(),
     (0, common_1.Get)('check-acronym'),
+    (0, swagger_1.ApiQuery)({ name: 'acronym', type: String, example: 'SAMPLE' }),
     __param(0, (0, common_1.Query)('acronym')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -77,6 +81,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, rbac_guard_1.Roles)('super_admin', 'org_admin'),
+    (0, swagger_1.ApiOperation)({ summary: 'List organizations' }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
@@ -84,6 +89,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':id'),
     (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    (0, swagger_1.ApiParam)({ name: 'id', type: String }),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -93,6 +99,8 @@ __decorate([
     (0, common_1.Patch)(':id'),
     (0, rbac_guard_1.Roles)('org_admin', 'super_admin'),
     (0, rbac_guard_1.RequirePermissions)('employee:*'),
+    (0, swagger_1.ApiParam)({ name: 'id', type: String }),
+    (0, swagger_1.ApiBody)({ schema: { type: 'object', properties: { name: { type: 'string', example: 'Sample Org Updated' }, logoUrl: { type: 'string', example: 'https://example.com/logo.png' }, primaryColor: { type: 'string', example: '#0F172A' } } } }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -196,6 +204,7 @@ __decorate([
 ], OrganizationsController.prototype, "health", null);
 exports.OrganizationsController = OrganizationsController = __decorate([
     (0, swagger_1.ApiTags)('organizations'),
+    (0, module_guard_1.RequireModule)('people'),
     (0, common_1.Controller)('organizations'),
     __metadata("design:paramtypes", [organizations_service_1.OrganizationsService])
 ], OrganizationsController);

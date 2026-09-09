@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const compliance_service_1 = require("./compliance.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let ComplianceController = class ComplianceController {
     svc;
     constructor(svc) {
@@ -115,6 +116,7 @@ __decorate([
 ], ComplianceController.prototype, "updateAudit", null);
 exports.ComplianceController = ComplianceController = __decorate([
     (0, swagger_1.ApiTags)('compliance'),
+    (0, module_guard_1.RequireModule)('compliance'),
     (0, common_1.Controller)('compliance'),
     __metadata("design:paramtypes", [compliance_service_1.ComplianceService])
 ], ComplianceController);

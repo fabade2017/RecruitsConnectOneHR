@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const workflows_service_1 = require("./workflows.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 let WorkflowsController = class WorkflowsController {
     svc;
@@ -136,6 +137,7 @@ __decorate([
 ], WorkflowsController.prototype, "toggle", null);
 exports.WorkflowsController = WorkflowsController = __decorate([
     (0, swagger_1.ApiTags)('workflows'),
+    (0, module_guard_1.RequireModule)('workflow'),
     (0, common_1.Controller)('workflows'),
     __metadata("design:paramtypes", [workflows_service_1.WorkflowsService])
 ], WorkflowsController);

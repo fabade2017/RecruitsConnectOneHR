@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const payroll_service_1 = require("./payroll.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let PayrollController = class PayrollController {
     svc;
     constructor(svc) {
@@ -91,6 +92,7 @@ __decorate([
 ], PayrollController.prototype, "upsertBank", null);
 exports.PayrollController = PayrollController = __decorate([
     (0, swagger_1.ApiTags)('payroll'),
+    (0, module_guard_1.RequireModule)('payroll'),
     (0, common_1.Controller)('payroll'),
     __metadata("design:paramtypes", [payroll_service_1.PayrollService])
 ], PayrollController);

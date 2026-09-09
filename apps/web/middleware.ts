@@ -7,13 +7,13 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes (face-enroll is public link for employee to self-enroll, but page checks token)
-  const publicPaths = ['/', '/login', '/register', '/about', '/contact', '/face-enroll', '/api/health'];
+  const publicPaths = ['/', '/login', '/register', '/about', '/contact', '/manual', '/face-enroll', '/api/health'];
   if (publicPaths.includes(pathname) || pathname.startsWith('/_next') || pathname.startsWith('/api/health') || pathname.startsWith('/face-enroll')) {
     return NextResponse.next();
   }
 
-  // Protected HR routes — require auth
-  const protectedPrefixes = ['/hr', '/executive', '/manager', '/employee', '/dashboard', '/payroll', '/jobs', '/learning', '/compliance', '/attendance', '/leave', '/employees', '/recruitment', '/admin', '/onboarding', '/shifts', '/projects', '/performance', '/engagement', '/reports', '/analytics', '/workflows', '/integrations', '/settings', '/documents', '/assets', '/chat', '/subscriptions'];
+  // Protected HR routes — require auth (includes /help center, collapsed sidebar by default per 2026-09-09)
+  const protectedPrefixes = ['/hr', '/executive', '/manager', '/employee', '/dashboard', '/payroll', '/jobs', '/learning', '/compliance', '/attendance', '/leave', '/employees', '/recruitment', '/admin', '/onboarding', '/shifts', '/projects', '/performance', '/engagement', '/reports', '/analytics', '/workflows', '/integrations', '/settings', '/documents', '/assets', '/chat', '/subscriptions', '/help', '/audit', '/id-cards', '/ai-copilot', '/intelligence'];
   const isProtected = protectedPrefixes.some((p) => pathname.startsWith(p));
 
   if (isProtected && !token) {

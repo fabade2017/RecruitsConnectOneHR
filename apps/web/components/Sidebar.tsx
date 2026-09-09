@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, UserPlus, Clock, CalendarCheck, Timer, Briefcase, Wallet, TrendingUp, GraduationCap, Heart, ShieldCheck, FileText, Boxes, ArrowUpCircle, UserMinus, Users2, Scale, Headset, BarChart3, Brain, Workflow, Plug, Settings,
-  MapPin, AlertTriangle, Building2, ChevronLeft, ChevronRight, LogOut, Sparkles, Layers, MessageCircle, CreditCard
+  MapPin, AlertTriangle, Building2, ChevronLeft, ChevronRight, LogOut, Sparkles, Layers, MessageCircle, CreditCard, HelpCircle, BookOpen
 } from 'lucide-react';
 
 type NavSection = { title: string; items: { href: string; label: string; icon: any; badge?: string; roles?: string[]; perms?: string[]; module?: string }[] };
@@ -58,6 +58,7 @@ const NAV: NavSection[] = [
     { href: '/admin', label: 'Super Admin', icon: ShieldCheck, roles: ['super_admin'] },
   ]},
   { title: 'HELP', items: [
+    { href: '/help', label: 'Help • Docs', icon: HelpCircle },
     { href: '/manual', label: 'Manual • PDF', icon: FileText },
     { href: '/about', label: 'About', icon: Building2 },
     { href: '/contact', label: 'Contact', icon: Headset },
@@ -66,8 +67,23 @@ const NAV: NavSection[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [user, setUser] = useState<any>(null);
+
+  // Persist collapsed state; default collapsed = true per requirements
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('onehr_sidebar_collapsed');
+      if (saved !== null) setCollapsed(saved === 'true');
+    } catch {}
+  }, []);
+  const toggleCollapsed = () => {
+    setCollapsed(v => {
+      const nv = !v;
+      try { localStorage.setItem('onehr_sidebar_collapsed', String(nv)); } catch {}
+      return nv;
+    });
+  };
   const [branding, setBranding] = useState<any>(null);
   const [chatUnread, setChatUnread] = useState<number>(0);
   const [allowedModules, setAllowedModules] = useState<Set<string> | null>(null);
@@ -163,7 +179,7 @@ export default function Sidebar() {
             {branding?.logoUrl ? <img src={branding.logoUrl} alt="logo" className="w-full h-full object-contain p-1" /> : <img src="/logo.svg" alt="OneHR" className="w-full h-full object-contain p-1" />}
           </div>
           {!collapsed && <div className="ml-3 leading-tight"><div className="font-bold tracking-tight">{branding?.watermarkText || 'OneHR'}</div><div className="text-[11px] text-white/60 -mt-1">RecruitConnect</div></div>}
-          <button onClick={() => setCollapsed(!collapsed)} className="ml-auto w-7 h-7 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center">
+          <button onClick={toggleCollapsed} className="ml-auto w-7 h-7 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center" aria-label={collapsed ? 'Expand menu' : 'Collapse menu'} title={collapsed ? 'Expand' : 'Collapse'}>
             {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
         </div>

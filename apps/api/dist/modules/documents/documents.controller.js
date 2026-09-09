@@ -18,6 +18,7 @@ const platform_express_1 = require("@nestjs/platform-express");
 const swagger_1 = require("@nestjs/swagger");
 const documents_service_1 = require("./documents.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let DocumentsController = class DocumentsController {
     svc;
     constructor(svc) {
@@ -156,6 +157,7 @@ __decorate([
 ], DocumentsController.prototype, "assignAssetById", null);
 exports.DocumentsController = DocumentsController = __decorate([
     (0, swagger_1.ApiTags)('documents'),
+    (0, module_guard_1.RequireModule)('documents'),
     (0, common_1.Controller)(),
     __metadata("design:paramtypes", [documents_service_1.DocumentsService])
 ], DocumentsController);

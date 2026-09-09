@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FileText, Download, BookOpen, ShieldCheck, Users, Clock, Sparkles } from 'lucide-react';
+import { FileText, Download, BookOpen, ShieldCheck, Users, Clock, Sparkles, HelpCircle } from 'lucide-react';
 
 export const metadata = { title: 'OneHR Manual — RecruitConnect' };
 
@@ -64,6 +64,18 @@ export default function ManualPage() {
           <div className="p-3 bg-slate-50/50 text-xs text-slate-500 flex justify-between">
             <span>If PDF doesn’t load, <a href="/manual.pdf" className="underline">click here to download</a> or check <code>apps/web/public/manual.pdf</code>.</span>
             <span className="hidden md:inline">Docs: PRD • ERD • API_SPEC • ARCHITECTURE • RBAC • ROADMAP</span>
+          </div>
+        </div>
+
+        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col md:flex-row justify-between gap-4">
+          <div>
+            <h3 className="font-bold flex items-center gap-2"><HelpCircle size={18} className="text-amber-600"/> New: Help Center inside the app</h3>
+            <p className="text-sm text-slate-600 mt-1">The updated docs now live under <b>Help • Docs (/help)</b> in the sidebar (collapsed by default → click chevron to expand). It includes the newbie story, 10-step process map, roles, and searchable modules.</p>
+            <p className="text-xs text-slate-500 mt-1">When you’re logged in, open the sidebar → HELP → Help • Docs. No need to hunt in docs/.</p>
+          </div>
+          <div className="flex gap-3 self-start">
+            <Link href="/help" className="bg-slate-900 text-white rounded-full px-5 py-2.5 text-sm font-semibold">Open Help Center →</Link>
+            <Link href="/login" className="glass rounded-full px-5 py-2.5 text-sm font-semibold">Login to see it</Link>
           </div>
         </div>
 

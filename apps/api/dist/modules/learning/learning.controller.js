@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const learning_service_1 = require("./learning.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let LearningController = class LearningController {
     svc;
     constructor(svc) {
@@ -165,6 +166,7 @@ __decorate([
 ], LearningController.prototype, "update", null);
 exports.LearningController = LearningController = __decorate([
     (0, swagger_1.ApiTags)('learning'),
+    (0, module_guard_1.RequireModule)('learning'),
     (0, common_1.Controller)('learning'),
     __metadata("design:paramtypes", [learning_service_1.LearningService])
 ], LearningController);

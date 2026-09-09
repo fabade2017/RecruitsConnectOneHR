@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const admin_service_1 = require("./admin.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let AdminController = class AdminController {
     svc;
     constructor(svc) {
@@ -392,6 +393,7 @@ __decorate([
 ], AdminController.prototype, "organizations", null);
 exports.AdminController = AdminController = __decorate([
     (0, swagger_1.ApiTags)('admin'),
+    (0, module_guard_1.RequireModule)('administration'),
     (0, common_1.Controller)('admin'),
     (0, rbac_guard_1.Roles)('super_admin'),
     __metadata("design:paramtypes", [admin_service_1.AdminService])

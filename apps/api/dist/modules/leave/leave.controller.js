@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const leave_service_1 = require("./leave.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let LeaveController = class LeaveController {
     svc;
     constructor(svc) {
@@ -139,6 +140,7 @@ __decorate([
 ], LeaveController.prototype, "bal", null);
 exports.LeaveController = LeaveController = __decorate([
     (0, swagger_1.ApiTags)('leave'),
+    (0, module_guard_1.RequireModule)('leave'),
     (0, common_1.Controller)('leave'),
     __metadata("design:paramtypes", [leave_service_1.LeaveService])
 ], LeaveController);

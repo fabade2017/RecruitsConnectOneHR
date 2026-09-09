@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const branches_service_1 = require("./branches.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let BranchesController = class BranchesController {
     svc;
     constructor(svc) {
@@ -93,6 +94,7 @@ __decorate([
 ], BranchesController.prototype, "remove", null);
 exports.BranchesController = BranchesController = __decorate([
     (0, swagger_1.ApiTags)('branches'),
+    (0, module_guard_1.RequireModule)('people'),
     (0, common_1.Controller)('branches'),
     __metadata("design:paramtypes", [branches_service_1.BranchesService])
 ], BranchesController);

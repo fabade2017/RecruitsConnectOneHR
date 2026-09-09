@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const onboarding_service_1 = require("./onboarding.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let OnboardingController = class OnboardingController {
     svc;
     constructor(svc) {
@@ -86,6 +87,7 @@ __decorate([
 ], OnboardingController.prototype, "toggleAlias", null);
 exports.OnboardingController = OnboardingController = __decorate([
     (0, swagger_1.ApiTags)('onboarding'),
+    (0, module_guard_1.RequireModule)('onboarding'),
     (0, common_1.Controller)('onboarding'),
     __metadata("design:paramtypes", [onboarding_service_1.OnboardingService])
 ], OnboardingController);

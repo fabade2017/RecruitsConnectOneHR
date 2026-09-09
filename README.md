@@ -3,7 +3,7 @@
 
 > Intelligent Workforce Operating System — not just HRIS. Answers "What is happening across your workforce right now?" — now on **MSSQL `onehr_v2`**.
 
-**Docs:** `docs/PRD.md` | `docs/ERD.md` | `docs/API_SPEC.md` | `docs/ARCHITECTURE.md` | `docs/RBAC.md` | `docs/ROADMAP.md` | `docs/MANUAL.md`
+**Docs:** `docs/PRD.md` | `docs/ERD.md` | `docs/API_SPEC.md` | `docs/ARCHITECTURE.md` | `docs/RBAC.md` | `docs/ROADMAP.md` | `docs/MANUAL.md` | **`docs/HELP.md` (Help Center story)** → also in-app **Sidebar → HELP → Help • Docs (/help)** (collapsed by default)
 
 ## Quick Start (MSSQL)
 
@@ -41,8 +41,9 @@ Demo logins: `admin@recruitconnect.ng/Admin@123` (org_admin, RC), `superadmin@re
 - **Phase 3 (M8-10) DONE:** Projects, Performance, Talent Marketplace, Passport, Documents/Assets
 - **Phase 4 (M11-14) DONE:** Workforce Intelligence (HR Health 89), Copilot (RAG), Digital Twin, Face Verification (motion 0.8–12%, FaceDetector, 90d retention), MSSQL `onehr_v2`
 - **Patch 2026-09-06 DONE:** **Leave** hard delete wrong pending + cancel + edit (`apps/api/src/modules/leave/*`, `leave/page.tsx`), **ChatBot** contrast fix `CsWidget.tsx:131-305` (`white/#1e293b !important`, remote CSS disabled) — all modules audited, docs updated `API_SPEC.md §7`, `MANUAL.md §5/5a`
+- **Patch 2026-09-09 DONE:** **Help Center (`/help`) + Sidebar collapsed by default** — story for newbies (Amara/Chidi/Blessing/Emeka/Zainab/Aisha), 10-step process map, roles matrix, 44 modules searchable, attendance/leave deep dives, FAQ. Sidebar `Sidebar.tsx:67` `useState(true)` + `localStorage onehr_sidebar_collapsed`, `HELP → Help • Docs` protected, `Manual • PDF` remains public. Docs: `docs/HELP.md` + `MANUAL.md §0` updated.
 
-See `docs/ROADMAP.md` for details. New: **Landing** (`/`, `/register`, `/about`, `/contact`) with `AuthNav` (Login vs Dashboard/Logout).
+See `docs/ROADMAP.md` for details. New: **Landing** (`/`, `/register`, `/about`, `/contact`) with `AuthNav` (Login vs Dashboard/Logout). **In-app Help:** Sidebar HELP → **Help • Docs (/help)** (collapsed by default → click `›` to expand).
 
 ## Key Design Principles
 

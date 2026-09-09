@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const shifts_service_1 = require("./shifts.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let ShiftsController = class ShiftsController {
     svc;
     constructor(svc) {
@@ -101,6 +102,7 @@ __decorate([
 ], ShiftsController.prototype, "rosters", null);
 exports.ShiftsController = ShiftsController = __decorate([
     (0, swagger_1.ApiTags)('shifts'),
+    (0, module_guard_1.RequireModule)('shifts'),
     (0, common_1.Controller)(),
     __metadata("design:paramtypes", [shifts_service_1.ShiftsService])
 ], ShiftsController);

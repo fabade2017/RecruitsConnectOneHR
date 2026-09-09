@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const projects_service_1 = require("./projects.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let ProjectsController = class ProjectsController {
     svc;
     constructor(svc) {
@@ -132,6 +133,7 @@ __decorate([
 ], ProjectsController.prototype, "workload", null);
 exports.ProjectsController = ProjectsController = __decorate([
     (0, swagger_1.ApiTags)('projects'),
+    (0, module_guard_1.RequireModule)('tasks'),
     (0, common_1.Controller)(),
     __metadata("design:paramtypes", [projects_service_1.ProjectsService])
 ], ProjectsController);

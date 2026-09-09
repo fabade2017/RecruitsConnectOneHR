@@ -37,6 +37,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const QRCode = __importStar(require("qrcode"));
 const bcrypt = __importStar(require("bcryptjs"));
+const jwt = __importStar(require("jsonwebtoken"));
 function canAccessEmployee(user, employeeId, employee) {
     const role = user?.role;
     if (['org_admin', 'super_admin', 'hr_admin', 'hr_manager', 'executive', 'auditor'].includes(role))
@@ -61,6 +62,179 @@ let EmployeesService = class EmployeesService {
             return user.employeeId;
         const emp = await this.prisma.employee.findUnique({ where: { userId: user.sub } });
         return emp?.id || null;
+    }
+    // Secured QR helpers
+    async generateSecureQrData(org, employee) {
+        const payload = {
+            employeeCode: employee.employeeCode,
+            employeeId: employee.id,
+            organizationId: employee.organizationId,
+            orgAcronym: org.acronym,
+            jobTitle: employee.jobTitle,
+            grade: employee.grade,
+            departmentId: employee.departmentId,
+            branchId: employee.branchId,
+            iat: Math.floor(Date.now() / 1000),
+        };
+        const token = jwt.sign(payload, (process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev'), { expiresIn: '10y' });
+        // QR contains secure token (can be verified via /employees/qr/verify)
+        const qrSecure = await QRCode.toDataURL(token);
+        return { token, qrSecure };
+    }
+    async verifySecureQr(token) {
+        try {
+            const decoded = jwt.verify(token, (process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev'));
+            const emp = await this.prisma.employee.findUnique({ where: { id: decoded.employeeId }, include: { department: true, branch: true, organization: true, user: { select: { email: true, role: true } } } });
+            if (!emp || emp.employeeCode !== decoded.employeeCode)
+                throw new common_1.NotFoundException('Employee not found for QR');
+            return { valid: true, decoded, employee: { id: emp.id, employeeCode: emp.employeeCode, jobTitle: emp.jobTitle, grade: emp.grade, department: emp.department?.name, branch: emp.branch?.name, organization: emp.organization.name, photoUrl: emp.photoUrl } };
+        }
+        catch (e) {
+            if (e.name === 'TokenExpiredError')
+                throw new common_1.ConflictException('QR expired');
+            throw new common_1.ConflictException('Invalid QR: ' + e.message);
+        }
+    }
+    async uploadPhoto(orgId, employeeId, file, user) {
+        const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, organizationId: orgId } });
+        if (!emp)
+            throw new common_1.NotFoundException('Employee not found');
+        if (user && !canAccessEmployee(user, employeeId, emp) && !['org_admin', 'super_admin', 'hr_admin', 'hr_manager', 'executive', 'auditor', 'manager'].includes(user.role)) {
+            if (user.role === 'employee') {
+                const ownId = await this.resolveEmployeeIdFromUser(user);
+                if (ownId !== employeeId)
+                    throw new common_1.ForbiddenException('Employees can only upload own photo');
+            }
+        }
+        if (!file || !file.buffer)
+            throw new common_1.ConflictException('No photo file uploaded. Use field name \"photo\"');
+        if (file.size > 5 * 1024 * 1024)
+            throw new common_1.ConflictException('Photo too large (max 5MB)');
+        const allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+        if (file.mimetype && !allowedMime.includes(file.mimetype))
+            throw new common_1.ConflictException('Invalid photo type (jpeg/png/webp only)');
+        const base64 = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+        // For MVP store as data URL (in production use S3). Truncate if needed
+        const updated = await this.prisma.employee.update({ where: { id: employeeId }, data: { photoUrl: base64 } });
+        return { employeeId, photoUrl: base64, message: 'Passport photo updated — visible to superadmin/management' };
+    }
+    async getIdCardData(orgId, employeeId, user) {
+        const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, organizationId: orgId }, include: { department: true, branch: true, organization: true, user: { select: { email: true, phone: true, role: true } } } });
+        if (!emp)
+            throw new common_1.NotFoundException('Employee not found');
+        if (user && !canAccessEmployee(user, employeeId, emp) && !['org_admin', 'super_admin', 'hr_admin', 'hr_manager', 'executive', 'auditor', 'manager'].includes(user.role)) {
+            if (user.role === 'employee') {
+                const ownId = await this.resolveEmployeeIdFromUser(user);
+                if (ownId !== employeeId)
+                    throw new common_1.ForbiddenException('Employees can only view own ID card');
+            }
+        }
+        const org = emp.organization;
+        const { token, qrSecure } = await this.generateSecureQrData(org, emp);
+        // Front/back data
+        return {
+            employee: {
+                id: emp.id,
+                employeeCode: emp.employeeCode,
+                jobTitle: emp.jobTitle,
+                grade: emp.grade,
+                department: emp.department?.name || null,
+                branch: emp.branch?.name || null,
+                photoUrl: emp.photoUrl,
+                hireDate: emp.hireDate,
+                dateOfBirth: emp.dateOfBirth,
+                employmentType: emp.employmentType,
+                workArrangement: emp.workArrangement,
+                status: emp.status,
+                email: emp.user?.email || null,
+                phone: emp.user?.phone || null,
+            },
+            organization: {
+                id: org.id,
+                name: org.name,
+                acronym: org.acronym,
+                logoUrl: org.logoUrl,
+                watermarkEnabled: org.watermarkEnabled,
+                watermarkText: org.watermarkText,
+                watermarkOpacity: org.watermarkOpacity,
+                watermarkPosition: org.watermarkPosition,
+                primaryColor: org.primaryColor,
+                config: (() => { try {
+                    return typeof org.config === 'string' ? JSON.parse(org.config) : org.config;
+                }
+                catch {
+                    return {};
+                } })(),
+            },
+            qr: {
+                legacy: emp.qrCode,
+                secureToken: token,
+                secureQr: qrSecure,
+                verifyUrl: `/v1/employees/qr/verify?token=${encodeURIComponent(token)}`,
+            },
+            card: {
+                front: {
+                    title: `${org.name} — Staff ID`,
+                    photoUrl: emp.photoUrl,
+                    employeeCode: emp.employeeCode,
+                    jobTitle: emp.jobTitle,
+                    department: emp.department?.name,
+                    branch: emp.branch?.name,
+                    qrSecure,
+                },
+                back: {
+                    organization: org.name,
+                    acronym: org.acronym,
+                    employeeCode: emp.employeeCode,
+                    secureToken: token,
+                    disclaimer: 'This card is property of ' + org.name + '. If found, return to HR. Secured QR verifies authenticity.',
+                    issuedAt: new Date().toISOString(),
+                },
+            },
+        };
+    }
+    async listIdCards(orgId, query, user) {
+        // RBAC scoping same as list
+        const where = { organizationId: orgId };
+        if (query.search)
+            where.OR = [{ employeeCode: { contains: query.search, mode: 'insensitive' } }, { jobTitle: { contains: query.search, mode: 'insensitive' } }];
+        const role = user?.role;
+        if (role === 'employee') {
+            const ownId = await this.resolveEmployeeIdFromUser(user);
+            if (!ownId)
+                return [];
+            where.id = ownId;
+        }
+        else if (role === 'manager') {
+            const ownId = await this.resolveEmployeeIdFromUser(user);
+            const team = await this.prisma.employee.findMany({ where: { organizationId: orgId, managerId: ownId }, select: { id: true } });
+            const ids = [ownId, ...team.map(t => t.id)].filter(Boolean);
+            where.id = { in: ids };
+        }
+        const employees = await this.prisma.employee.findMany({ where, take: Math.min(parseInt(query.limit || '50'), 100), orderBy: { createdAt: 'desc' }, include: { department: true, branch: true, organization: true, user: { select: { email: true } } } });
+        const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
+        const orgCfg = (() => { try {
+            return typeof org.config === 'string' ? JSON.parse(org.config) : org.config;
+        }
+        catch {
+            return {};
+        } })();
+        const cards = await Promise.all(employees.map(async (emp) => {
+            const { token, qrSecure } = await this.generateSecureQrData(org, emp);
+            return {
+                id: emp.id,
+                employeeCode: emp.employeeCode,
+                jobTitle: emp.jobTitle,
+                grade: emp.grade,
+                department: emp.department?.name,
+                branch: emp.branch?.name,
+                photoUrl: emp.photoUrl,
+                qrSecure,
+                secureToken: token,
+                organization: { name: org?.name, acronym: org?.acronym, logoUrl: org?.logoUrl, watermarkEnabled: org.watermarkEnabled, watermarkOpacity: org.watermarkOpacity, watermarkText: org.watermarkText, watermarkPosition: org.watermarkPosition, primaryColor: org.primaryColor, config: orgCfg },
+            };
+        }));
+        return { total: cards.length, cards };
     }
     async create(orgId, dto, user) {
         const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
@@ -191,16 +365,47 @@ let EmployeesService = class EmployeesService {
             const ownId = await this.resolveEmployeeIdFromUser(user);
             if (ownId !== id)
                 throw new common_1.ForbiddenException('Employees can only update self');
-            const allowed = ['phone', 'address', 'photoUrl', 'skills'];
-            const filtered = {};
-            for (const k of allowed)
-                if (dto[k] !== undefined)
-                    filtered[k] = dto[k];
-            if (Object.keys(filtered).length === 0)
-                throw new common_1.ForbiddenException('No permitted fields');
-            if (filtered.skills && Array.isArray(filtered.skills))
-                filtered.skills = JSON.stringify(filtered.skills);
-            return this.prisma.employee.update({ where: { id }, data: filtered });
+            // Employee self can update: phone/email (User), skills/photoUrl (Employee)
+            const userUpdates = {};
+            if (dto.phone !== undefined)
+                userUpdates.phone = dto.phone;
+            if (dto.email !== undefined)
+                userUpdates.email = dto.email;
+            // allow skills and photoUrl on employee
+            const empUpdates = {};
+            if (dto.skills !== undefined)
+                empUpdates.skills = Array.isArray(dto.skills) ? JSON.stringify(dto.skills) : dto.skills;
+            if (dto.photoUrl !== undefined)
+                empUpdates.photoUrl = dto.photoUrl;
+            if (dto.address !== undefined)
+                empUpdates.metadata = dto.address; // store loosely if needed
+            if (Object.keys(userUpdates).length === 0 && Object.keys(empUpdates).length === 0)
+                throw new common_1.ForbiddenException('No permitted fields (employee can only edit phone/skills/photo)');
+            if (Object.keys(userUpdates).length) {
+                const empForUser = await this.prisma.employee.findUnique({ where: { id }, select: { userId: true } });
+                if (empForUser?.userId) {
+                    if (userUpdates.email) {
+                        const exists = await this.prisma.user.findFirst({ where: { email: userUpdates.email, organizationId: orgId, id: { not: empForUser.userId } } });
+                        if (exists)
+                            throw new common_1.ConflictException('Email already exists in organization');
+                    }
+                    await this.prisma.user.update({ where: { id: empForUser.userId }, data: userUpdates });
+                }
+                else if (userUpdates.email) {
+                    // create user link if not exists (first time phone/email set)
+                    const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { acronym: true } });
+                    const hash = await bcrypt.hash('Temp@123', 10);
+                    const newUser = await this.prisma.user.create({ data: { organizationId: orgId, email: userUpdates.email, phone: userUpdates.phone, passwordHash: hash, role: 'employee', mustChangePassword: true } });
+                    await this.prisma.employee.update({ where: { id }, data: { userId: newUser.id } });
+                }
+                else {
+                    throw new common_1.ConflictException('No linked user to update phone — provide email first');
+                }
+            }
+            if (Object.keys(empUpdates).length) {
+                await this.prisma.employee.update({ where: { id }, data: empUpdates });
+            }
+            return this.prisma.employee.findUnique({ where: { id }, include: { user: { select: { id: true, email: true, phone: true, role: true } }, department: true, branch: true } });
         }
         if (role === 'manager') {
             const ownId = await this.resolveEmployeeIdFromUser(user);

@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const analytics_service_1 = require("./analytics.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let AnalyticsController = class AnalyticsController {
     svc;
     constructor(svc) {
@@ -125,6 +126,7 @@ __decorate([
 ], AnalyticsController.prototype, "detail", null);
 exports.AnalyticsController = AnalyticsController = __decorate([
     (0, swagger_1.ApiTags)('analytics'),
+    (0, module_guard_1.RequireModule)('analytics'),
     (0, common_1.Controller)('analytics'),
     __metadata("design:paramtypes", [analytics_service_1.AnalyticsService])
 ], AnalyticsController);

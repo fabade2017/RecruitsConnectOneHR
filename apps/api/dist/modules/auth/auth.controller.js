@@ -41,6 +41,19 @@ __decorate([
     (0, jwt_auth_guard_1.Public)(),
     (0, common_1.Post)('login'),
     (0, swagger_1.ApiOperation)({ summary: 'Login - requires email, password and organization acronym' }),
+    (0, swagger_1.ApiBody)({
+        schema: {
+            type: 'object',
+            required: ['email', 'password', 'acronym'],
+            properties: {
+                email: { type: 'string', example: 'sample.admin@example.com' },
+                password: { type: 'string', example: 'Sample@123' },
+                acronym: { type: 'string', example: 'SAMPLE', description: 'Organization acronym (also accepts org_acronym / organizationAcronym)' },
+                org_acronym: { type: 'string', example: 'SAMPLE' },
+                organizationAcronym: { type: 'string', example: 'SAMPLE' },
+            },
+        },
+    }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -49,6 +62,7 @@ __decorate([
 __decorate([
     (0, jwt_auth_guard_1.Public)(),
     (0, common_1.Post)('refresh'),
+    (0, swagger_1.ApiBody)({ schema: { type: 'object', required: ['refresh_token'], properties: { refresh_token: { type: 'string', example: 'eyJ...' } } } }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),

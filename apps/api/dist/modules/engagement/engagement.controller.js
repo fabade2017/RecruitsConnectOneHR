@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const engagement_service_1 = require("./engagement.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let EngagementController = class EngagementController {
     svc;
     constructor(svc) {
@@ -102,6 +103,7 @@ __decorate([
 ], EngagementController.prototype, "responses", null);
 exports.EngagementController = EngagementController = __decorate([
     (0, swagger_1.ApiTags)('engagement'),
+    (0, module_guard_1.RequireModule)('engagement'),
     (0, common_1.Controller)('engagement'),
     __metadata("design:paramtypes", [engagement_service_1.EngagementService])
 ], EngagementController);

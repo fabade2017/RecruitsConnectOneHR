@@ -1,6 +1,14 @@
 # OneHR — Operations Manual (MSSQL `onehr_v2`)
 
-> Updated 2026-09-06 — covers MSSQL migration, landing, auth, People edit, face clock, register → superadmin onboarding, **Leave full lifecycle (edit/cancel/delete)** and **ChatBot contrast fix**.
+> Updated 2026-09-09 — **Help Center (/help) + Sidebar collapsed by default** — covers MSSQL migration, landing, auth, People edit, face clock, register → superadmin onboarding, **Leave full lifecycle (edit/cancel/delete)**, **ChatBot contrast fix**, and **Help • Docs story + collapsed sidebar**.
+
+## 0. New — Help Center & Sidebar (2026-09-09)
+
+**Sidebar:** `apps/web/components/Sidebar.tsx:67-69` now `useState(true)` → **collapsed by default (72px icons-only)**. Click chevron `›` to expand to 280px, `‹` to collapse; preference persists in `localStorage onehr_sidebar_collapsed`. All docs now sit under **HELP → Help • Docs (/help)` `apps/web/app/(dashboard)/help/page.tsx` — protected, requires auth. Public `Manual • PDF (/manual)` remains public via `middleware.ts publicPaths` plus inline iframe. See `§ Help Center` below and `docs/HELP.md` (story).
+
+**Help Center (`/help`):** Story narrative for newbies (Amara/Chidi/Blessing/Emeka/Zainab/Aisha), 10-step process map (Register → Predict), Quick Start, Roles matrix, 44 modules searchable, Attendance deep dive (7 methods, motion 0.8–12%, FaceDetector), Leave lifecycle table, HR daily flow, Tech docs summary (PRD/ERD/API_SPEC/ARCH/RBAC/ROADMAP), FAQ (acronym, collapsed tip, delete vs cancel, missing clock-out, fraud flags). Search filters modules; TOC smooth-scrolls; sidebar collapsed tip visible in hero.
+
+**Navigation:** Landing `/` → public Manual/About/Contact + Login/Register. After login → Dashboard (`/(dashboard)/layout.tsx`) with collapsable Sidebar; **HELP** section: `Help • Docs (/help)` (protected story + process flow), `Manual • PDF (/manual)`, `About`, `Contact`. Previous `docs/MANUAL.md` now augmented; new `docs/HELP.md` is the story source used by `/help`.
 
 ## 1. Quick Verify (2 min)
 

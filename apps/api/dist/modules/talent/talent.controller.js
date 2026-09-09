@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const talent_service_1 = require("./talent.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const module_guard_1 = require("../../common/guards/module.guard");
 let TalentController = class TalentController {
     svc;
     constructor(svc) {
@@ -107,6 +108,7 @@ __decorate([
 ], TalentController.prototype, "marketplace", null);
 exports.TalentController = TalentController = __decorate([
     (0, swagger_1.ApiTags)('talent'),
+    (0, module_guard_1.RequireModule)('talent_marketplace'),
     (0, common_1.Controller)(),
     __metadata("design:paramtypes", [talent_service_1.TalentService])
 ], TalentController);
