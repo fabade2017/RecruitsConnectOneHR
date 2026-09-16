@@ -1,5 +1,5 @@
 {
-  "installCommand": "cd ../.. && pnpm install",
+  "installCommand": "cd ../.. && pnpm install --no-frozen-lockfile",
   "buildCommand": "cd ../.. && pnpm --filter onehr-web build",
   "framework": "nextjs",
   "rewrites": [

@@ -1,5 +1,5 @@
 {
-  "installCommand": "pnpm install",
+  "installCommand": "pnpm install --no-frozen-lockfile",
   "buildCommand": "pnpm --filter onehr-web build",
   "outputDirectory": "apps/web/.next",
   "rewrites": [
