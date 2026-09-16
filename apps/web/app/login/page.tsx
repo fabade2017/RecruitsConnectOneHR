@@ -24,8 +24,9 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Login failed');
-      // HttpOnly cookies set by server route (/api/auth/login) — no JS cookie write (point 2 hardening)
-      // Keep minimal non-sensitive user meta in localStorage for UI; token stays HttpOnly
+      // HttpOnly cookies set by server route (/api/auth/login) + Bearer fallback for API calls (api/lib/api.ts:8 getAuthHeaders)
+      if (data.access_token) localStorage.setItem('onehr_token', data.access_token);
+      else if ((data as any).accessToken) localStorage.setItem('onehr_token', (data as any).accessToken);
       localStorage.setItem('onehr_user', JSON.stringify(data.user));
       const role = data.user.role;
       // Employee gets immediate clock-in popup

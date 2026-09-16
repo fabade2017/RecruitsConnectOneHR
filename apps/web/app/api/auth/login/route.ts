@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   }
 
   const token: string = json.access_token;
-  const res = NextResponse.json({ user: json.user, refresh_token: json.refresh_token, success: true });
+  const res = NextResponse.json({ user: json.user, refresh_token: json.refresh_token, access_token: token, success: true });
   // HttpOnly + Secure + SameSite=Lax — JS cannot read, mitigates XSS steal (point 2)
   const isProd = process.env.NODE_ENV === 'production';
   res.cookies.set('onehr_auth', token, {

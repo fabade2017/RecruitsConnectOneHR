@@ -12,6 +12,7 @@ const TOC = [
   { id: 'attendance', label: 'Attendance Deep Dive', icon: Clock, desc: '7 methods + fraud flags' },
   { id: 'leave', label: 'Leave Lifecycle', icon: CalendarCheck, desc: 'Request → approve → cancel/delete' },
   { id: 'hrflow', label: 'HR Daily Flow', icon: Compass, desc: 'Command Center to payroll' },
+  { id: 'reports', label: 'Reports • Exports', icon: BarChart3, desc: 'Live Demo — run as any role, slice/dice, download' },
   { id: 'tech', label: 'Technical Docs', icon: FileText, desc: 'PRD • ERD • API • ARCH • RBAC' },
   { id: 'faq', label: 'FAQ', icon: HelpCircle, desc: 'Privacy, retention, acronym' },
 ];
@@ -374,6 +375,69 @@ npm run dev --workspace=apps/web
               <li><Link href="/reports" className="font-semibold underline">Reports</Link> → attendance CSV, department bar, workforce mix donut.</li>
               <li><Link href="/ai-copilot" className="font-semibold underline">Copilot</Link> → ask “pending probation” → cites policy.</li>
             </ol>
+          </Section>
+
+          {/* REPORTS — LIVE DEMO UNDER HELP */}
+          <Section id="reports" title="Reports • Exports — Live Demo (Run as Any Role)" subtitle="Under HELP → Reports. Same page you’re on. Live from GET /v1/analytics/reports • Try as super_admin / hr_admin / manager / employee." icon={BarChart3}>
+            <div className="grid md:grid-cols-3 gap-3 mb-4">
+              <div className="bg-slate-900 text-white rounded-xl p-4">
+                <div className="font-bold flex items-center gap-2"><ShieldCheck size={16}/> super_admin • org_admin</div>
+                <p className="text-xs text-white/70 mt-1">Full access: payroll, attendance, workforce scores, audit. <code className="bg-white/10 rounded px-1">report:read</code> + <code>analytics:read</code> via <code>*</code>.</p>
+                <Link href="/reports" className="mt-3 inline-block bg-white text-slate-900 rounded-full px-3 py-1.5 text-xs font-semibold">Open Reports →</Link>
+              </div>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                <div className="font-bold text-emerald-800 flex items-center gap-2"><Users size={16}/> hr_admin • Recruiter</div>
+                <p className="text-xs text-emerald-700 mt-1">HR sees all-org reports; recruiter sees recruitment only. Try: <code>RC / hr@ / Test@123</code></p>
+                <span className="mt-3 inline-block bg-emerald-600 text-white rounded-full px-3 py-1.5 text-xs">200 OK — /analytics/reports</span>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <div className="font-bold text-amber-800 flex items-center gap-2"><UserMinus size={16}/> manager • employee</div>
+                <p className="text-xs text-amber-700 mt-1">Manager: My Team + attendance:read (no reports). Employee: self-only. Reports → 403 Expected — RBAC.</p>
+                <span className="mt-3 inline-block bg-amber-500 text-white rounded-full px-3 py-1.5 text-xs">403 Missing permission: report:read</span>
+              </div>
+            </div>
+
+            <div className="border rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 flex items-center justify-between">
+                <h4 className="font-bold text-sm flex items-center gap-2"><BarChart3 size={16}/> How to run as a role — 30 seconds</h4>
+                <Link href="/reports" className="text-xs bg-slate-900 text-white rounded-full px-3 py-1.5">Go to Reports</Link>
+              </div>
+              <div className="p-4 grid md:grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                  <div className="font-semibold">1. Logout → Login with role</div>
+                  <pre className="bg-slate-900 text-slate-100 rounded-xl p-3 text-xs overflow-auto">RC / superadmin@recruitconnect.ng / Test@123 → super_admin (→ /admin)
+RC / admin@recruitconnect.ng / Test@123 → org_admin (→ /hr)
+RC / hr@recruitconnect.ng / Test@123 → hr_admin (→ /hr)
+RC / manager@recruitconnect.ng / Test@123 → manager (→ /manager)
+RC / employee@recruitconnect.ng / Test@123 → employee (→ /employee)</pre>
+                  <div className="text-xs text-slate-600">Sidebar <code>HELP → Help • Docs (/help)</code> stays visible for all roles. It links here. collapsed by default → click <code>›</code> to expand.</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="font-semibold">2. Report flow (all roles)</div>
+                  <ol className="list-decimal pl-5 space-y-1 text-xs text-slate-700">
+                    <li><b>Help</b> → read <b>Story Chapter 7–8</b> (Watchtower → Ledger) → note same APIs.</li>
+                    <li><Link href="/reports" className="underline font-semibold">Reports (/reports)</Link> → <code>GET /analytics/reports</code> → DataGrid with slice/dice/group/pivot.</li>
+                    <li>Use <b>Slice</b> <code>type=payroll</code>, <b>Group by</b> <code>type</code>, <b>Download</b> row JSON. Live from API — no mock.</li>
+                    <li>Try <b>Analytics</b> → Workforce Score 74/100, <b>Intelligence</b> → Simulator <code>salary +10% → +₦X</code>.</li>
+                  </ol>
+                  <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs">
+                    <div className="font-bold text-violet-800 flex items-center gap-2"><Lightbulb size={14}/> Story tie-in</div>
+                    <p className="text-violet-700 mt-1">Help Story <b>Chapter 2 (Gatekeeper)</b> → <b>Chapter 8 (Ledger)</b> → <b>Help → Reports</b> is the artifact: super_admin sees cross-org, org_admin/hr_admin see org, manager sees team, employee blocked — exactly <code>docs/RBAC.md:22</code> matrix.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="px-4 pb-3 text-xs text-slate-500">
+                API: <code>GET /analytics/reports</code> <code>GET /analytics/dashboard</code> <code>GET /analytics/workforce-scores</code> • RBAC <code>@RequirePermissions('report:read')</code> • Sidebar <code>visible()</code> gates <code>Reports</code> to hr_admin/org_admin/super_admin/auditor/executive only. Under HELP, this docs page is always visible (no perms).
+              </div>
+            </div>
+
+            <div className="mt-4 bg-gradient-to-br from-slate-900 to-violet-900 rounded-xl p-4 text-white flex flex-col md:flex-row gap-3 justify-between">
+              <div className="text-sm">
+                <div className="font-bold">Live verification (we ran it)</div>
+                <p className="text-white/70 text-xs mt-1">super_admin 200 → 1 report (HR Health 89 computed) • hr_admin 200 → same • manager 403 Missing permission: report:read • employee 403 — matches RBAC. Branches 200 for all roles (employee:read).</p>
+              </div>
+              <Link href="/reports" className="self-start bg-white text-slate-900 rounded-full px-5 py-2 text-sm font-semibold">Slice & Dice Reports →</Link>
+            </div>
           </Section>
 
           {/* TECH DOCS */}
