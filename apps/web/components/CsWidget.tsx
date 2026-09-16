@@ -572,7 +572,7 @@ export default function CsWidget() {
     // Set NEXT_PUBLIC_CHATBOT_API in apps/web/.env.local or Vercel env and rebuild: `npm run build`
     const envApi = (typeof process !== 'undefined' && (process.env as any).NEXT_PUBLIC_CHATBOT_API) as string | undefined;
     const winApi = typeof window !== 'undefined' ? ((window as any).NEXT_PUBLIC_CHATBOT_API || (window as any).CS_API) : undefined;
-    const api = winApi || envApi || 'http://localhost:8003';
+    const api = winApi || envApi || 'https://customer-service-agent-sr5j.onrender.com';
     console.log(`${api}`);
     script.setAttribute('data-api', api);
     script.setAttribute('data-title', 'Support');
