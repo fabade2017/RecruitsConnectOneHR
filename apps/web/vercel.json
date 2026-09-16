@@ -3,6 +3,7 @@
   "buildCommand": "cd ../.. && pnpm --filter onehr-web build",
   "framework": "nextjs",
   "rewrites": [
-    { "source": "/v1/:path*", "destination": "https://recruits-connect-one-hr-api.onrender.com/v1/:path*" }
+    { "source": "/v1/:path*", "destination": "https://recruits-connect-one-hr-api.onrender.com/v1/:path*" },
+    { "source": "/cs/:path*", "destination": "https://customer-service-agent-sr5j.onrender.com/:path*" }
   ]
 }

@@ -9,7 +9,11 @@ const nextConfig = {
   async rewrites() {
     // Local dev proxy; in Vercel prod, NEXT_PUBLIC_API_URL points to hosted API
     const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
-    return [{ source: '/api/:path*', destination: `${api}/:path*` }];
+    const chatbotApi = process.env.NEXT_PUBLIC_CHATBOT_API || 'https://customer-service-agent-sr5j.onrender.com';
+    return [
+      { source: '/cs/:path*', destination: `${chatbotApi}/:path*` },
+      { source: '/api/:path*', destination: `${api}/:path*` },
+    ];
   },
 };
 module.exports = nextConfig;

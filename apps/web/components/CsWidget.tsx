@@ -572,8 +572,13 @@ export default function CsWidget() {
     // Set NEXT_PUBLIC_CHATBOT_API in apps/web/.env.local or Vercel env and rebuild: `npm run build`
     const envApi = (typeof process !== 'undefined' && (process.env as any).NEXT_PUBLIC_CHATBOT_API) as string | undefined;
     const winApi = typeof window !== 'undefined' ? ((window as any).NEXT_PUBLIC_CHATBOT_API || (window as any).CS_API) : undefined;
-    const api = winApi || envApi || 'https://customer-service-agent-sr5j.onrender.com';
-    console.log(`${api}`);
+    let api = winApi || envApi || 'https://customer-service-agent-sr5j.onrender.com';
+    // Use same-origin proxy on Vercel/Render to bypass CORS (see next.config.js /cs rewrite -> chatbot)
+    // Direct fetch to https://customer-service-agent-sr5j.onrender.com fails CORS preflight for Vercel domains (Disallowed CORS origin)
+    if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+      api = '/cs';
+    }
+    console.log(`[CsWidget] API: ${api} (env:${envApi} win:${winApi})`);
     script.setAttribute('data-api', api);
     script.setAttribute('data-title', 'Support');
     script.textContent = CS_JS;
