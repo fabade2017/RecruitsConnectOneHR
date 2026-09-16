@@ -1,4 +1,7 @@
 {
+  "installCommand": "cd ../.. && pnpm install",
+  "buildCommand": "cd ../.. && pnpm --filter onehr-web build",
+  "framework": "nextjs",
   "rewrites": [
     { "source": "/v1/:path*", "destination": "https://recruits-connect-one-hr-api.onrender.com/v1/:path*" }
   ]
