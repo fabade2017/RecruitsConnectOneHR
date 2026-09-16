@@ -29,6 +29,11 @@ export default function DropdownsPage() {
   const [permFilterModule, setPermFilterModule] = useState<string>('');
 
   const auth = ()=> getAuthHeaders() as any;
+  const parsePerms = (p:any): string[] => {
+    if (Array.isArray(p)) return p;
+    if (typeof p === 'string') { try { const j = JSON.parse(p); return Array.isArray(j) ? j : []; } catch { return []; } }
+    return [];
+  };
   const getRole = () => {
     try {
       const u = JSON.parse(localStorage.getItem('onehr_user')||'{}');
@@ -404,18 +409,20 @@ export default function DropdownsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-xs"><tr><th className="text-left p-2">Role</th><th className="p-2">Slug</th><th className="p-2">Perms</th><th className="p-2">System</th><th className="text-right p-2">Actions</th></tr></thead>
                 <tbody className="divide-y">
-                  {filteredRoles.map((r:any)=> (
+                  {filteredRoles.map((r:any)=> {
+                    const permsArr = parsePerms((r as any).permissions);
+                    return (
                     <tr key={r.id} className="hover:bg-slate-50/50">
-                      <td className="p-2"><div className="font-semibold">{r.name}</div><div className="text-xs text-slate-500">{r.description}</div></td>
+                      <td className="p-2"><div className="font-semibold">{r.name}</div><div className="text-xs text-slate-500">{r.description}</div><div className="text-[11px] text-slate-400 truncate max-w-[260px]">{permsArr.slice(0,3).join(', ')}{permsArr.length>3?' …':''}</div></td>
                       <td className="p-2 font-mono text-xs">{r.slug}</td>
-                      <td className="p-2 text-xs">{r.permissions?.length ?? 0}</td>
+                      <td className="p-2 text-xs"><span className="bg-slate-100 rounded-full px-2 py-0.5">{permsArr.length}</span></td>
                       <td className="p-2"><Pill tone={r.isSystem?'slate':'emerald'}>{r.isSystem?'system':'custom'}</Pill></td>
                       <td className="p-2"><div className="flex justify-end gap-1">
-                        <button onClick={()=>setEditingRole({...r, permissions: r.permissions || []})} className="w-8 h-8 rounded-full glass flex items-center justify-center hover:bg-white"><Edit2 size={14}/></button>
+                        <button onClick={()=>setEditingRole({...r, permissions: parsePerms((r as any).permissions)})} className="w-8 h-8 rounded-full glass flex items-center justify-center hover:bg-white"><Edit2 size={14}/></button>
                         <button onClick={()=>deleteRole(r.id)} className="w-8 h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-100"><Trash2 size={14}/></button>
                       </div></td>
                     </tr>
-                  ))}
+                  );})}
                   {filteredRoles.length===0 && <tr><td colSpan={5} className="p-8 text-center text-slate-500">No roles.</td></tr>}
                 </tbody>
               </table>
@@ -431,23 +438,34 @@ export default function DropdownsPage() {
                   <input value={editingRole.slug} onChange={e=>setEditingRole({...editingRole, slug:e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm font-mono"/>
                   <input value={editingRole.description||''} onChange={e=>setEditingRole({...editingRole, description:e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm"/>
                   <div className="border rounded-xl p-2 max-h-[300px] overflow-auto space-y-2">
-                    {Object.entries(groupedPerms).map(([mod, list]:any)=> (
+                    <div className="text-xs text-slate-500 flex items-center justify-between px-1"><span>{parsePerms(editingRole.permissions).length} selected</span><button onClick={()=>setEditingRole({...editingRole, permissions: []})} className="text-xs underline">Clear</button></div>
+                    {Object.entries(groupedPerms).map(([mod, list]:any)=> {
+                      const curPerms = parsePerms(editingRole.permissions);
+                      const allChecked = (list as any[]).every((p:any)=> curPerms.includes(p.key));
+                      const someChecked = (list as any[]).some((p:any)=> curPerms.includes(p.key));
+                      return (
                       <div key={mod} className="border rounded-lg overflow-hidden">
-                        <div className="px-2 py-1 bg-slate-50 text-xs font-semibold capitalize">{mod}</div>
+                        <label className={`flex items-center gap-2 px-2 py-1 text-xs font-semibold capitalize cursor-pointer ${someChecked?'bg-violet-50':'bg-slate-50'}`}>
+                          <input type="checkbox" checked={allChecked} onChange={e=>{
+                            const keys = (list as any[]).map((p:any)=>p.key);
+                            const next = e.target.checked ? Array.from(new Set([...curPerms, ...keys])) : curPerms.filter(k=> !keys.includes(k));
+                            setEditingRole({...editingRole, permissions: next});
+                          }}/>
+                          <span className="flex-1">{mod}</span><span className="text-[11px] bg-white border rounded-full px-1.5">{(list as any[]).length}</span>{someChecked && <span className="text-[10px] bg-violet-600 text-white rounded-full px-1.5 py-0.5">{curPerms.filter(k=> (list as any[]).some((p:any)=>p.key===k)).length} ✓</span>}
+                        </label>
                         <div className="divide-y">
                           {(list as any[]).map((p:any)=> (
-                            <label key={p.key} className="flex items-center gap-2 px-2 py-1 text-xs">
-                              <input type="checkbox" checked={Array.isArray(editingRole.permissions) ? editingRole.permissions.includes(p.key) : false} onChange={e=>{
-                                const cur = Array.isArray(editingRole.permissions) ? editingRole.permissions : [];
-                                const next = e.target.checked ? [...cur, p.key] : cur.filter((x:string)=> x!==p.key);
+                            <label key={p.key} className="flex items-center gap-2 px-2 py-1 text-xs hover:bg-slate-50 cursor-pointer">
+                              <input type="checkbox" checked={curPerms.includes(p.key)} onChange={e=>{
+                                const next = e.target.checked ? [...curPerms, p.key] : curPerms.filter((x:string)=> x!==p.key);
                                 setEditingRole({...editingRole, permissions: next});
                               }}/>
-                              <span className="font-mono">{p.key}</span>
+                              <span className="font-mono flex-1">{p.key}<span className="text-slate-400 ml-1 hidden md:inline">— {p.name}</span></span>
                             </label>
                           ))}
                         </div>
                       </div>
-                    ))}
+                    );})}
                   </div>
                   <div className="flex gap-2"><button onClick={()=>setEditingRole(null)} className="flex-1 glass rounded-xl py-2">Cancel</button><button onClick={updateRole} className="flex-1 bg-slate-900 text-white rounded-xl py-2 flex items-center justify-center gap-2"><Save size={14}/> Save</button></div>
                 </div>
