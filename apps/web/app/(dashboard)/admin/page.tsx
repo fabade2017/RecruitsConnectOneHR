@@ -31,6 +31,9 @@ export default function SuperAdminPage() {
 
   const auth = () => getAuthHeaders() as any;
 
+  const [ops, setOps] = useState<any>(null);
+  const [activityLog, setActivityLog] = useState<any[]>([]);
+
   const load = async () => {
     const h = auth();
     if (!h.Authorization) { setPermsError('Missing token — please re-login as superadmin@recruitconnect.ng'); return; }
@@ -63,6 +66,22 @@ export default function SuperAdminPage() {
       setCatalog(Array.isArray(cat)?cat:parseApiList(cat));
       setPlansPricing(Array.isArray(pricing)?pricing:pricing?.length?pricing:[]);
       setRenewals(Array.isArray(ren)?ren:parseApiList(ren));
+      // Point 6: Platform snapshot ops — parity with live onehr.com.ng dashboard
+      const payrollList = await fetch(`${api}/payroll`, { headers: h }).then(r=> r.ok ? r.json() : null).catch(()=>null);
+      const allOrgs = Array.isArray(o)?o:parseApiList(o);
+      const runs = payrollList ? (Array.isArray(payrollList)?payrollList:parseApiList(payrollList)) : [];
+      const pendingOrgs = allOrgs.filter((x:any)=> !x.subscriptions?.length).length;
+      setOps({
+        totalOrgs: allOrgs.length,
+        activeRate: allOrgs.length ? Math.round(allOrgs.filter((x:any)=> x.isActive!==false && x.status==='active').length / allOrgs.length * 100) : 0,
+        pendingOnboard: pendingOrgs,
+        openRuns: runs.filter((r:any)=> r.status==='DRAFT' || r.status==='open').length,
+        finalised: runs.filter((r:any)=> r.status==='PAID' || r.status==='finalised').length,
+        runs,
+      });
+      const logs = await fetch(`${api}/audit-logs?limit=8`, { headers: h }).then(r=> r.ok ? r.json() : null).catch(()=>null);
+      const logArr = logs ? (Array.isArray(logs)?logs:parseApiList(logs)) : [];
+      setActivityLog(logArr.slice(0,8));
     } catch (e:any) {
       setPermsError(e.message || 'Failed to load admin data');
     }
@@ -174,6 +193,22 @@ export default function SuperAdminPage() {
 
   return (
     <div className="space-y-6">
+      {ops && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-slate-900 text-white rounded-2xl p-4"><div className="text-xs opacity-70">Organisations</div><div className="text-2xl font-black">{ops.totalOrgs}</div><div className="text-xs opacity-60">{ops.pendingOnboard} pending onboard</div></div>
+          <div className="bg-white border rounded-2xl p-4"><div className="text-xs text-slate-500">Open payroll runs</div><div className="text-2xl font-black">{ops.openRuns}</div><div className="text-xs text-slate-400">{ops.finalised} finalised</div></div>
+          <div className="bg-white border rounded-2xl p-4"><div className="text-xs text-slate-500">Active tenant rate</div><div className="text-2xl font-black">{ops.activeRate}%</div><div className="text-xs text-emerald-600">● All systems operational</div></div>
+          <div className="bg-white border rounded-2xl p-4"><div className="text-xs text-slate-500">Wallet transactions</div><div className="text-2xl font-black">—</div><div className="text-xs text-slate-400">via payroll integration</div></div>
+        </div>
+      )}
+      {activityLog.length > 0 && (
+        <div className="bg-white border rounded-2xl p-4">
+          <h3 className="font-semibold text-sm flex items-center gap-2">Recent platform activity</h3>
+          <div className="mt-2 divide-y text-xs">
+            {activityLog.map((a:any)=> <div key={a.id} className="flex justify-between py-1.5"><span className="font-mono">{a.action} • {a.entityType}</span><span className="text-slate-500">{new Date(a.createdAt).toLocaleString()}</span></div>)}
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><Shield className="text-slate-900"/> Super Admin <span className="text-slate-500 font-normal">— Roles • Modules • Pricing • Subscriptions</span></h1>

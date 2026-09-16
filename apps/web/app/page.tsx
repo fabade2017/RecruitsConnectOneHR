@@ -8,11 +8,10 @@ import { Users, Clock, ShieldCheck, Sparkles, TrendingUp, GraduationCap, Wallet,
 function AuthNav() {
   const [user, setUser] = useState<any>(null);
   useEffect(() => {
-    const t = localStorage.getItem('onehr_token');
     const u = localStorage.getItem('onehr_user');
-    if (t && u) try { setUser(JSON.parse(u)); } catch {}
+    if (u) try { setUser(JSON.parse(u)); } catch {}
   }, []);
-  const logout = () => { localStorage.clear(); document.cookie='onehr_auth=; Max-Age=0; path=/'; document.cookie='onehr_token=; Max-Age=0; path=/'; window.location.href='/login'; };
+  const logout = () => { localStorage.removeItem('onehr_user'); document.cookie='onehr_auth=; Max-Age=0; path=/'; document.cookie='onehr_token=; Max-Age=0; path=/'; fetch('/api/auth/logout', { method: 'POST' }).finally(()=> window.location.href='/login'); };
   if (user) {
     const dash = user.role==='super_admin'?'/admin': user.role==='employee'?'/employee': user.role==='manager'?'/manager': user.role==='executive'?'/executive':'/hr';
     return (
@@ -62,6 +61,54 @@ const faqs = [
   { q: 'How is fraud handled?', a: 'Never auto-accused. Flagged for review: device sharing, impossible travel, duplicate face → HR resolves.' },
   { q: 'Can we import existing payroll?', a: 'Yes. OneHRCon merged payroll (basic + allowances − deductions − tax) + simulator. Bank details via /payroll/bank/details.' },
 ];
+
+function LiveStats() {
+  const [stats, setStats] = useState<{ employees?: number; clockedIn?: number; exceptions?: number; onLeave?: number; loading: boolean }>({ loading: true });
+  useEffect(() => {
+    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
+    const headers: any = {};
+    try {
+      const t = localStorage.getItem('onehr_token');
+      if (t) headers.Authorization = `Bearer ${t}`;
+    } catch {}
+    const fetchStats = async () => {
+      try {
+        const [ccRes, exRes] = await Promise.all([
+          fetch(`${base}/attendance/command-center`, { headers, cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`${base}/attendance/exceptions?limit=1`, { headers, cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null),
+        ]);
+        if (ccRes) {
+          const emp = ccRes.totalEmployees ?? ccRes.employees ?? 0;
+          const ci = ccRes.clockedIn ?? ccRes.present ?? 0;
+          const ol = ccRes.onLeave ?? ccRes.leave ?? 0;
+          const exCount = Array.isArray(exRes) ? exRes.length : exRes?.total ?? exRes?.count ?? 0;
+          setStats({ employees: emp, clockedIn: ci, exceptions: exCount || ccRes.exceptions || 0, onLeave: ol, loading: false });
+          return;
+        }
+        // fallback to orgs count for public/unauthenticated
+        const orgs = await fetch(`${base}/admin/organizations`, { headers, cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+        if (orgs) {
+          const list = Array.isArray(orgs) ? orgs : (orgs.data || []);
+          setStats({ employees: list.reduce((s: number, o: any) => s + (o._count?.employees || 0), 0), clockedIn: undefined, exceptions: undefined, onLeave: undefined, loading: false });
+          return;
+        }
+        setStats({ loading: false });
+      } catch { setStats({ loading: false }); }
+    };
+    fetchStats();
+  }, []);
+  const tiles = [
+    { k: 'Employees', v: stats.loading ? '—' : (stats.employees ?? '—'), c: 'bg-slate-900 text-white' },
+    { k: 'Clocked In', v: stats.loading ? '—' : (stats.clockedIn != null ? `${stats.clockedIn}${stats.employees ? ` • ${Math.round((stats.clockedIn / Math.max(1, stats.employees)) * 100)}%` : ''}` : '—'), c: 'bg-emerald-500 text-white' },
+    { k: 'Exceptions', v: stats.loading ? '—' : (stats.exceptions ?? '—'), c: 'bg-red-500 text-white' },
+    { k: 'On Leave', v: stats.loading ? '—' : (stats.onLeave ?? '—'), c: 'bg-sky-500 text-white' },
+  ];
+  return (
+    <div className="grid grid-cols-4 gap-3 mt-4">
+      {tiles.map(s => <div key={s.k} className={`rounded-2xl p-3 ${s.c}`}><div className="text-[11px] opacity-80">{s.k}</div><div className="font-bold">{s.v}</div></div>)}
+    </div>
+  );
+}
 
 export default function LandingPage() {
   return (
@@ -132,14 +179,7 @@ export default function LandingPage() {
                   <div className="text-xs tracking-widest text-slate-500">WORKFORCE COMMAND CENTER • TODAY</div>
                   <span className="text-xs bg-emerald-50 text-emerald-700 rounded-full px-2 py-1">HR Health 89/100</span>
                 </div>
-                <div className="grid grid-cols-4 gap-3 mt-4">
-                  {[
-                    {k:'Employees',v:'1,245', c:'bg-slate-900 text-white'},
-                    {k:'Clocked In',v:'1,067 • 86%', c:'bg-emerald-500 text-white'},
-                    {k:'Exceptions',v:'17', c:'bg-red-500 text-white'},
-                    {k:'On Leave',v:'84', c:'bg-sky-500 text-white'},
-                  ].map(s=> <div key={s.k} className={`rounded-2xl p-3 ${s.c}`}><div className="text-[11px] opacity-80">{s.k}</div><div className="font-bold">{s.v}</div></div>)}
-                </div>
+                <LiveStats />
                 <div className="mt-4 h-[160px] rounded-2xl bg-gradient-to-br from-slate-50 to-violet-50 border flex items-center justify-center text-slate-400 text-sm">
                   <span className="flex items-center gap-2"><BarChart3 size={16}/> Attendance Trend • Health Radar • Branch Bar</span>
                 </div>

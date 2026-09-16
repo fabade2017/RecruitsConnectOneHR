@@ -18,14 +18,14 @@ export default function LoginPage() {
     if (!acronym.trim()) return setError('Organization acronym is required');
     setLoading(true); setError('');
     try {
-      const res = await fetch(`${apiUrl}/auth/login`, {
+      const res = await fetch(`/api/auth/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, org_acronym: acronym.trim().toUpperCase(), acronym: acronym.trim().toUpperCase() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Login failed');
-      document.cookie = `onehr_auth=${data.access_token}; path=/; max-age=${7*86400}; SameSite=Lax`;
-      localStorage.setItem('onehr_token', data.access_token);
+      // HttpOnly cookies set by server route (/api/auth/login) — no JS cookie write (point 2 hardening)
+      // Keep minimal non-sensitive user meta in localStorage for UI; token stays HttpOnly
       localStorage.setItem('onehr_user', JSON.stringify(data.user));
       const role = data.user.role;
       // Employee gets immediate clock-in popup

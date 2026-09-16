@@ -3,7 +3,9 @@
 export const getApiUrl = () => process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
 export const getAuthHeaders = (): Record<string,string> => {
   if (typeof window === 'undefined') return {};
-  const t = localStorage.getItem('onehr_token');
+  // Point 2: token now HttpOnly — JS cannot read. Use cookie auth via fetch credentials:include.
+  // Keep Bearer fallback only if token still in localStorage (legacy transition)
+  const t = typeof localStorage !== 'undefined' ? localStorage.getItem('onehr_token') : null;
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 

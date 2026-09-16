@@ -11,6 +11,7 @@ import { Public } from '../../common/guards/jwt-auth.guard';
 export class WorkflowsController {
   constructor(private svc: WorkflowsService) {}
 
+  @Get('catalog') @RequirePermissions('employee:read') catalog(@Req() req: any) { return this.svc.catalog(req.orgId); }
   @Get('instances/list') @RequirePermissions('employee:read') instances(@Req() req: any, @Query() q: any) { return this.svc.listInstances(req.orgId, q); }
   @Post('instances') @Roles('hr_admin','org_admin','super_admin') createInstance(@Req() req: any, @Body() dto: any) { return this.svc.createInstance(req.orgId, dto.workflowId, dto.entityType, dto.entityId); }
   @Patch('instances/:id/approve') @RequirePermissions('employee:read') approve(@Req() req: any, @Param('id') id: string, @Body() dto: any) { return this.svc.approveInstance(req.orgId, id, dto, req.user); }

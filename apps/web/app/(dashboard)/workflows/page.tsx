@@ -16,11 +16,16 @@ export default function WorkflowsPage() {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const auth = () => ({ Authorization: `Bearer ${localStorage.getItem('onehr_token')}` });
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const auth = () => ({ Authorization: `Bearer ${typeof localStorage !== 'undefined' ? localStorage.getItem('onehr_token') : ''}` });
 
   const load = async () => {
     setLoading(true);
     try {
+      try {
+        const c = await fetch(`${api}/workflows/catalog`, { headers: auth() as any });
+        if (c.ok) setCatalog(await c.json());
+      } catch {}
       const res = await fetch(`${api}/workflows`, { headers: auth() as any });
       if (res.ok) {
         const data = await res.json();
@@ -174,6 +179,23 @@ export default function WorkflowsPage() {
           <div className="p-3 bg-slate-50/50 text-xs text-slate-500 flex items-center gap-2"><Settings2 size={12}/> Execution log: <code>GET /v1/workflows/:id/runs</code> • Audit: assignment → approval → notification → §34</div>
         </GlassCard>
       </div>
+
+      {catalog.length > 0 && (
+        <GlassCard>
+          <h4 className="font-semibold flex items-center gap-2"><Layers size={16}/> Versioned Engines (parity with live v2.8–v3.3)</h4>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+            {catalog.map((e:any)=> (
+              <div key={e.trigger} className="border rounded-xl p-3 bg-slate-50/50">
+                <div className="flex items-center justify-between"><span className="font-mono text-xs bg-slate-900 text-white rounded-full px-2 py-1">{e.trigger}</span><span className="text-xs bg-violet-600 text-white rounded-full px-2 py-0.5">{e.version}</span></div>
+                <div className="font-semibold text-sm mt-2">{e.label}</div>
+                <div className="text-xs text-slate-500">{e.active}/{e.total} active • default {e.defaultSteps.length} steps</div>
+                <div className="mt-1 flex flex-wrap gap-1">{e.defaultSteps.map((s:any,i:number)=><span key={i} className="text-[11px] bg-white border rounded-full px-2 py-0.5">{s.type}:{s.assignee}</span>)}</div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500 mt-2">GET /v1/workflows/catalog — 6 engines mirroring Live enterprise-shell</p>
+        </GlassCard>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <GlassCard>

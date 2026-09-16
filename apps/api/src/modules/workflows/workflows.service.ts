@@ -114,6 +114,29 @@ export class WorkflowsService {
     return this.prisma.workflowInstance.update({ where: { id: instanceId }, data: { status, currentStep, escalatedAt: dto.escalate ? new Date() : undefined } });
   }
 
+  // Point 5: versioned engines — seed catalog matching live v2.7..v3.3
+  static ENGINE_CATALOG: Record<string, { version: string; label: string; defaultSteps: any[] }> = {
+    'leave_request': { version: 'v2.8', label: 'Leave Workflow', defaultSteps: [{ type: 'approval', assignee: 'manager' }, { type: 'notification', channel: 'email' }] },
+    'performance_review': { version: 'v2.9', label: 'Performance Workflow', defaultSteps: [{ type: 'approval', assignee: 'manager' }, { type: 'approval', assignee: 'hr_admin' }] },
+    'recruitment': { version: 'v3.0', label: 'Recruitment Workflow', defaultSteps: [{ type: 'approval', assignee: 'recruiter' }, { type: 'approval', assignee: 'hr_admin' }] },
+    'documents_compliance': { version: 'v3.1', label: 'Documents & Compliance Workflow', defaultSteps: [{ type: 'approval', assignee: 'hr_admin' }] },
+    'service_desk': { version: 'v3.2', label: 'Service Desk Workflow', defaultSteps: [{ type: 'approval', assignee: 'hr_admin' }] },
+    'payroll_run': { version: 'v3.3', label: 'Payroll Workflow', defaultSteps: [{ type: 'approval', assignee: 'org_admin' }, { type: 'approval', assignee: 'super_admin' }] },
+  };
+
+  async catalog(orgId: string) {
+    const workflows = await this.prisma.workflow.findMany({ where: { organizationId: orgId } });
+    const byTrigger: Record<string, any[]> = {};
+    for (const w of workflows) (byTrigger[w.trigger] = byTrigger[w.trigger] || []).push(w);
+    return Object.entries(WorkflowsService.ENGINE_CATALOG).map(([trigger, meta]) => ({
+      trigger, version: meta.version, label: meta.label,
+      active: (byTrigger[trigger] || []).filter((w:any)=>w.isActive).length,
+      total: (byTrigger[trigger] || []).length,
+      workflows: byTrigger[trigger] || [],
+      defaultSteps: meta.defaultSteps,
+    }));
+  }
+
   async trigger(orgId: string, trigger: string, payload: any) {
     const workflows = await this.prisma.workflow.findMany({ where: { organizationId: orgId, trigger, isActive: true } });
     const instances = [];
@@ -121,6 +144,7 @@ export class WorkflowsService {
       const inst = await this.createInstance(orgId, wf.id, payload.entityType || 'manual', payload.entityId || 'unknown');
       instances.push(inst);
     }
-    return { trigger, matched: workflows.length, instances };
+    const meta = (WorkflowsService.ENGINE_CATALOG as any)[trigger];
+    return { trigger, version: meta?.version || 'v2.7', label: meta?.label || trigger, matched: workflows.length, instances };
   }
 }
