@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -26,23 +26,36 @@ export class PayrollService {
     return this.prisma.payrollMerged.findMany({ where, take: 50, orderBy: { createdAt: 'desc' }, include: { employee: true } });
   }
 
-  create(orgId: string, dto: any) {
+  async create(orgId: string, dto: any) {
     const allowances = dto.allowances || 0;
     const deductions = dto.deductions || 0;
     const tax = dto.tax || 0;
     const netPay = dto.basicSalary + allowances - deductions - tax;
+    // Reject foreign employees so a payroll row can never point at another tenant's staff.
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: dto.employeeId, organizationId: orgId },
+      select: { id: true },
+    });
+    if (!employee) throw new NotFoundException('Employee not found in this organization');
     return this.prisma.payrollMerged.create({
       data: { organizationId: orgId, employeeId: dto.employeeId, month: dto.month, year: dto.year, basicSalary: dto.basicSalary, allowances, deductions, tax, netPay, status: dto.status || 'DRAFT' },
     });
   }
 
-  update(id: string, dto: any) { return this.prisma.payrollMerged.update({ where: { id }, data: dto }); }
+  async update(orgId: string, id: string, dto: any) {
+    const existing = await this.prisma.payrollMerged.findFirst({
+      where: { id, organizationId: orgId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('Payroll record not found');
+    return this.prisma.payrollMerged.update({ where: { id }, data: dto });
+  }
 
-  async payslip(id: string, user?: any) {
-    const p = await this.prisma.payrollMerged.findUnique({ where: { id }, include: { employee: true } });
-    if (!p) throw new ForbiddenException('Not found');
+  async payslip(orgId: string, id: string, user?: any) {
+    const p = await this.prisma.payrollMerged.findFirst({ where: { id, organizationId: orgId }, include: { employee: true } });
+    if (!p) throw new NotFoundException('Not found');
     if (user?.role === 'employee') {
-      const emp = await this.prisma.employee.findUnique({ where: { userId: user.sub } });
+      const emp = await this.prisma.employee.findFirst({ where: { userId: user.sub, organizationId: orgId } });
       if (emp?.id !== p.employeeId) throw new ForbiddenException('Can only view own payslip');
     }
     return p;

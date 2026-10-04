@@ -10,15 +10,23 @@ import {
 import { Server, Socket } from 'socket.io';
 import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../../prisma/prisma.service';
+import { runWithTenant } from '../../prisma/tenant-context';
+
+const socketOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+type SocketUser = { userId: string; orgId: string; email: string; role: string };
 
 @WebSocketGateway({
-  cors: { origin: '*', credentials: true },
+  cors: { origin: socketOrigins, credentials: true },
   namespace: '/chat',
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server!: Server;
   private userSockets = new Map<string, Set<string>>(); // userId -> socketIds
-  private socketUser = new Map<string, { userId: string; orgId: string; email: string }>();
+  private socketUser = new Map<string, SocketUser>();
 
   constructor(private prisma: PrismaService) {}
 
@@ -36,12 +44,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.disconnect();
         return;
       }
-      this.socketUser.set(client.id, { userId, orgId, email: payload.email });
+      this.socketUser.set(client.id, { userId, orgId, email: payload.email, role: payload.role });
       if (!this.userSockets.has(userId)) this.userSockets.set(userId, new Set());
       this.userSockets.get(userId)!.add(client.id);
 
       // Join all conversation rooms for this user
-      const parts = await this.prisma.conversationParticipant.findMany({ where: { userId }, select: { conversationId: true } });
+      const parts = await runWithTenant({ orgId, role: payload.role }, () =>
+        this.prisma.conversationParticipant.findMany({ where: { userId }, select: { conversationId: true } }),
+      );
       for (const p of parts) client.join(`conv:${p.conversationId}`);
       // Also join org room
       client.join(`org:${orgId}`);
@@ -82,7 +92,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleJoin(@ConnectedSocket() client: Socket, @MessageBody() data: { conversationId: string }) {
     const info = this.socketUser.get(client.id);
     if (!info) return;
-    const part = await this.prisma.conversationParticipant.findFirst({ where: { conversationId: data.conversationId, userId: info.userId } });
+    const part = await runWithTenant({ orgId: info.orgId, role: info.role }, () =>
+      this.prisma.conversationParticipant.findFirst({ where: { conversationId: data.conversationId, userId: info.userId } }),
+    );
     if (!part) return;
     client.join(`conv:${data.conversationId}`);
     return { joined: data.conversationId };
@@ -106,6 +118,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleMessageSend(@ConnectedSocket() client: Socket, @MessageBody() data: { conversationId: string; content: string; replyToId?: string; messageType?: string; attachments?: any }) {
     const info = this.socketUser.get(client.id);
     if (!info) return { error: 'Unauthorized' };
+    return runWithTenant({ orgId: info.orgId, role: info.role }, async () => {
     // validate participant
     const part = await this.prisma.conversationParticipant.findFirst({ where: { conversationId: data.conversationId, userId: info.userId } });
     if (!part) return { error: 'Not a participant' };
@@ -145,12 +158,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     return msg;
+    });
   }
 
   @SubscribeMessage('message:read')
   async handleRead(@ConnectedSocket() client: Socket, @MessageBody() data: { conversationId: string; messageId?: string }) {
     const info = this.socketUser.get(client.id);
     if (!info) return;
+    return runWithTenant({ orgId: info.orgId, role: info.role }, async () => {
     let lastId = data.messageId;
     if (!lastId) {
       const last = await this.prisma.message.findFirst({ where: { conversationId: data.conversationId }, orderBy: { createdAt: 'desc' }, select: { id: true } });
@@ -164,6 +179,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       await this.prisma.messageRead.upsert({ where: { messageId_userId: { messageId: m.id, userId: info.userId } as any }, create: { messageId: m.id, userId: info.userId }, update: {} });
     }
     this.server.to(`conv:${data.conversationId}`).emit('message:read', { conversationId: data.conversationId, userId: info.userId, messageId: lastId });
+    });
   }
 
   // Called by service to notify after REST creation

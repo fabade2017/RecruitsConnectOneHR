@@ -1,4 +1,24 @@
 /** @type {import('next').NextConfig} */
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
+const chatbotApi = process.env.NEXT_PUBLIC_CHATBOT_API || 'https://customer-service-agent-sr5j.onrender.com';
+
+const originOf = (value) => {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+};
+
+// ws:/wss: are scheme sources so Socket.IO keeps working on any domain this is deployed to.
+const connectSrc = [
+  "'self'",
+  'ws:',
+  'wss:',
+  originOf(apiUrl),
+  originOf(chatbotApi),
+].filter(Boolean).join(' ');
+
 const nextConfig = {
   transpilePackages: ['@vladmandic/face-api'],
   webpack: (config) => {
@@ -6,11 +26,9 @@ const nextConfig = {
     return config;
   },
   async rewrites() {
-    const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
-    const chatbotApi = process.env.NEXT_PUBLIC_CHATBOT_API || 'https://customer-service-agent-sr5j.onrender.com';
     return [
       { source: '/cs/:path*', destination: `${chatbotApi}/:path*` },
-      { source: '/api/:path*', destination: `${api}/:path*` },
+      { source: '/api/:path*', destination: `${apiUrl}/:path*` },
     ];
   },
   async headers() {
@@ -23,7 +41,7 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self)' },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
-          { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.dicebear.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https://recruits-connect-one-hr-api.onrender.com https://customer-service-agent-sr5j.onrender.com; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'none'" },
+          { key: 'Content-Security-Policy', value: `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.dicebear.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src ${connectSrc}; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'none'` },
         ],
       },
     ];

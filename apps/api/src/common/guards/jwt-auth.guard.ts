@@ -33,8 +33,9 @@ export class JwtAuthGuard {
     try {
       const payload = jwt.verify(token, process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev') as any;
       req.user = payload;
-      // Tenant resolution: prefer JWT org_id, fallback to header
-      req.orgId = payload.org_id || payload.orgId || (req.headers['x-organization-id'] as string);
+      // Tenant comes from the signed JWT only. An X-Organization-Id header must
+      // never be able to move a token into a different organization.
+      req.orgId = payload.org_id || payload.orgId || null;
       // super_admin is global — allow missing org context (admin endpoints are org-agnostic)
       if (!req.orgId && payload.role !== 'super_admin') throw new UnauthorizedException('Missing organization context');
       return true;
