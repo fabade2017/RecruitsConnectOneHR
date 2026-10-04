@@ -8,7 +8,7 @@ export class ProjectsService {
   async list(orgId: string, q: any, user?: any) {
     const where: any = { organizationId: orgId };
     if (q.status) where.status = q.status;
-    if (q.search) where.name = { contains: q.search, mode: 'insensitive' };
+    if (q.search) where.name = { contains: q.search };
     const projects = await this.prisma.project.findMany({
       where,
       take: Math.min(parseInt(q.limit || '50'), 100),

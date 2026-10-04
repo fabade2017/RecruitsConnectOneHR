@@ -7,8 +7,8 @@ export class BranchesService {
 
   async list(orgId: string, query: any) {
     const where: any = { organizationId: orgId };
-    if (query.search) where.name = { contains: query.search, mode: 'insensitive' };
-    if (query.name) where.name = { contains: query.name, mode: 'insensitive' };
+    if (query.search) where.name = { contains: query.search };
+    if (query.name) where.name = { contains: query.name };
     // organizationId query param ignored for RLS; JWT orgId is source of truth
     return this.prisma.branch.findMany({
       where,

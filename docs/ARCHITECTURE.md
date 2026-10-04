@@ -5,7 +5,7 @@
 
 ## 1. Overview
 
-OneHR is multi-tenant SaaS. Start as modular monolith (NestJS + PostgreSQL + Redis) for speed/cost, extract services (Attendance, AI) when scale demands. Event-driven via BullMQ + Postgres LISTEN/NOTIFY for Automation Engine.
+OneHR is multi-tenant SaaS. Start as modular monolith (NestJS + MySQL + Redis) for speed/cost, extract services (Attendance, AI) when scale demands. Event-driven via BullMQ + MySQL polling for Automation Engine.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -33,7 +33,7 @@ OneHR is multi-tenant SaaS. Start as modular monolith (NestJS + PostgreSQL + Red
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                   INFRASTRUCTURE                                 │
-│  PostgreSQL (RLS, PostGIS, pgvector, partitioning)              │
+│  MySQL 8 (tenant scoping via app-layer query extension)       │
 │  Redis (cache, sessions, queues) | S3 (snapshots/docs)          │
 │  Meilisearch (employee search) | Cron (pg_cron)                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -142,7 +142,7 @@ eventBus.emit('employee.probation_due', { employeeId, orgId, date });
 
 ```
 Policy PDF → S3 → Text Extraction (pdf-parse) → Chunk (500 tokens, overlap 50)
-→ Embed (text-embedding-3-small) → pgvector (policies.embeddings)
+→ Embed (text-embedding-3-small) → vector store (policies.embeddings)
 → Query: User question → Embed → Cosine similarity >0.78 → Top 5 chunks
 → LLM (GPT-4o / local) with system prompt: "Answer only from provided policy chunks, cite page"
 → RBAC filter: only policies for user's org
@@ -200,7 +200,7 @@ Policy PDF → S3 → Text Extraction (pdf-parse) → Chunk (500 tokens, overlap
 ## 12. Tech Decisions (ADR)
 
 1. **Modular Monolith first** - Faster MVP, lower ops cost; extract Attendance service at 20k concurrent clocks.
-2. **PostgreSQL over Mongo** - Strong relational + PostGIS + pgvector + RLS + partitioning covers 95% needs.
+2. **MySQL over Mongo** - Strong relational integrity + transactions covers 95% needs. Originally Postgres (PostGIS/pgvector/RLS); ported to MySQL 8 for hosting cost/availability. Trade-off: tenant isolation is enforced in the app layer (Prisma query extension), not by database RLS.
 3. **BullMQ over SQS** - Delayed jobs needed for escalation; easier local dev.
 4. **Next.js App Router** - SSR for dashboards, SEO for marketing, same TS stack.
 

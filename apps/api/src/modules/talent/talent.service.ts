@@ -8,7 +8,7 @@ export class TalentService {
   async listVacancies(orgId: string, q: any, user?: any) {
     const where: any = { organizationId: orgId };
     if (q.status) where.status = q.status;
-    if (q.search) where.title = { contains: q.search, mode: 'insensitive' };
+    if (q.search) where.title = { contains: q.search };
     const vacancies = await this.prisma.internalVacancy.findMany({ where, take: 100, orderBy: { createdAt: 'desc' }, include: { applications: true } });
     // if eligible_for filter, check eligibility
     if (q.eligible_for || q.eligibleFor) {
@@ -92,7 +92,7 @@ export class TalentService {
     const where: any = { organizationId: orgId };
     if (q.type) where.type = q.type;
     if (q.status) where.status = q.status;
-    if (q.search) where.title = { contains: q.search, mode: 'insensitive' };
+    if (q.search) where.title = { contains: q.search };
     return this.prisma.talentOpportunity.findMany({ where, take: 100, orderBy: { createdAt: 'desc' } });
   }
 

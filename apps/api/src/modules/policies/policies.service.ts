@@ -8,7 +8,7 @@ export class PoliciesService {
   async list(orgId: string, q: any) {
     const where: any = { organizationId: orgId };
     if (q.category) where.category = q.category;
-    if (q.search) where.title = { contains: q.search, mode: 'insensitive' };
+    if (q.search) where.title = { contains: q.search };
     return this.prisma.policy.findMany({ where, take: 100, orderBy: { createdAt: 'desc' } });
   }
 

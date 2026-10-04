@@ -36,8 +36,8 @@ export class ChatService implements OnModuleInit {
     const where: any = { id: { in: ids }, organizationId: orgId };
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { lastMessagePreview: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search } },
+        { lastMessagePreview: { contains: search } },
       ];
     }
     const convs = await this.prisma.conversation.findMany({
@@ -231,7 +231,7 @@ export class ChatService implements OnModuleInit {
     const cursor = q.cursor; // message id
     const order = q.order === 'asc' ? 'asc' : 'desc';
     const where: any = { conversationId, organizationId: orgId };
-    if (q.search) where.content = { contains: q.search, mode: 'insensitive' };
+    if (q.search) where.content = { contains: q.search };
 
     let query: any = {
       where,
@@ -385,7 +385,7 @@ export class ChatService implements OnModuleInit {
         organizationId: orgId,
         id: { not: userId },
         OR: [
-          { email: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search } },
         ],
       },
       take: 20,

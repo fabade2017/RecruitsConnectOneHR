@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
   async list(orgId: string, q?: any) {
     const where: any = { organizationId: orgId };
     if (q?.type) where.type = q.type;
-    if (q?.search) where.name = { contains: q.search, mode: 'insensitive' };
+    if (q?.search) where.name = { contains: q.search };
     return this.prisma.shift.findMany({ where, orderBy: { createdAt: 'desc' } });
   }
   async get(orgId: string, id: string) {

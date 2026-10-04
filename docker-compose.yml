@@ -1,18 +1,23 @@
 version: "3.9"
 services:
-  postgres:
-    image: postgis/postgis:15-3.4
+  mysql:
+    image: mysql:8.0
     container_name: onehr-db
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
     environment:
-      POSTGRES_USER: onehr
-      POSTGRES_PASSWORD: onehr
-      POSTGRES_DB: onehr
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: onehr
+      MYSQL_PASSWORD: onehr
+      MYSQL_DATABASE: onehr
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mysqldata:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U onehr"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uonehr -ponehr"]
       interval: 5s
       retries: 5
 
@@ -35,7 +40,6 @@ services:
     volumes:
       - miniodata:/data
 
-  # Optional: pgvector + postgis are in postgis image; enable via init script
 volumes:
-  pgdata:
+  mysqldata:
   miniodata:

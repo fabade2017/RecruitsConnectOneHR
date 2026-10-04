@@ -13,8 +13,8 @@ export class DepartmentsService {
     if (query.branch_id) where.branchId = query.branch_id;
     if (query.parentId) where.parentId = query.parentId;
     if (query.parent_id) where.parentId = query.parent_id;
-    if (query.search) where.name = { contains: query.search, mode: 'insensitive' };
-    if (query.name) where.name = { contains: query.name, mode: 'insensitive' };
+    if (query.search) where.name = { contains: query.search };
+    if (query.name) where.name = { contains: query.name };
 
     return this.prisma.department.findMany({
       where,

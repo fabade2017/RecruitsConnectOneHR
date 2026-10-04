@@ -1,5 +1,5 @@
 # RecruitConnect OneHR™ - Data Model & ERD
-**Version:** 1.0 | **DB:** PostgreSQL 15+ | **ORM:** Prisma | **Date:** 2026-08-31
+**Version:** 1.0 | **DB:** MySQL 8 | **ORM:** Prisma | **Date:** 2026-08-31
 
 ---
 

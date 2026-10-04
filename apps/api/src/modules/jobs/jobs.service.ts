@@ -8,7 +8,7 @@ export class JobsService {
     const where: any = { organizationId: orgId };
     if (q.status) where.status = q.status;
     if (q.department) where.department = q.department;
-    if (q.search) where.title = { contains: q.search, mode: 'insensitive' };
+    if (q.search) where.title = { contains: q.search };
     return this.prisma.jobPosting.findMany({ where, take: 50, orderBy: { postedAt: 'desc' }, include: { applications: true } });
   }
   async create(orgId: string, dto: any) {

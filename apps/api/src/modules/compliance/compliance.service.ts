@@ -8,7 +8,7 @@ export class ComplianceService {
     const where: any = { organizationId: orgId };
     if (q.category) where.category = q.category;
     if (q.status) where.status = q.status;
-    if (q.search) where.title = { contains: q.search, mode: 'insensitive' };
+    if (q.search) where.title = { contains: q.search };
     return this.prisma.compliancePolicy.findMany({ where, take: 50, include: { audits: true }, orderBy: { createdAt: 'desc' } });
   }
   async create(orgId: string, dto: any) {

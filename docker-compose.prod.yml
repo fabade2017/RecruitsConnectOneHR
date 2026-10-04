@@ -1,16 +1,21 @@
 version: "3.9"
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: onehr-postgres-prod
+  mysql:
+    image: mysql:8.0
+    container_name: onehr-mysql-prod
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-onehr}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-onehr_prod_change_me}
-      POSTGRES_DB: ${POSTGRES_DB:-onehr}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_change_me}
+      MYSQL_USER: ${MYSQL_USER:-onehr}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-onehr_prod_change_me}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-onehr}
     volumes:
-      - pgdata_prod:/var/lib/postgresql/data
+      - mysqldata_prod:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-onehr}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD"]
       interval: 10s
       retries: 5
     restart: unless-stopped
@@ -18,11 +23,11 @@ services:
   redis:
     image: redis:7-alpine
     container_name: onehr-redis-prod
-    command: redis-server --requirepass ${REDIS_PASSWORD:-}
+    command: redis-server --requirepass ${REDIS_PASSWORD:-onehr_redis_change_me}
     volumes:
       - redis_prod:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-onehr_redis_change_me} --no-auth-warning ping"]
       interval: 10s
       retries: 5
     restart: unless-stopped
@@ -32,16 +37,17 @@ services:
     container_name: onehr-api-prod
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-onehr}:${POSTGRES_PASSWORD:-onehr_prod_change_me}@postgres:5432/${POSTGRES_DB:-onehr}
+      DATABASE_URL: mysql://${MYSQL_USER:-onehr}:${MYSQL_PASSWORD:-onehr_prod_change_me}@mysql:3306/${MYSQL_DATABASE:-onehr}
+      DIRECT_URL: mysql://${MYSQL_USER:-onehr}:${MYSQL_PASSWORD:-onehr_prod_change_me}@mysql:3306/${MYSQL_DATABASE:-onehr}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET required}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://onehr.recruitconnect.ng}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD:-onehr_redis_change_me}@redis:6379
     ports:
       - "${PORT_API:-3001}:3001"
     depends_on:
-      postgres: { condition: service_healthy }
+      mysql: { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/v1/health"]
@@ -68,5 +74,5 @@ services:
   #   depends_on: [api, web]
 
 volumes:
-  pgdata_prod:
+  mysqldata_prod:
   redis_prod:

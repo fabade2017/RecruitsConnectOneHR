@@ -150,7 +150,7 @@ export class EmployeesService {
   async listIdCards(orgId: string, query: any, user?: any): Promise<any> {
     // RBAC scoping same as list
     const where: any = { organizationId: orgId };
-    if (query.search) where.OR = [{ employeeCode: { contains: query.search, mode: 'insensitive' } }, { jobTitle: { contains: query.search, mode: 'insensitive' } }];
+    if (query.search) where.OR = [{ employeeCode: { contains: query.search } }, { jobTitle: { contains: query.search } }];
     const role = user?.role;
     if (role === 'employee') {
       const ownId = await this.resolveEmployeeIdFromUser(user);
@@ -257,7 +257,7 @@ export class EmployeesService {
   async list(orgId: string, query: any, user?: any) {
     const where: any = { organizationId: orgId };
     if (query.status) where.status = query.status;
-    if (query.search) where.OR = [{ employeeCode: { contains: query.search, mode: 'insensitive' } }, { jobTitle: { contains: query.search, mode: 'insensitive' } }];
+    if (query.search) where.OR = [{ employeeCode: { contains: query.search } }, { jobTitle: { contains: query.search } }];
     if (query.department_id) where.departmentId = query.department_id;
 
     // RBAC scoping

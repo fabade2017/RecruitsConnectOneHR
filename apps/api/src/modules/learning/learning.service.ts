@@ -8,7 +8,7 @@ export class LearningService {
     const where: any = { organizationId: orgId };
     if (q.category) where.category = q.category;
     if (q.status) where.status = q.status;
-    if (q.search) where.title = { contains: q.search, mode: 'insensitive' };
+    if (q.search) where.title = { contains: q.search };
     return this.prisma.course.findMany({ where, take: 50, orderBy: { createdAt: 'desc' }, include: { enrollments: true } });
   }
   async getCourse(orgId: string, id: string) {

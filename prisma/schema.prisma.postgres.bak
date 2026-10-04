@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "mysql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
@@ -1106,7 +1106,7 @@ model Message {
   organizationId String       @map("organization_id")
   conversationId String       @map("conversation_id")
   senderId       String       @map("sender_id")
-  content        String       @db.LongText
+  content        String       @db.Text
   messageType    String       @default("text") @map("message_type") // text | image | file | system
   attachments    String?      // JSON stringified array of {url, name, type, size}
   replyToId      String?      @map("reply_to_id")
