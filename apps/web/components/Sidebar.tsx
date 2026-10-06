@@ -128,6 +128,7 @@ export default function Sidebar() {
   const [chatUnread, setChatUnread] = useState<number>(0);
   const [allowedModules, setAllowedModules] = useState<Set<string> | null>(null);
   const role = user?.role || null;
+  const userOrgId = user?.org_id || user?.organizationId;
   const userPerms: string[] = (user as any)?.permissions || [];
 
   // Chat unread badge — poll + socket via storage event from ChatProvider
@@ -198,9 +199,19 @@ export default function Sidebar() {
       });
     });
   };
-  const visible = (roles?: string[], perms?: string[], module?: string) => {
-    // super_admin/org_admin bypass all
-    if (role === 'super_admin' || role === 'org_admin') return true;
+  const visible = (roles?: string[], perms?: string[], module?: string, orgId?: string) => {
+    // Global super_admin (RC) bypass all — sees everything
+    if (role === 'super_admin') return true;
+    // org_admin — only show if belongs to this organization
+    if (role === 'org_admin') {
+      // If no orgId specified (e.g. admin page global view), allow
+      if (!orgId) return true;
+      // Only show if user's organization matches the current org
+      if (userOrgId && orgId && userOrgId === orgId) return true;
+      // org_admin of a different organization — hide
+      return false;
+    }
+    // Regular roles (employee, manager, etc.) — normal RBAC checks
     if (roles && roles.length && role && !roles.includes(role)) return false;
     if (roles && roles.length && !role) return false;
     if (perms && !hasPerm(perms)) return false;
@@ -225,7 +236,7 @@ export default function Sidebar() {
         </div>
         <div className="flex-1 overflow-y-auto py-3 px-2 space-y-3 scrollbar-thin">
           {NAV.map(sec => {
-            const visibleItems = sec.items.filter(i => visible(i.roles, i.perms, i.module));
+            const visibleItems = sec.items.filter(i => visible(i.roles, i.perms, i.module, userOrgId || ''));
             if (visibleItems.length === 0) return null;
             const isOpen = openSections.has(sec.title);
             const SectionIcon = SECTION_ICONS[sec.title] || Layers;

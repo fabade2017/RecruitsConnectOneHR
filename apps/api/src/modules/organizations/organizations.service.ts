@@ -156,20 +156,24 @@ export class OrganizationsService {
     const exists = await this.prisma.organization.findUnique({ where: { acronym } });
     if (exists) throw new ConflictException('Acronym already exists — choose another');
 
-    const yearlyEnd = new Date(); yearlyEnd.setFullYear(yearlyEnd.getFullYear()+1);
+    const defaultPlan = await this.prisma.subscriptionPlan.findFirst({ where: { slug: 'growth' } });
+    const defaultPlanId = defaultPlan?.id || '';
+
+    const yearlyEnd = new Date();
+    yearlyEnd.setFullYear(yearlyEnd.getFullYear() + 1);
     const org = await this.prisma.organization.create({
       data: {
         name: dto.name,
         acronym,
         industryTemplate: dto.industryTemplate || 'generic',
-        config: JSON.stringify({ workdays: ['mon','tue','wed','thu','fri'], grace_period_minutes: 10 }),
+        config: JSON.stringify({ workdays: ['mon', 'tue', 'wed', 'thu', 'fri'], grace_period_minutes: 10 }),
         status: 'active',
         isActive: true,
       },
     });
 
     await this.prisma.organizationSubscription.create({
-      data: { organizationId: org.id,planId:"", status: 'active',  billingCycle: 'yearly', endDate: yearlyEnd }
+      data: { organizationId: org.id, planId: defaultPlanId, status: 'active', billingCycle: 'yearly', endDate: yearlyEnd }
     }).catch(()=>{});
 
     await this.prisma.attendancePolicy.create({
