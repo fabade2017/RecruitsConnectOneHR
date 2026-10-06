@@ -169,7 +169,7 @@ export class OrganizationsService {
     });
 
     await this.prisma.organizationSubscription.create({
-      data: { organizationId: org.id, status: 'active', planId: org.planId, billingCycle: 'yearly', endDate: yearlyEnd }
+      data: { organizationId: org.id,planId:0, status: 'active',  billingCycle: 'yearly', endDate: yearlyEnd }
     }).catch(()=>{});
 
     await this.prisma.attendancePolicy.create({
