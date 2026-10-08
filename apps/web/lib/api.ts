@@ -32,3 +32,32 @@ export async function fetchJson(endpoint: string, opts: RequestInit = {}) {
   if (!res.ok) throw new Error((json && (json.message || json.error)) || `Request failed ${res.status}`);
   return json;
 }
+
+// ===== Platform Super Admin (only the platform organisation's super_admin) =====
+export const PLATFORM_ORG_ACRONYM = (process.env.NEXT_PUBLIC_SUPER_ADMIN_ORG_ACRONYM || 'RC').trim().toUpperCase();
+
+export function getOrgAcronym(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    const u = JSON.parse(localStorage.getItem('onehr_user') || 'null');
+    if (u?.org_acronym) return String(u.org_acronym).trim().toUpperCase();
+    const t = localStorage.getItem('onehr_token');
+    if (t) {
+      const part = t.split('.')[1] || '';
+      const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(b64));
+      if (payload?.org_acronym) return String(payload.org_acronym).trim().toUpperCase();
+    }
+  } catch {}
+  return '';
+}
+
+export function isPlatformSuperAdmin(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const u = JSON.parse(localStorage.getItem('onehr_user') || 'null');
+    return u?.role === 'super_admin' && getOrgAcronym() === PLATFORM_ORG_ACRONYM;
+  } catch {
+    return false;
+  }
+}

@@ -21,13 +21,23 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
@@ -121,6 +131,43 @@ let OrganizationsService = class OrganizationsService {
     }
     listAll() {
         return this.prisma.organization.findMany({ orderBy: { createdAt: 'desc' }, include: { _count: { select: { employees: true, branches: true, users: true } } } });
+    }
+    listMine(orgId) {
+        if (!orgId)
+            return [];
+        return this.prisma.organization.findMany({ where: { id: orgId }, orderBy: { createdAt: 'desc' }, include: { _count: { select: { employees: true, branches: true, users: true } } } });
+    }
+    // Active plans catalog (for the org-side "request a plan" page)
+    async listPublicPlans() {
+        const plans = await this.prisma.subscriptionPlan.findMany({ where: { isActive: true }, include: { modules: true }, orderBy: { price: 'asc' } });
+        const catalog = await this.prisma.moduleCatalog.findMany();
+        const catMap = new Map(catalog.map(c => [c.key, c]));
+        return plans.map(p => {
+            const totalModule = p.modules.reduce((s, m) => s + (m.price != null ? Number(m.price) : (catMap.get(m.moduleKey) ? Number(catMap.get(m.moduleKey).basePrice) : 0)), 0);
+            return { ...p, totalPrice: Number(p.price) + totalModule, moduleCount: p.modules.length };
+        });
+    }
+    // Org requests a plan (no active subscription) → pending Super Admin approval
+    async requestSubscription(organizationId, planId, userId) {
+        if (!planId)
+            throw new common_1.NotFoundException('planId required');
+        const active = await this.prisma.organizationSubscription.findFirst({ where: { organizationId, status: 'active' } });
+        if (active)
+            throw new common_1.ConflictException('Active subscription exists — request a renewal instead');
+        const pending = await this.prisma.subscriptionRenewal.findFirst({ where: { organizationId, status: 'pending' } });
+        if (pending)
+            throw new common_1.ConflictException('A request is already pending Super Admin approval');
+        const plan = await this.prisma.subscriptionPlan.findUnique({ where: { id: planId }, include: { modules: true } });
+        if (!plan || !plan.isActive)
+            throw new common_1.NotFoundException('Plan not available');
+        const catalog = await this.prisma.moduleCatalog.findMany({ where: { key: { in: plan.modules.map(m => m.moduleKey) } } });
+        const catMap = new Map(catalog.map(c => [c.key, c]));
+        const totalModule = plan.modules.reduce((s, m) => s + (m.price != null ? Number(m.price) : (catMap.get(m.moduleKey) ? Number(catMap.get(m.moduleKey).basePrice) : 0)), 0);
+        const amount = Number(plan.price) + totalModule;
+        // subscriptionId/previousEndDate stay null = first-time grant (renewals have previousEndDate set)
+        return this.prisma.subscriptionRenewal.create({
+            data: { organizationId, planId, amount, status: 'pending', requestedBy: userId },
+        });
     }
     async getSubscription(organizationId) {
         const sub = await this.prisma.organizationSubscription.findFirst({
@@ -217,16 +264,23 @@ let OrganizationsService = class OrganizationsService {
         const exists = await this.prisma.organization.findUnique({ where: { acronym } });
         if (exists)
             throw new common_1.ConflictException('Acronym already exists — choose another');
+        const defaultPlan = await this.prisma.subscriptionPlan.findFirst({ where: { slug: 'growth' } });
+        const defaultPlanId = defaultPlan?.id || '';
+        const yearlyEnd = new Date();
+        yearlyEnd.setFullYear(yearlyEnd.getFullYear() + 1);
         const org = await this.prisma.organization.create({
             data: {
                 name: dto.name,
                 acronym,
                 industryTemplate: dto.industryTemplate || 'generic',
                 config: JSON.stringify({ workdays: ['mon', 'tue', 'wed', 'thu', 'fri'], grace_period_minutes: 10 }),
-                status: 'pending',
-                isActive: false,
+                status: 'active',
+                isActive: true,
             },
         });
+        await this.prisma.organizationSubscription.create({
+            data: { organizationId: org.id, planId: defaultPlanId, status: 'active', billingCycle: 'yearly', endDate: yearlyEnd }
+        }).catch(() => { });
         await this.prisma.attendancePolicy.create({
             data: {
                 organizationId: org.id,

@@ -1,0 +1,34 @@
+# Apache config for the OneHR static export (qservers.net / cPanel).
+# This file is copied into out/ at build time (apps/web/public -> out).
+
+Options -Indexes
+DirectoryIndex index.html
+
+# Use the Next.js static 404 page (out/404.html) instead of Apache's default error page.
+ErrorDocument 404 /404.html
+
+RewriteEngine On
+
+# /face-enroll/<any id> -> static placeholder page (client reads the real id from the URL)
+RewriteRule ^face-enroll/([^/]+)/?$ /face-enroll/placeholder/ [L]
+
+# Static export uses trailing-slash URLs (out/<route>/index.html).
+# Redirect any existing route without a trailing slash to the directory form.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*[^/])$ /$1/ [L,R=301]
+
+# Security headers (same intent as the old next.config headers()).
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "DENY"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+  Header set Permissions-Policy "camera=(self), microphone=(), geolocation=(self)"
+  # HSTS only applies when the site is served over HTTPS (cPanel Let's Encrypt)
+  Header set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+</IfModule>
+
+# Optional: proxy /api and /cs to the backend if mod_proxy is enabled on your plan.
+# <IfModule mod_proxy.c>
+#   ProxyPass /api "https://recruits-connect-one-hr-api.onrender.com/v1"
+#   ProxyPassReverse /api "https://recruits-connect-one-hr-api.onrender.com/v1"
+# </IfModule>

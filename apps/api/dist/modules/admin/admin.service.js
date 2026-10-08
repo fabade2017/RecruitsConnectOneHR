@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
+const rbac_guard_1 = require("../../common/guards/rbac.guard");
 let AdminService = class AdminService {
     prisma;
     constructor(prisma) {
@@ -29,7 +30,13 @@ let AdminService = class AdminService {
         // Only super_admin or org_admin can create roles
         if (!['super_admin', 'org_admin'].includes(user.role))
             throw new common_1.ForbiddenException('Only super_admin/org_admin can create roles');
-        const orgId = dto.organizationId || (user.role === 'org_admin' ? user.org_id : null);
+        const platform = (0, rbac_guard_1.isPlatformSuperAdmin)(user);
+        // super_admin role may only ever be created by the platform Super Admin
+        if (!platform && String(dto.slug || '').trim().toLowerCase() === 'super_admin') {
+            throw new common_1.ForbiddenException('Only the platform Super Admin can create super_admin roles');
+        }
+        // Org admins always create roles inside their own organisation; platform Super Admin chooses (or global)
+        const orgId = platform ? (dto.organizationId || null) : (user.org_id || user.orgId || null);
         // Check duplicate slug
         const exists = await this.prisma.roleDefinition.findFirst({ where: { slug: dto.slug, organizationId: orgId } });
         if (exists)
@@ -47,40 +54,61 @@ let AdminService = class AdminService {
             }
         });
     }
-    async updateRole(id, dto) {
+    async updateRole(id, dto, actor) {
         const role = await this.prisma.roleDefinition.findUnique({ where: { id } });
         if (!role)
             throw new common_1.NotFoundException('Role not found');
         if (role.isSystem)
             throw new common_1.ForbiddenException('Cannot modify system roles');
+        // Non-platform admins can only modify their own organisation's roles (global = platform config)
+        if (actor && !(0, rbac_guard_1.isPlatformSuperAdmin)(actor) && role.organizationId !== (actor.org_id || actor.orgId)) {
+            throw new common_1.ForbiddenException('Can only modify roles in your own organisation');
+        }
         if (dto.permissions && Array.isArray(dto.permissions))
             dto.permissions = JSON.stringify(dto.permissions);
         return this.prisma.roleDefinition.update({ where: { id }, data: dto });
     }
-    async deleteRole(id) {
+    async deleteRole(id, actor) {
         const role = await this.prisma.roleDefinition.findUnique({ where: { id } });
         if (!role)
             throw new common_1.NotFoundException('Role not found');
         if (role.isSystem)
             throw new common_1.ForbiddenException('Cannot delete system roles');
+        if (actor && !(0, rbac_guard_1.isPlatformSuperAdmin)(actor) && role.organizationId !== (actor.org_id || actor.orgId)) {
+            throw new common_1.ForbiddenException('Can only delete roles in your own organisation');
+        }
         // Check if any user assigned
         const assigned = await this.prisma.user.count({ where: { customRoleId: id } });
         if (assigned > 0)
             throw new common_1.ConflictException(`Cannot delete: ${assigned} users assigned`);
         return this.prisma.roleDefinition.delete({ where: { id } });
     }
-    async assignRole(userId, roleSlug, customRoleId) {
+    async assignRole(userId, roleSlug, customRoleId, actor) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         if (!user)
             throw new common_1.NotFoundException('User not found');
+        const platform = actor ? (0, rbac_guard_1.isPlatformSuperAdmin)(actor) : false;
+        // Scope: non-platform admins manage users in their own organisation only
+        if (actor && !platform && user.organizationId !== (actor.org_id || actor.orgId)) {
+            throw new common_1.ForbiddenException('Can only manage users in your own organisation');
+        }
         // If customRoleId provided, use it; otherwise use slug (system role)
         if (customRoleId) {
             const customRole = await this.prisma.roleDefinition.findUnique({ where: { id: customRoleId } });
             if (!customRole)
                 throw new common_1.NotFoundException('Custom role not found');
+            if (!platform && customRole.organizationId && customRole.organizationId !== (actor?.org_id || actor?.orgId)) {
+                throw new common_1.ForbiddenException('Can only assign roles from your own organisation');
+            }
+            if (!platform && String(customRole.slug).toLowerCase() === 'super_admin') {
+                throw new common_1.ForbiddenException('Only the platform Super Admin can grant super_admin');
+            }
             return this.prisma.user.update({ where: { id: userId }, data: { role: customRole.slug, customRoleId } });
         }
-        // System role assignment
+        // System role assignment — super_admin is platform-only
+        if (!platform && roleSlug === 'super_admin') {
+            throw new common_1.ForbiddenException('Only the platform Super Admin can grant super_admin');
+        }
         return this.prisma.user.update({ where: { id: userId }, data: { role: roleSlug, customRoleId: null } });
     }
     // ===== Permissions =====
@@ -388,12 +416,29 @@ let AdminService = class AdminService {
             throw new common_1.NotFoundException('Renewal not found');
         if (renewal.status !== 'pending')
             throw new common_1.ConflictException('Renewal not pending');
-        const sub = await this.prisma.organizationSubscription.findFirst({ where: { id: renewal.subscriptionId || undefined, organizationId: renewal.organizationId, status: 'active' } });
-        if (!sub)
-            throw new common_1.NotFoundException('Active subscription not found');
-        const newEndDate = renewal.newEndDate || new Date(new Date(sub.endDate || new Date()).setFullYear(new Date(sub.endDate || new Date()).getFullYear() + 1));
-        // Update subscription endDate
-        await this.prisma.organizationSubscription.update({ where: { id: sub.id }, data: { endDate: newEndDate, status: 'active' } });
+        const plusOneYear = (from) => { const d = from ? new Date(from) : new Date(); d.setFullYear(d.getFullYear() + 1); return d; };
+        let sub = renewal.subscriptionId
+            ? await this.prisma.organizationSubscription.findFirst({ where: { id: renewal.subscriptionId, organizationId: renewal.organizationId } })
+            : await this.prisma.organizationSubscription.findFirst({ where: { organizationId: renewal.organizationId, status: 'active' }, orderBy: { createdAt: 'desc' } });
+        let newEndDate;
+        if (sub) {
+            // Renewal of an existing subscription — extend one year
+            newEndDate = renewal.newEndDate || plusOneYear(sub.endDate);
+            await this.prisma.organizationSubscription.update({ where: { id: sub.id }, data: { endDate: newEndDate, status: 'active' } });
+        }
+        else {
+            // First-time subscription request (org had no active subscription) — grant it now
+            newEndDate = renewal.newEndDate || plusOneYear(null);
+            const existing = await this.prisma.organizationSubscription.findFirst({ where: { organizationId: renewal.organizationId, planId: renewal.planId } });
+            if (existing) {
+                sub = await this.prisma.organizationSubscription.update({ where: { id: existing.id }, data: { status: 'active', startDate: new Date(), endDate: newEndDate } });
+            }
+            else {
+                sub = await this.prisma.organizationSubscription.create({
+                    data: { organizationId: renewal.organizationId, planId: renewal.planId, status: 'active', billingCycle: 'yearly', endDate: newEndDate }
+                });
+            }
+        }
         // Generate receipt
         const receiptNumber = `RCPT-${new Date().getFullYear()}-${renewal.id.slice(0, 8).toUpperCase()}`;
         const receiptUrl = `receipts/${receiptNumber}.pdf`; // placeholder — frontend can generate PDF from data

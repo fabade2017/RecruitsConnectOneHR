@@ -24,23 +24,27 @@ let AdminController = class AdminController {
         this.svc = svc;
     }
     // ===== Roles =====
-    roles(req, orgId) { return this.svc.listRoles(orgId || req.user?.org_id || req.user?.orgId); }
+    roles(req, orgId) {
+        // Non-platform admins can only ever list their own organisation's roles (ignore client-supplied orgId)
+        const scoped = (0, rbac_guard_1.isPlatformSuperAdmin)(req.user) ? orgId : (req.user?.org_id || req.user?.orgId);
+        return this.svc.listRoles(scoped);
+    }
     createRole(dto, req) { return this.svc.createRole(dto, req.user); }
-    updateRole(id, dto) { return this.svc.updateRole(id, dto); }
-    deleteRole(id) { return this.svc.deleteRole(id); }
-    assignRole(userId, dto) { return this.svc.assignRole(userId, dto.role, dto.customRoleId); }
+    updateRole(id, dto, req) { return this.svc.updateRole(id, dto, req.user); }
+    deleteRole(id, req) { return this.svc.deleteRole(id, req.user); }
+    assignRole(userId, dto, req) { return this.svc.assignRole(userId, dto.role, dto.customRoleId, req.user); }
     // ===== Permissions =====
     permissions() { return this.svc.listPermissions(); }
     permissionsGrouped() { return this.svc.listPermissionsGrouped(); }
     modules() { return this.svc.listModules(); }
     createPermission(dto) { return this.svc.createPermission(dto); }
-    // ===== Module Catalog (pricing) =====
+    // ===== Module Catalog (pricing) — platform Super Admin only =====
     moduleCatalog() { return this.svc.listModuleCatalog(); }
     upsertModuleCatalog(dto) { return this.svc.upsertModuleCatalog(dto); }
     updateModuleCatalog(key, dto) { return this.svc.updateModuleCatalog(key, dto); }
     deleteModuleCatalog(key) { return this.svc.deleteModuleCatalog(key); }
     plansWithPricing() { return this.svc.getPlansWithPricing(); }
-    // ===== Company Groups (Group of Companies) =====
+    // ===== Company Groups (Group of Companies) — platform Super Admin only =====
     groups() { return this.svc.listGroups(); }
     group(id) { return this.svc.getGroup(id); }
     hierarchy(id) { return this.svc.groupHierarchy(id); }
@@ -48,7 +52,7 @@ let AdminController = class AdminController {
     updateGroup(id, dto) { return this.svc.updateGroup(id, dto); }
     assignOrg(groupId, orgId) { return this.svc.assignOrganizationToGroup(groupId, orgId); }
     removeOrg(orgId) { return this.svc.removeOrganizationFromGroup(orgId); }
-    // ===== Subscriptions & Module Assignment =====
+    // ===== Subscriptions & Module Assignment — platform Super Admin only =====
     plans() { return this.svc.listPlans(); }
     plan(id) { return this.svc.getPlan(id); }
     createPlan(dto) { return this.svc.createPlan(dto); }
@@ -61,7 +65,7 @@ let AdminController = class AdminController {
     updateSubscription(id, dto) { return this.svc.updateSubscription(id, dto); }
     cancelSubscription(id) { return this.svc.cancelSubscription(id); }
     checkAccess(orgId, moduleKey) { return this.svc.checkModuleAccess(orgId, moduleKey); }
-    // ===== Renewals (yearly) =====
+    // ===== Renewals (yearly) — platform Super Admin approves/rejects =====
     renewals(status) { return this.svc.listRenewals(status); }
     approveRenewal(id, req) { return this.svc.approveRenewal(id, req.user.sub); }
     rejectRenewal(id, req, dto) { return this.svc.rejectRenewal(id, req.user.sub, dto.reason); }
@@ -73,7 +77,7 @@ __decorate([
     (0, common_1.Get)('roles'),
     (0, rbac_guard_1.Roles)('super_admin', 'org_admin', 'hr_admin'),
     (0, rbac_guard_1.RequirePermissions)('employee:read'),
-    (0, swagger_1.ApiOperation)({ summary: 'List all roles (super_admin can create/assign, org_admin can list own)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'List roles (platform Super Admin: all/any org; others: own organisation only)' }),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Query)('organizationId')),
     __metadata("design:type", Function),
@@ -94,16 +98,18 @@ __decorate([
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "updateRole", null);
 __decorate([
     (0, common_1.Delete)('roles/:id'),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "deleteRole", null);
 __decorate([
@@ -111,8 +117,9 @@ __decorate([
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('userId')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "assignRole", null);
 __decorate([
@@ -149,6 +156,7 @@ __decorate([
 ], AdminController.prototype, "createPermission", null);
 __decorate([
     (0, common_1.Get)('module-catalog'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
@@ -156,6 +164,7 @@ __decorate([
 ], AdminController.prototype, "moduleCatalog", null);
 __decorate([
     (0, common_1.Post)('module-catalog'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -164,6 +173,7 @@ __decorate([
 ], AdminController.prototype, "upsertModuleCatalog", null);
 __decorate([
     (0, common_1.Patch)('module-catalog/:key'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('key')),
     __param(1, (0, common_1.Body)()),
@@ -173,6 +183,7 @@ __decorate([
 ], AdminController.prototype, "updateModuleCatalog", null);
 __decorate([
     (0, common_1.Delete)('module-catalog/:key'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('key')),
     __metadata("design:type", Function),
@@ -181,6 +192,7 @@ __decorate([
 ], AdminController.prototype, "deleteModuleCatalog", null);
 __decorate([
     (0, common_1.Get)('plans/pricing'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
@@ -188,6 +200,7 @@ __decorate([
 ], AdminController.prototype, "plansWithPricing", null);
 __decorate([
     (0, common_1.Get)('groups'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
@@ -195,6 +208,7 @@ __decorate([
 ], AdminController.prototype, "groups", null);
 __decorate([
     (0, common_1.Get)('groups/:id'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -203,6 +217,7 @@ __decorate([
 ], AdminController.prototype, "group", null);
 __decorate([
     (0, common_1.Get)('groups/:id/hierarchy'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -211,6 +226,7 @@ __decorate([
 ], AdminController.prototype, "hierarchy", null);
 __decorate([
     (0, common_1.Post)('groups'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Req)()),
@@ -220,6 +236,7 @@ __decorate([
 ], AdminController.prototype, "createGroup", null);
 __decorate([
     (0, common_1.Patch)('groups/:id'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -229,6 +246,7 @@ __decorate([
 ], AdminController.prototype, "updateGroup", null);
 __decorate([
     (0, common_1.Post)('groups/:id/organizations/:orgId'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('orgId')),
@@ -238,6 +256,7 @@ __decorate([
 ], AdminController.prototype, "assignOrg", null);
 __decorate([
     (0, common_1.Delete)('groups/:id/organizations/:orgId'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('orgId')),
     __metadata("design:type", Function),
@@ -246,6 +265,7 @@ __decorate([
 ], AdminController.prototype, "removeOrg", null);
 __decorate([
     (0, common_1.Get)('plans'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
@@ -253,6 +273,7 @@ __decorate([
 ], AdminController.prototype, "plans", null);
 __decorate([
     (0, common_1.Get)('plans/:id'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -261,6 +282,7 @@ __decorate([
 ], AdminController.prototype, "plan", null);
 __decorate([
     (0, common_1.Post)('plans'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -269,6 +291,7 @@ __decorate([
 ], AdminController.prototype, "createPlan", null);
 __decorate([
     (0, common_1.Patch)('plans/:id'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -278,6 +301,7 @@ __decorate([
 ], AdminController.prototype, "updatePlan", null);
 __decorate([
     (0, common_1.Post)('plans/:id/modules'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     (0, swagger_1.ApiOperation)({ summary: 'Assign modules to subscription plan (Super Admin)' }),
     __param(0, (0, common_1.Param)('id')),
@@ -288,6 +312,7 @@ __decorate([
 ], AdminController.prototype, "assignModules", null);
 __decorate([
     (0, common_1.Patch)('plans/:id/modules/:moduleKey/price'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('moduleKey')),
@@ -298,6 +323,7 @@ __decorate([
 ], AdminController.prototype, "setModulePrice", null);
 __decorate([
     (0, common_1.Delete)('plans/:id/modules/:moduleKey'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('moduleKey')),
@@ -307,6 +333,7 @@ __decorate([
 ], AdminController.prototype, "removeModule", null);
 __decorate([
     (0, common_1.Get)('subscriptions'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Query)('organizationId')),
     __param(1, (0, common_1.Query)('companyGroupId')),
@@ -316,6 +343,7 @@ __decorate([
 ], AdminController.prototype, "subscriptions", null);
 __decorate([
     (0, common_1.Post)('subscriptions/assign'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     (0, swagger_1.ApiOperation)({ summary: 'Assign subscription to org or entire group' }),
     __param(0, (0, common_1.Body)()),
@@ -325,6 +353,7 @@ __decorate([
 ], AdminController.prototype, "assignSubscription", null);
 __decorate([
     (0, common_1.Patch)('subscriptions/:id'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -334,6 +363,7 @@ __decorate([
 ], AdminController.prototype, "updateSubscription", null);
 __decorate([
     (0, common_1.Post)('subscriptions/:id/cancel'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -342,6 +372,7 @@ __decorate([
 ], AdminController.prototype, "cancelSubscription", null);
 __decorate([
     (0, common_1.Get)('organizations/:orgId/modules/:moduleKey/access'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('orgId')),
     __param(1, (0, common_1.Param)('moduleKey')),
@@ -351,6 +382,7 @@ __decorate([
 ], AdminController.prototype, "checkAccess", null);
 __decorate([
     (0, common_1.Get)('renewals'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Query)('status')),
     __metadata("design:type", Function),
@@ -359,6 +391,7 @@ __decorate([
 ], AdminController.prototype, "renewals", null);
 __decorate([
     (0, common_1.Post)('renewals/:id/approve'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Req)()),
@@ -368,6 +401,7 @@ __decorate([
 ], AdminController.prototype, "approveRenewal", null);
 __decorate([
     (0, common_1.Post)('renewals/:id/reject'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Req)()),
@@ -378,6 +412,7 @@ __decorate([
 ], AdminController.prototype, "rejectRenewal", null);
 __decorate([
     (0, common_1.Get)('renewals/:id/receipt'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -386,6 +421,7 @@ __decorate([
 ], AdminController.prototype, "renewalReceipt", null);
 __decorate([
     (0, common_1.Get)('organizations'),
+    (0, rbac_guard_1.PlatformOnly)(),
     (0, rbac_guard_1.RequirePermissions)('admin:manage'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),

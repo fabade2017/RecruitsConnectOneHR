@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { isPlatformSuperAdmin } from '../../common/guards/rbac.guard';
 
 @Injectable()
 export class AdminService {
@@ -17,8 +18,15 @@ export class AdminService {
   async createRole(dto: any, user: any) {
     // Only super_admin or org_admin can create roles
     if (!['super_admin','org_admin'].includes(user.role)) throw new ForbiddenException('Only super_admin/org_admin can create roles');
-    
-    const orgId = dto.organizationId || (user.role === 'org_admin' ? user.org_id : null);
+
+    const platform = isPlatformSuperAdmin(user);
+    // super_admin role may only ever be created by the platform Super Admin
+    if (!platform && String(dto.slug || '').trim().toLowerCase() === 'super_admin') {
+      throw new ForbiddenException('Only the platform Super Admin can create super_admin roles');
+    }
+
+    // Org admins always create roles inside their own organisation; platform Super Admin chooses (or global)
+    const orgId = platform ? (dto.organizationId || null) : (user.org_id || user.orgId || null);
     
     // Check duplicate slug
     const exists = await this.prisma.roleDefinition.findFirst({ where: { slug: dto.slug, organizationId: orgId } });
@@ -38,36 +46,58 @@ export class AdminService {
     });
   }
 
-  async updateRole(id: string, dto: any) {
+  async updateRole(id: string, dto: any, actor?: any) {
     const role = await this.prisma.roleDefinition.findUnique({ where: { id } });
     if (!role) throw new NotFoundException('Role not found');
     if (role.isSystem) throw new ForbiddenException('Cannot modify system roles');
+    // Non-platform admins can only modify their own organisation's roles (global = platform config)
+    if (actor && !isPlatformSuperAdmin(actor) && role.organizationId !== (actor.org_id || actor.orgId)) {
+      throw new ForbiddenException('Can only modify roles in your own organisation');
+    }
     if (dto.permissions && Array.isArray(dto.permissions)) dto.permissions = JSON.stringify(dto.permissions);
     return this.prisma.roleDefinition.update({ where: { id }, data: dto });
   }
 
-  async deleteRole(id: string) {
+  async deleteRole(id: string, actor?: any) {
     const role = await this.prisma.roleDefinition.findUnique({ where: { id } });
     if (!role) throw new NotFoundException('Role not found');
     if (role.isSystem) throw new ForbiddenException('Cannot delete system roles');
+    if (actor && !isPlatformSuperAdmin(actor) && role.organizationId !== (actor.org_id || actor.orgId)) {
+      throw new ForbiddenException('Can only delete roles in your own organisation');
+    }
     // Check if any user assigned
     const assigned = await this.prisma.user.count({ where: { customRoleId: id } });
     if (assigned > 0) throw new ConflictException(`Cannot delete: ${assigned} users assigned`);
     return this.prisma.roleDefinition.delete({ where: { id } });
   }
 
-  async assignRole(userId: string, roleSlug: string, customRoleId?: string) {
+  async assignRole(userId: string, roleSlug: string, customRoleId?: string, actor?: any) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
-    
+
+    const platform = actor ? isPlatformSuperAdmin(actor) : false;
+    // Scope: non-platform admins manage users in their own organisation only
+    if (actor && !platform && user.organizationId !== (actor.org_id || actor.orgId)) {
+      throw new ForbiddenException('Can only manage users in your own organisation');
+    }
+
     // If customRoleId provided, use it; otherwise use slug (system role)
     if (customRoleId) {
       const customRole = await this.prisma.roleDefinition.findUnique({ where: { id: customRoleId } });
       if (!customRole) throw new NotFoundException('Custom role not found');
+      if (!platform && customRole.organizationId && customRole.organizationId !== (actor?.org_id || actor?.orgId)) {
+        throw new ForbiddenException('Can only assign roles from your own organisation');
+      }
+      if (!platform && String(customRole.slug).toLowerCase() === 'super_admin') {
+        throw new ForbiddenException('Only the platform Super Admin can grant super_admin');
+      }
       return this.prisma.user.update({ where: { id: userId }, data: { role: customRole.slug, customRoleId } });
     }
-    
-    // System role assignment
+
+    // System role assignment — super_admin is platform-only
+    if (!platform && roleSlug === 'super_admin') {
+      throw new ForbiddenException('Only the platform Super Admin can grant super_admin');
+    }
     return this.prisma.user.update({ where: { id: userId }, data: { role: roleSlug, customRoleId: null } });
   }
 
@@ -389,11 +419,29 @@ export class AdminService {
     const renewal = await this.prisma.subscriptionRenewal.findUnique({ where: { id: renewalId }, include: { organization: true, plan: true } });
     if (!renewal) throw new NotFoundException('Renewal not found');
     if (renewal.status !== 'pending') throw new ConflictException('Renewal not pending');
-    const sub = await this.prisma.organizationSubscription.findFirst({ where: { id: renewal.subscriptionId || undefined, organizationId: renewal.organizationId, status: 'active' } });
-    if (!sub) throw new NotFoundException('Active subscription not found');
-    const newEndDate = renewal.newEndDate || new Date(new Date(sub.endDate || new Date()).setFullYear(new Date(sub.endDate || new Date()).getFullYear()+1));
-    // Update subscription endDate
-    await this.prisma.organizationSubscription.update({ where: { id: sub.id }, data: { endDate: newEndDate, status: 'active' } });
+    const plusOneYear = (from?: Date | null) => { const d = from ? new Date(from) : new Date(); d.setFullYear(d.getFullYear() + 1); return d; };
+
+    let sub = renewal.subscriptionId
+      ? await this.prisma.organizationSubscription.findFirst({ where: { id: renewal.subscriptionId, organizationId: renewal.organizationId } })
+      : await this.prisma.organizationSubscription.findFirst({ where: { organizationId: renewal.organizationId, status: 'active' }, orderBy: { createdAt: 'desc' } });
+
+    let newEndDate: Date;
+    if (sub) {
+      // Renewal of an existing subscription — extend one year
+      newEndDate = renewal.newEndDate || plusOneYear(sub.endDate);
+      await this.prisma.organizationSubscription.update({ where: { id: sub.id }, data: { endDate: newEndDate, status: 'active' } });
+    } else {
+      // First-time subscription request (org had no active subscription) — grant it now
+      newEndDate = renewal.newEndDate || plusOneYear(null);
+      const existing = await this.prisma.organizationSubscription.findFirst({ where: { organizationId: renewal.organizationId, planId: renewal.planId } });
+      if (existing) {
+        sub = await this.prisma.organizationSubscription.update({ where: { id: existing.id }, data: { status: 'active', startDate: new Date(), endDate: newEndDate } });
+      } else {
+        sub = await this.prisma.organizationSubscription.create({
+          data: { organizationId: renewal.organizationId, planId: renewal.planId, status: 'active', billingCycle: 'yearly', endDate: newEndDate }
+        });
+      }
+    }
     // Generate receipt
     const receiptNumber = `RCPT-${new Date().getFullYear()}-${renewal.id.slice(0,8).toUpperCase()}`;
     const receiptUrl = `receipts/${receiptNumber}.pdf`; // placeholder — frontend can generate PDF from data

@@ -24,6 +24,8 @@ let WorkflowsController = class WorkflowsController {
     constructor(svc) {
         this.svc = svc;
     }
+    catalog(req) { return this.svc.catalog(req.orgId); }
+    approverOptions(req) { return this.svc.approverOptions(req.orgId); }
     instances(req, q) { return this.svc.listInstances(req.orgId, q); }
     createInstance(req, dto) { return this.svc.createInstance(req.orgId, dto.workflowId, dto.entityType, dto.entityId); }
     approve(req, id, dto) { return this.svc.approveInstance(req.orgId, id, dto, req.user); }
@@ -41,6 +43,22 @@ let WorkflowsController = class WorkflowsController {
     toggle(req, id) { return this.svc.toggle(req.orgId, id); }
 };
 exports.WorkflowsController = WorkflowsController;
+__decorate([
+    (0, common_1.Get)('catalog'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], WorkflowsController.prototype, "catalog", null);
+__decorate([
+    (0, common_1.Get)('approver-options'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], WorkflowsController.prototype, "approverOptions", null);
 __decorate([
     (0, common_1.Get)('instances/list'),
     (0, rbac_guard_1.RequirePermissions)('employee:read'),

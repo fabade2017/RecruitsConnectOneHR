@@ -4,14 +4,29 @@ import Watermark from '../../components/Watermark';
 import ChatProvider from '../../components/ChatProvider';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
+  const [checked, setChecked] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  useEffect(() => {
+    // Client-side auth guard (replaces middleware.ts, which can't run under static export).
+    const t = localStorage.getItem('onehr_token') || localStorage.getItem('onehr_auth') || document.cookie.includes('onehr_auth=');
+    if (!t) {
+      const next = pathname && pathname !== '/' ? `?next=${encodeURIComponent(pathname)}` : '';
+      router.replace(`/login${next}`);
+      return;
+    }
+    setChecked(true);
+  }, [pathname, router]);
   useEffect(() => {
     const u = localStorage.getItem('onehr_user');
     if (u) try { setUser(JSON.parse(u)); } catch {}
   }, []);
   const logout = () => { localStorage.clear(); document.cookie='onehr_auth=; Max-Age=0; path=/'; document.cookie='onehr_token=; Max-Age=0; path=/'; window.location.href='/login'; };
+  if (!checked) return null;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_20%_-10%,#e0f2fe_0%,transparent_60%),radial-gradient(1000px_500px_at_90%_0%,#f0f9ff_0%,transparent_60%),linear-gradient(to_bottom,#f8fafc,#f1f5f9)] flex relative">

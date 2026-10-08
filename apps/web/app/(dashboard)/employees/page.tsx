@@ -486,7 +486,7 @@ export default function PeoplePage() {
                     <div className="flex justify-end gap-1">
                       <button
                         onClick={()=>{
-                          const link = `${window.location.origin}/face-enroll/${e.id}`;
+                          const link = `${window.location.origin}/face-enroll/?id=${e.id}`;
                           navigator.clipboard.writeText(link);
                           alert(`Face enroll link copied for ${e.employeeCode}:\n${link}\n\nSend this link to the employee to capture 3 face images. Clock-in will compare live snap with enrolled faces for fraud detection.`);
                         }}
@@ -495,7 +495,7 @@ export default function PeoplePage() {
                       >
                         <Camera size={14}/>
                       </button>
-                      <a href={`/face-enroll/${e.id}`} className="w-8 h-8 rounded-full glass flex items-center justify-center hover:bg-white" title="Open face enroll"><Eye size={14}/></a>
+                      <a href={`/face-enroll/?id=${e.id}`} className="w-8 h-8 rounded-full glass flex items-center justify-center hover:bg-white" title="Open face enroll"><Eye size={14}/></a>
                       <a href={`/employee`} className="w-8 h-8 rounded-full glass flex items-center justify-center hover:bg-white"><Eye size={14}/></a>
                       <button onClick={()=>openEdit(e)} className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-800"><Edit2 size={14}/></button>
                     </div>

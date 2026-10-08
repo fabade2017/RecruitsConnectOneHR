@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import ContactForm from '../components/ContactForm';
 import CsWidget from '../components/CsWidget';
 import { Users, Clock, ShieldCheck, Sparkles, TrendingUp, GraduationCap, Wallet, Building2, Check, ArrowRight, Star, Quote, MapPin, Phone, Mail, Play, Zap, Fingerprint, BarChart3, Layers, HeartHandshake, Briefcase, Shield, Menu, X, LogOut } from 'lucide-react';
+// import process from 'process';
 
 function AuthNav() {
   const [user, setUser] = useState<any>(null);
@@ -11,7 +12,8 @@ function AuthNav() {
     const u = localStorage.getItem('onehr_user');
     if (u) try { setUser(JSON.parse(u)); } catch {}
   }, []);
-  const logout = () => { localStorage.removeItem('onehr_user'); document.cookie='onehr_auth=; Max-Age=0; path=/'; document.cookie='onehr_token=; Max-Age=0; path=/'; fetch('/api/auth/logout', { method: 'POST' }).finally(()=> window.location.href='/login'); };
+    const base2 = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
+  const logout = () => { localStorage.removeItem('onehr_user'); document.cookie='onehr_auth=; Max-Age=0; path=/'; document.cookie='onehr_token=; Max-Age=0; path=/'; fetch(`${base2}/auth/logout`, { method: 'POST' }).finally(()=> window.location.href='/login'); };
   if (user) {
     const dash = user.role==='super_admin'?'/admin': user.role==='employee'?'/employee': user.role==='manager'?'/manager': user.role==='executive'?'/executive':'/hr';
     return (

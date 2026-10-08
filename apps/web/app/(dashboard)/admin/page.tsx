@@ -3,10 +3,11 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { GlassCard, Pill } from '../../../components/ui/GlassCard';
 import { Shield, Users, Building2, CreditCard, Plus, Trash2, Edit2, Check, X, Layers, Sparkles, Search, DollarSign, Package, Eye, EyeOff, RefreshCw, Receipt, Bell, Calendar, Clock } from 'lucide-react';
-import { getApiUrl, getAuthHeaders, parseApiList } from '../../../lib/api';
+import { getApiUrl, getAuthHeaders, parseApiList, isPlatformSuperAdmin, PLATFORM_ORG_ACRONYM } from '../../../lib/api';
 
 export default function SuperAdminPage() {
   const api = getApiUrl();
+  const [platform, setPlatform] = useState<boolean | null>(null);
   const [active, setActive] = useState<'roles'|'groups'|'plans'|'orgs'|'modules'|'renewals'>('roles');
   const [roles, setRoles] = useState<any[]>([]);
   const [perms, setPerms] = useState<any[]>([]);
@@ -128,7 +129,12 @@ export default function SuperAdminPage() {
     } catch (e:any) { setPermsError(e.message || 'Failed to load permissions'); } finally { setPermsLoading(false); }
   };
 
-  useEffect(()=>{ load(); loadPermissionsGrouped(); }, []);
+  useEffect(() => {
+    // Platform-only console: only the platform organisation's super_admin may load data
+    const ok = isPlatformSuperAdmin();
+    setPlatform(ok);
+    if (ok) { load(); loadPermissionsGrouped(); }
+  }, []);
 
   const createRole = async () => {
     await fetch(`${api}/admin/roles`, { method:'POST', headers:{'Content-Type':'application/json', ...auth()}, body: JSON.stringify(newRole) });
@@ -190,6 +196,23 @@ export default function SuperAdminPage() {
     if (checked) setNewRole({...newRole, permissions: Array.from(new Set([...newRole.permissions, ...permsInMod]))});
     else setNewRole({...newRole, permissions: newRole.permissions.filter(k=> !permsInMod.includes(k))});
   };
+
+  if (platform === false) return (
+    <div className="p-8">
+      <GlassCard className="border-amber-200 bg-amber-50/50 max-w-2xl mx-auto text-center">
+        <Shield className="mx-auto text-amber-600" size={28} />
+        <h1 className="text-xl font-bold mt-3">Super Admin console restricted</h1>
+        <p className="text-sm text-slate-600 mt-2">
+          Platform Super Admin access is limited to organisation <b>{PLATFORM_ORG_ACRONYM}</b>.
+          Your organisation manages its own plan from the Subscription page — request a plan or renewal there.
+        </p>
+        <Link href="/subscriptions" className="inline-flex mt-4 items-center gap-2 bg-slate-900 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-slate-800">
+          <CreditCard size={16}/> Subscription → request &amp; renew
+        </Link>
+      </GlassCard>
+    </div>
+  );
+  if (platform === null) return <div className="p-8 text-center text-sm text-slate-500">Checking access…</div>;
 
   return (
     <div className="space-y-6">

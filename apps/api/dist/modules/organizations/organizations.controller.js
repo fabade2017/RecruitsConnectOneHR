@@ -18,42 +18,53 @@ const platform_express_1 = require("@nestjs/platform-express");
 const swagger_1 = require("@nestjs/swagger");
 const organizations_service_1 = require("./organizations.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
-const module_guard_1 = require("../../common/guards/module.guard");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 let OrganizationsController = class OrganizationsController {
     svc;
     constructor(svc) {
         this.svc = svc;
     }
+    // Org admins may only touch their own organisation; platform Super Admin may touch any
+    assertOwnOrPlatform(id, user, what = 'organization') {
+        if ((0, rbac_guard_1.isPlatformSuperAdmin)(user))
+            return;
+        const oid = user?.org_id || user?.orgId;
+        if (!oid || oid !== id)
+            throw new common_1.ForbiddenException(`Can only view your own ${what}`);
+    }
     create(dto) { return this.svc.create(dto); }
     checkAcronym(acronym) { return this.svc.checkAcronym(acronym || ''); }
-    list() { return this.svc.listAll(); }
-    get(id) { return this.svc.findOne(id); }
-    update(id, dto) { return this.svc.update(id, dto); }
-    config(id) { return this.svc.getConfig(id); }
-    branding(id) { return this.svc.getBranding(id); }
-    updateBranding(id, dto) { return this.svc.updateBranding(id, dto); }
-    uploadLogo(id, file) { return this.svc.uploadLogo(id, file); }
-    uploadLogoFile(id, file) { return this.svc.uploadLogo(id, file); }
+    list(req) {
+        if ((0, rbac_guard_1.isPlatformSuperAdmin)(req.user))
+            return this.svc.listAll();
+        return this.svc.listMine(req.user?.org_id || req.user?.orgId);
+    }
+    plans() { return this.svc.listPublicPlans(); }
+    get(id, req) { this.assertOwnOrPlatform(id, req.user); return this.svc.findOne(id); }
+    update(id, dto, req) { this.assertOwnOrPlatform(id, req.user); return this.svc.update(id, dto); }
+    config(id, req) { this.assertOwnOrPlatform(id, req.user); return this.svc.getConfig(id); }
+    branding(id, req) { this.assertOwnOrPlatform(id, req.user); return this.svc.getBranding(id); }
+    updateBranding(id, dto, req) { this.assertOwnOrPlatform(id, req.user); return this.svc.updateBranding(id, dto); }
+    uploadLogo(id, file, req) { this.assertOwnOrPlatform(id, req.user); return this.svc.uploadLogo(id, file); }
+    uploadLogoFile(id, file, req) { this.assertOwnOrPlatform(id, req.user); return this.svc.uploadLogo(id, file); }
     subscription(id, req) {
-        // org_admin can view own, super_admin can view any, others can view own org only
-        if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id)
-            throw new (require('@nestjs/common').ForbiddenException)('Can only view own organization subscription');
+        this.assertOwnOrPlatform(id, req.user, 'organization subscription');
         return this.svc.getSubscription(id);
     }
+    requestSubscription(id, dto, req) {
+        this.assertOwnOrPlatform(id, req.user, 'organization');
+        return this.svc.requestSubscription(id, dto?.planId, req.user.sub);
+    }
     requestRenewal(id, req) {
-        if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id)
-            throw new (require('@nestjs/common').ForbiddenException)('Can only renew own organization');
+        this.assertOwnOrPlatform(id, req.user, 'organization');
         return this.svc.requestRenewal(id, req.user.sub);
     }
     renewals(id, req) {
-        if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id)
-            throw new (require('@nestjs/common').ForbiddenException)('Can only view own renewals');
+        this.assertOwnOrPlatform(id, req.user, 'organization renewals');
         return this.svc.listRenewals(id);
     }
     getRenewal(id, renewalId, req) {
-        if (req.user.role !== 'super_admin' && req.user.org_id !== id && req.user.orgId !== id)
-            throw new (require('@nestjs/common').ForbiddenException)('Can only view own renewal');
+        this.assertOwnOrPlatform(id, req.user, 'organization renewal');
         return this.svc.getRenewal(renewalId, id);
     }
     health(id, date) { return this.svc.healthScore(id, date); }
@@ -81,18 +92,28 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, rbac_guard_1.Roles)('super_admin', 'org_admin'),
-    (0, swagger_1.ApiOperation)({ summary: 'List organizations' }),
+    (0, swagger_1.ApiOperation)({ summary: 'List organizations (own organisation only unless platform Super Admin)' }),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], OrganizationsController.prototype, "list", null);
+__decorate([
+    (0, common_1.Get)('plans'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    (0, swagger_1.ApiOperation)({ summary: 'Active subscription plans (catalog — used to request a plan)' }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
-], OrganizationsController.prototype, "list", null);
+], OrganizationsController.prototype, "plans", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, rbac_guard_1.RequirePermissions)('employee:read'),
     (0, swagger_1.ApiParam)({ name: 'id', type: String }),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "get", null);
 __decorate([
@@ -103,24 +124,27 @@ __decorate([
     (0, swagger_1.ApiBody)({ schema: { type: 'object', properties: { name: { type: 'string', example: 'Sample Org Updated' }, logoUrl: { type: 'string', example: 'https://example.com/logo.png' }, primaryColor: { type: 'string', example: '#0F172A' } } } }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "update", null);
 __decorate([
     (0, common_1.Get)(':id/config'),
     (0, rbac_guard_1.RequirePermissions)('employee:read'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "config", null);
 __decorate([
     (0, common_1.Get)(':id/branding'),
     (0, rbac_guard_1.RequirePermissions)('employee:read'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "branding", null);
 __decorate([
@@ -129,8 +153,9 @@ __decorate([
     (0, rbac_guard_1.RequirePermissions)('employee:*'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "updateBranding", null);
 __decorate([
@@ -140,8 +165,9 @@ __decorate([
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('logo')),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.UploadedFile)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "uploadLogo", null);
 __decorate([
@@ -151,8 +177,9 @@ __decorate([
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.UploadedFile)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "uploadLogoFile", null);
 __decorate([
@@ -164,6 +191,17 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "subscription", null);
+__decorate([
+    (0, common_1.Post)(':id/subscription-request'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    (0, swagger_1.ApiOperation)({ summary: 'Request a plan — pending Super Admin approval (orgs with no active subscription)' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", void 0)
+], OrganizationsController.prototype, "requestSubscription", null);
 __decorate([
     (0, common_1.Post)(':id/renew'),
     (0, rbac_guard_1.RequirePermissions)('employee:read'),
@@ -204,7 +242,6 @@ __decorate([
 ], OrganizationsController.prototype, "health", null);
 exports.OrganizationsController = OrganizationsController = __decorate([
     (0, swagger_1.ApiTags)('organizations'),
-    (0, module_guard_1.RequireModule)('people'),
     (0, common_1.Controller)('organizations'),
     __metadata("design:paramtypes", [organizations_service_1.OrganizationsService])
 ], OrganizationsController);

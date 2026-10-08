@@ -67,6 +67,41 @@ export class OrganizationsService {
     return this.prisma.organization.findMany({ orderBy: { createdAt: 'desc' }, include: { _count: { select: { employees: true, branches: true, users: true } } } });
   }
 
+  listMine(orgId?: string) {
+    if (!orgId) return [];
+    return this.prisma.organization.findMany({ where: { id: orgId }, orderBy: { createdAt: 'desc' }, include: { _count: { select: { employees: true, branches: true, users: true } } } });
+  }
+
+  // Active plans catalog (for the org-side "request a plan" page)
+  async listPublicPlans() {
+    const plans = await this.prisma.subscriptionPlan.findMany({ where: { isActive: true }, include: { modules: true }, orderBy: { price: 'asc' } });
+    const catalog = await this.prisma.moduleCatalog.findMany();
+    const catMap = new Map(catalog.map(c => [c.key, c]));
+    return plans.map(p => {
+      const totalModule = p.modules.reduce((s, m) => s + (m.price != null ? Number(m.price) : (catMap.get(m.moduleKey) ? Number(catMap.get(m.moduleKey)!.basePrice) : 0)), 0);
+      return { ...p, totalPrice: Number(p.price) + totalModule, moduleCount: p.modules.length };
+    });
+  }
+
+  // Org requests a plan (no active subscription) → pending Super Admin approval
+  async requestSubscription(organizationId: string, planId: string, userId?: string) {
+    if (!planId) throw new NotFoundException('planId required');
+    const active = await this.prisma.organizationSubscription.findFirst({ where: { organizationId, status: 'active' } });
+    if (active) throw new ConflictException('Active subscription exists — request a renewal instead');
+    const pending = await this.prisma.subscriptionRenewal.findFirst({ where: { organizationId, status: 'pending' } });
+    if (pending) throw new ConflictException('A request is already pending Super Admin approval');
+    const plan = await this.prisma.subscriptionPlan.findUnique({ where: { id: planId }, include: { modules: true } });
+    if (!plan || !plan.isActive) throw new NotFoundException('Plan not available');
+    const catalog = await this.prisma.moduleCatalog.findMany({ where: { key: { in: plan.modules.map(m => m.moduleKey) } } });
+    const catMap = new Map(catalog.map(c => [c.key, c]));
+    const totalModule = plan.modules.reduce((s, m) => s + (m.price != null ? Number(m.price) : (catMap.get(m.moduleKey) ? Number(catMap.get(m.moduleKey)!.basePrice) : 0)), 0);
+    const amount = Number(plan.price) + totalModule;
+    // subscriptionId/previousEndDate stay null = first-time grant (renewals have previousEndDate set)
+    return this.prisma.subscriptionRenewal.create({
+      data: { organizationId, planId, amount, status: 'pending', requestedBy: userId } as any,
+    });
+  }
+
   async getSubscription(organizationId: string) {
     const sub = await this.prisma.organizationSubscription.findFirst({
       where: { organizationId, status: 'active' },

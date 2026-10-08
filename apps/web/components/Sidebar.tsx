@@ -6,8 +6,9 @@ import {
   LayoutDashboard, Users, UserPlus, Clock, CalendarCheck, Timer, Briefcase, Wallet, TrendingUp, GraduationCap, Heart, ShieldCheck, FileText, Boxes, ArrowUpCircle, UserMinus, Users2, Scale, Headset, BarChart3, Brain, Workflow, Plug, Settings,
   MapPin, AlertTriangle, Building2, ChevronLeft, ChevronRight, ChevronDown, LogOut, Sparkles, Layers, MessageCircle, CreditCard, HelpCircle, BookOpen
 } from 'lucide-react';
+import { isPlatformSuperAdmin } from '../lib/api';
 
-type NavSection = { title: string; items: { href: string; label: string; icon: any; badge?: string; roles?: string[]; perms?: string[]; module?: string }[] };
+type NavSection = { title: string; items: { href: string; label: string; icon: any; badge?: string; roles?: string[]; perms?: string[]; module?: string; platformOnly?: boolean }[] };
 
 const SECTION_ICONS: Record<string, any> = {
   'OVERVIEW': LayoutDashboard,
@@ -66,7 +67,7 @@ const NAV: NavSection[] = [
       { href: '/settings/dropdowns', label: 'Dropdowns', icon: Layers, roles:['org_admin','super_admin','hr_admin'], perms:['employee:*'], module:'administration' },
     ]},
   { title: 'SUPER ADMIN', items: [
-    { href: '/admin', label: 'Super Admin', icon: ShieldCheck, roles: ['super_admin'] },
+    { href: '/admin', label: 'Super Admin', icon: ShieldCheck, roles: ['super_admin'], platformOnly: true },
   ]},
   { title: 'HELP', items: [
     { href: '/help', label: 'Help • Docs', icon: HelpCircle },
@@ -130,6 +131,8 @@ export default function Sidebar() {
   const role = user?.role || null;
   const userOrgId = user?.org_id || user?.organizationId;
   const userPerms: string[] = (user as any)?.permissions || [];
+  // Only super_admin of the platform organisation (acronym) gets the global Super Admin view
+  const platformAdmin = !!user && isPlatformSuperAdmin();
 
   // Chat unread badge — poll + socket via storage event from ChatProvider
   useEffect(() => {
@@ -200,10 +203,12 @@ export default function Sidebar() {
     });
   };
   const visible = (roles?: string[], perms?: string[], module?: string, orgId?: string) => {
-    // Global super_admin (RC) bypass all — sees everything
-    if (role === 'super_admin') return true;
+    // Platform super_admin (acronym-matched) bypasses all — sees everything
+    if (role === 'super_admin' && platformAdmin) return true;
+    // Any other org's super_admin is treated as their organisation's admin (no global view)
+    const effectiveRole = role === 'super_admin' ? 'org_admin' : role;
     // org_admin — only show if belongs to this organization
-    if (role === 'org_admin') {
+    if (effectiveRole === 'org_admin') {
       // If no orgId specified (e.g. admin page global view), allow
       if (!orgId) return true;
       // Only show if user's organization matches the current org
@@ -212,13 +217,13 @@ export default function Sidebar() {
       return false;
     }
     // Regular roles (employee, manager, etc.) — normal RBAC checks
-    if (roles && roles.length && role && !roles.includes(role)) return false;
-    if (roles && roles.length && !role) return false;
+    if (roles && roles.length && effectiveRole && !roles.includes(effectiveRole)) return false;
+    if (roles && roles.length && !effectiveRole) return false;
     if (perms && !hasPerm(perms)) return false;
     if (module && allowedModules && !allowedModules.has(module)) return false;
     // if no roles/perms/module specified, hide from employee (core RBAC)
     if (!roles && !perms && !module) return false;
-    if (!roles && role === 'employee' && perms) return hasPerm(perms);
+    if (!roles && effectiveRole === 'employee' && perms) return hasPerm(perms);
     return true;
   };
 
@@ -236,7 +241,7 @@ export default function Sidebar() {
         </div>
         <div className="flex-1 overflow-y-auto py-3 px-2 space-y-3 scrollbar-thin">
           {NAV.map(sec => {
-            const visibleItems = sec.items.filter(i => visible(i.roles, i.perms, i.module, userOrgId || ''));
+            const visibleItems = sec.items.filter(i => !i.platformOnly || platformAdmin).filter(i => visible(i.roles, i.perms, i.module, userOrgId || ''));
             if (visibleItems.length === 0) return null;
             const isOpen = openSections.has(sec.title);
             const SectionIcon = SECTION_ICONS[sec.title] || Layers;

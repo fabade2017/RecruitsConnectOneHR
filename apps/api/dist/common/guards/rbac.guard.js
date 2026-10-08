@@ -9,7 +9,9 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RbacGuard = exports.ROLE_PERMISSIONS = exports.RequirePermissions = exports.Roles = exports.PERMISSIONS_KEY = exports.ROLES_KEY = void 0;
+exports.RbacGuard = exports.ROLE_PERMISSIONS = exports.PlatformOnly = exports.RequirePermissions = exports.Roles = exports.PLATFORM_ONLY_KEY = exports.PERMISSIONS_KEY = exports.ROLES_KEY = void 0;
+exports.getPlatformOrgAcronym = getPlatformOrgAcronym;
+exports.isPlatformSuperAdmin = isPlatformSuperAdmin;
 exports.hasPermission = hasPermission;
 exports.getSystemPermissions = getSystemPermissions;
 const common_1 = require("@nestjs/common");
@@ -17,10 +19,23 @@ const core_1 = require("@nestjs/core");
 const prisma_service_1 = require("../../prisma/prisma.service");
 exports.ROLES_KEY = 'roles';
 exports.PERMISSIONS_KEY = 'permissions';
+exports.PLATFORM_ONLY_KEY = 'platformOnly';
 const Roles = (...roles) => (0, common_1.SetMetadata)(exports.ROLES_KEY, roles);
 exports.Roles = Roles;
 const RequirePermissions = (...perms) => (0, common_1.SetMetadata)(exports.PERMISSIONS_KEY, perms);
 exports.RequirePermissions = RequirePermissions;
+// Platform-only: super_admin belonging to the platform organisation (acronym) — other orgs' admins are not allowed
+const PlatformOnly = () => (0, common_1.SetMetadata)(exports.PLATFORM_ONLY_KEY, true);
+exports.PlatformOnly = PlatformOnly;
+function getPlatformOrgAcronym() {
+    return (process.env.SUPER_ADMIN_ORG_ACRONYM || 'RC').trim().toUpperCase();
+}
+function isPlatformSuperAdmin(user) {
+    if (!user || user.role !== 'super_admin')
+        return false;
+    const ac = String(user.org_acronym || '').trim().toUpperCase();
+    return !!ac && ac === getPlatformOrgAcronym();
+}
 // RBAC matrix per docs/RBAC.md — system roles fallback (custom roles override via DB)
 exports.ROLE_PERMISSIONS = {
     super_admin: ['*'],
@@ -70,7 +85,8 @@ let RbacGuard = class RbacGuard {
             return true;
         const requiredRoles = this.reflector?.getAllAndOverride(exports.ROLES_KEY, [context.getHandler(), context.getClass()]);
         const requiredPerms = this.reflector?.getAllAndOverride(exports.PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
-        if (!requiredRoles && !requiredPerms)
+        const platformOnly = this.reflector?.getAllAndOverride(exports.PLATFORM_ONLY_KEY, [context.getHandler(), context.getClass()]);
+        if (!requiredRoles && !requiredPerms && !platformOnly)
             return true;
         const user = req.user;
         if (!user)
@@ -78,6 +94,24 @@ let RbacGuard = class RbacGuard {
         const role = user.role;
         if (!role)
             throw new common_1.ForbiddenException('No role');
+        // Platform-only gate — runs before the role/permission bypasses below so org_admin
+        // cannot slip past @Roles('super_admin') on subscription/plan/renewal endpoints
+        if (platformOnly) {
+            let ok = isPlatformSuperAdmin(user);
+            // Older tokens may not carry org_acronym — resolve it once from DB
+            if (!ok && role === 'super_admin' && !user.org_acronym && (user.org_id || user.orgId)) {
+                try {
+                    const org = await this.prisma.organization.findUnique({ where: { id: user.org_id || user.orgId }, select: { acronym: true } });
+                    if (org?.acronym && org.acronym.trim().toUpperCase() === getPlatformOrgAcronym()) {
+                        user.org_acronym = org.acronym;
+                        ok = true;
+                    }
+                }
+                catch { }
+            }
+            if (!ok)
+                throw new common_1.ForbiddenException(`Platform Super Admin only — managed by organisation ${getPlatformOrgAcronym()}`);
+        }
         // Resolve dynamic permissions: if user has customRole, use DB, else system map, else JWT perms
         let userPerms = [];
         if (user.permissions && Array.isArray(user.permissions)) {

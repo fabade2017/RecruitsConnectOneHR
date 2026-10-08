@@ -4,8 +4,21 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 export const ROLES_KEY = 'roles';
 export const PERMISSIONS_KEY = 'permissions';
+export const PLATFORM_ONLY_KEY = 'platformOnly';
 export const Roles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles);
 export const RequirePermissions = (...perms: string[]) => SetMetadata(PERMISSIONS_KEY, perms);
+// Platform-only: super_admin belonging to the platform organisation (acronym) — other orgs' admins are not allowed
+export const PlatformOnly = () => SetMetadata(PLATFORM_ONLY_KEY, true);
+
+export function getPlatformOrgAcronym(): string {
+  return (process.env.SUPER_ADMIN_ORG_ACRONYM || 'RC').trim().toUpperCase();
+}
+
+export function isPlatformSuperAdmin(user: any): boolean {
+  if (!user || user.role !== 'super_admin') return false;
+  const ac = String(user.org_acronym || '').trim().toUpperCase();
+  return !!ac && ac === getPlatformOrgAcronym();
+}
 
 // RBAC matrix per docs/RBAC.md — system roles fallback (custom roles override via DB)
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -51,13 +64,31 @@ export class RbacGuard {
 
     const requiredRoles = this.reflector?.getAllAndOverride<string[]>(ROLES_KEY, [context.getHandler(), context.getClass()]);
     const requiredPerms = this.reflector?.getAllAndOverride<string[]>(PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
+    const platformOnly = this.reflector?.getAllAndOverride<boolean>(PLATFORM_ONLY_KEY, [context.getHandler(), context.getClass()]);
 
-    if (!requiredRoles && !requiredPerms) return true;
+    if (!requiredRoles && !requiredPerms && !platformOnly) return true;
 
     const user = req.user;
     if (!user) throw new ForbiddenException('No user context');
     const role = user.role as string;
     if (!role) throw new ForbiddenException('No role');
+
+    // Platform-only gate — runs before the role/permission bypasses below so org_admin
+    // cannot slip past @Roles('super_admin') on subscription/plan/renewal endpoints
+    if (platformOnly) {
+      let ok = isPlatformSuperAdmin(user);
+      // Older tokens may not carry org_acronym — resolve it once from DB
+      if (!ok && role === 'super_admin' && !user.org_acronym && (user.org_id || user.orgId)) {
+        try {
+          const org = await this.prisma.organization.findUnique({ where: { id: user.org_id || user.orgId }, select: { acronym: true } });
+          if (org?.acronym && org.acronym.trim().toUpperCase() === getPlatformOrgAcronym()) {
+            user.org_acronym = org.acronym;
+            ok = true;
+          }
+        } catch {}
+      }
+      if (!ok) throw new ForbiddenException(`Platform Super Admin only — managed by organisation ${getPlatformOrgAcronym()}`);
+    }
 
     // Resolve dynamic permissions: if user has customRole, use DB, else system map, else JWT perms
     let userPerms: string[] = [];

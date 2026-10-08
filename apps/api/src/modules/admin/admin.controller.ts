@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
-import { Roles, RequirePermissions } from '../../common/guards/rbac.guard';
+import { Roles, RequirePermissions, PlatformOnly, isPlatformSuperAdmin } from '../../common/guards/rbac.guard';
 import { RequireModule } from '../../common/guards/module.guard';
 import { Public } from '../../common/guards/jwt-auth.guard';
 
@@ -16,8 +16,12 @@ export class AdminController {
   @Get('roles')
   @Roles('super_admin','org_admin','hr_admin')
   @RequirePermissions('employee:read')
-  @ApiOperation({ summary: 'List all roles (super_admin can create/assign, org_admin can list own)' })
-  roles(@Req() req:any, @Query('organizationId') orgId?: string) { return this.svc.listRoles(orgId || req.user?.org_id || req.user?.orgId); }
+  @ApiOperation({ summary: 'List roles (platform Super Admin: all/any org; others: own organisation only)' })
+  roles(@Req() req:any, @Query('organizationId') orgId?: string) {
+    // Non-platform admins can only ever list their own organisation's roles (ignore client-supplied orgId)
+    const scoped = isPlatformSuperAdmin(req.user) ? orgId : (req.user?.org_id || req.user?.orgId);
+    return this.svc.listRoles(scoped);
+  }
 
   @Post('roles')
   @RequirePermissions('admin:manage')
@@ -25,15 +29,15 @@ export class AdminController {
 
   @Patch('roles/:id')
   @RequirePermissions('admin:manage')
-  updateRole(@Param('id') id: string, @Body() dto: any) { return this.svc.updateRole(id, dto); }
+  updateRole(@Param('id') id: string, @Body() dto: any, @Req() req: any) { return this.svc.updateRole(id, dto, req.user); }
 
   @Delete('roles/:id')
   @RequirePermissions('admin:manage')
-  deleteRole(@Param('id') id: string) { return this.svc.deleteRole(id); }
+  deleteRole(@Param('id') id: string, @Req() req: any) { return this.svc.deleteRole(id, req.user); }
 
   @Post('users/:userId/assign-role')
   @RequirePermissions('admin:manage')
-  assignRole(@Param('userId') userId: string, @Body() dto: { role: string; customRoleId?: string }) { return this.svc.assignRole(userId, dto.role, dto.customRoleId); }
+  assignRole(@Param('userId') userId: string, @Body() dto: { role: string; customRoleId?: string }, @Req() req: any) { return this.svc.assignRole(userId, dto.role, dto.customRoleId, req.user); }
 
   // ===== Permissions =====
   @Get('permissions')
@@ -55,125 +59,154 @@ export class AdminController {
   @RequirePermissions('admin:manage')
   createPermission(@Body() dto: any) { return this.svc.createPermission(dto); }
 
-  // ===== Module Catalog (pricing) =====
+  // ===== Module Catalog (pricing) — platform Super Admin only =====
   @Get('module-catalog')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   moduleCatalog() { return this.svc.listModuleCatalog(); }
 
   @Post('module-catalog')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   upsertModuleCatalog(@Body() dto: any) { return this.svc.upsertModuleCatalog(dto); }
 
   @Patch('module-catalog/:key')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   updateModuleCatalog(@Param('key') key: string, @Body() dto: any) { return this.svc.updateModuleCatalog(key, dto); }
 
   @Delete('module-catalog/:key')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   deleteModuleCatalog(@Param('key') key: string) { return this.svc.deleteModuleCatalog(key); }
 
   @Get('plans/pricing')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   plansWithPricing() { return this.svc.getPlansWithPricing(); }
 
-  // ===== Company Groups (Group of Companies) =====
+  // ===== Company Groups (Group of Companies) — platform Super Admin only =====
   @Get('groups')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   groups() { return this.svc.listGroups(); }
 
   @Get('groups/:id')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   group(@Param('id') id: string) { return this.svc.getGroup(id); }
 
   @Get('groups/:id/hierarchy')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   hierarchy(@Param('id') id: string) { return this.svc.groupHierarchy(id); }
 
   @Post('groups')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   createGroup(@Body() dto: any, @Req() req: any) { return this.svc.createGroup(dto, req.user); }
 
   @Patch('groups/:id')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   updateGroup(@Param('id') id: string, @Body() dto: any) { return this.svc.updateGroup(id, dto); }
 
   @Post('groups/:id/organizations/:orgId')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   assignOrg(@Param('id') groupId: string, @Param('orgId') orgId: string) { return this.svc.assignOrganizationToGroup(groupId, orgId); }
 
   @Delete('groups/:id/organizations/:orgId')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   removeOrg(@Param('orgId') orgId: string) { return this.svc.removeOrganizationFromGroup(orgId); }
 
-  // ===== Subscriptions & Module Assignment =====
+  // ===== Subscriptions & Module Assignment — platform Super Admin only =====
   @Get('plans')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   plans() { return this.svc.listPlans(); }
 
   @Get('plans/:id')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   plan(@Param('id') id: string) { return this.svc.getPlan(id); }
 
   @Post('plans')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   createPlan(@Body() dto: any) { return this.svc.createPlan(dto); }
 
   @Patch('plans/:id')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   updatePlan(@Param('id') id: string, @Body() dto: any) { return this.svc.updatePlan(id, dto); }
 
   @Post('plans/:id/modules')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   @ApiOperation({ summary: 'Assign modules to subscription plan (Super Admin)' })
   assignModules(@Param('id') planId: string, @Body() dto: { modules: any[] }) { return this.svc.assignModulesToPlan(planId, dto.modules); }
 
   @Patch('plans/:id/modules/:moduleKey/price')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   setModulePrice(@Param('id') planId: string, @Param('moduleKey') moduleKey: string, @Body() dto: { price: number }) { return this.svc.setModulePrice(planId, moduleKey, dto.price); }
 
   @Delete('plans/:id/modules/:moduleKey')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   removeModule(@Param('id') planId: string, @Param('moduleKey') moduleKey: string) { return this.svc.removeModuleFromPlan(planId, moduleKey); }
 
   @Get('subscriptions')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   subscriptions(@Query('organizationId') orgId?: string, @Query('companyGroupId') groupId?: string) { return this.svc.listSubscriptions(orgId, groupId); }
 
   @Post('subscriptions/assign')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   @ApiOperation({ summary: 'Assign subscription to org or entire group' })
   assignSubscription(@Body() dto: any) { return this.svc.assignSubscription(dto); }
 
   @Patch('subscriptions/:id')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   updateSubscription(@Param('id') id: string, @Body() dto: any) { return this.svc.updateSubscription(id, dto); }
 
   @Post('subscriptions/:id/cancel')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   cancelSubscription(@Param('id') id: string) { return this.svc.cancelSubscription(id); }
 
   @Get('organizations/:orgId/modules/:moduleKey/access')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   checkAccess(@Param('orgId') orgId: string, @Param('moduleKey') moduleKey: string) { return this.svc.checkModuleAccess(orgId, moduleKey); }
 
-  // ===== Renewals (yearly) =====
+  // ===== Renewals (yearly) — platform Super Admin approves/rejects =====
   @Get('renewals')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   renewals(@Query('status') status?: string) { return this.svc.listRenewals(status); }
 
   @Post('renewals/:id/approve')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   approveRenewal(@Param('id') id: string, @Req() req: any) { return this.svc.approveRenewal(id, req.user.sub); }
 
   @Post('renewals/:id/reject')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   rejectRenewal(@Param('id') id: string, @Req() req: any, @Body() dto: any) { return this.svc.rejectRenewal(id, req.user.sub, dto.reason); }
 
   @Get('renewals/:id/receipt')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   renewalReceipt(@Param('id') id: string) { return this.svc.getRenewalReceipt(id); }
 
   @Get('organizations')
+  @PlatformOnly()
   @RequirePermissions('admin:manage')
   organizations() { return this.svc.listOrganizations(); }
 }

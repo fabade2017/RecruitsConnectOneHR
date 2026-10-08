@@ -32,7 +32,7 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, { method: 'POST' })
     window.location.href = '/login'
   }
 

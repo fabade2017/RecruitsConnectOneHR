@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -13,18 +13,31 @@ export default function LoginPage() {
   const router = useRouter();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
 
+  useEffect(() => {
+    // Replicates old middleware: already-authenticated users are routed to their home.
+    const t = localStorage.getItem('onehr_token') || localStorage.getItem('onehr_auth');
+    if (!t) return;
+    try {
+      const u = JSON.parse(localStorage.getItem('onehr_user') || 'null');
+      const role = u?.role;
+      const target = role === 'super_admin' ? '/admin' : role === 'manager' ? '/manager' : role === 'executive' ? '/executive' : role === 'recruiter' ? '/jobs' : role === 'employee' ? '/employee' : '/hr';
+      router.replace(target);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!acronym.trim()) return setError('Organization acronym is required');
     setLoading(true); setError('');
     try {
-      const res = await fetch(`/api/auth/login`, {
+      const res = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, org_acronym: acronym.trim().toUpperCase(), acronym: acronym.trim().toUpperCase() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Login failed');
-      // HttpOnly cookies set by server route (/api/auth/login) + Bearer fallback for API calls (api/lib/api.ts:8 getAuthHeaders)
+      // Static export has no Next server routes — token goes to localStorage (Bearer fallback in lib/api.ts:8). CORS must allow this frontend origin on the API.
       if (data.access_token) localStorage.setItem('onehr_token', data.access_token);
       else if ((data as any).accessToken) localStorage.setItem('onehr_token', (data as any).accessToken);
       localStorage.setItem('onehr_user', JSON.stringify(data.user));
