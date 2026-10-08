@@ -38,8 +38,9 @@ const toEditStep = (s: Step) => {
 };
 const userMatchesRole = (roles: any[], u: any, slug: string) => {
   const r = roles.find((x: any) => x.slug === slug);
-  if (r && !r.system) return u.customRoleId === r.id;
-  return u.role === slug;
+  if (!r) return u.role === slug;
+  if (r.system) return u.role === slug;
+  return u.customRoleId === r.id;
 };
 const approverChip = (s: Step) => {
   if (s.type !== 'approval') return '';
