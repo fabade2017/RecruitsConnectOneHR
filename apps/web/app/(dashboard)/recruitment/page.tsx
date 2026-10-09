@@ -30,7 +30,7 @@ export default function RecruitmentPage() {
   const create = async () => {
     if (!form.title) return alert('Title required');
     const t = localStorage.getItem('onehr_token');
-    const payload = { title: form.title, department: form.department, location: form.location, type: form.type, description: form.description || 'OneHR recruitment §28 — auto eligibility check by grade/skills', salaryRange: form.salaryRange, requirements: form.requirements };
+    const payload = { title: form.title, department: form.department, location: form.location, type: form.type, description: form.description || 'OneHR recruitment — auto eligibility check by grade/skills', salaryRange: form.salaryRange, requirements: form.requirements };
     const res = await fetch(`${api}/jobs`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` }, body: JSON.stringify(payload) });
     if (!res.ok) {
       const e = await res.text();
@@ -82,8 +82,8 @@ export default function RecruitmentPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Briefcase /> Recruitment <span className="text-slate-500 font-normal">— Internal Job Market §28</span></h1>
-          <p className="text-sm text-slate-500">Talent Marketplace §27: internal jobs • projects • mentors — grade/skills auto-check • API: /v1/jobs</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Briefcase /> Recruitment <span className="text-slate-500 font-normal">— Internal Job Market</span></h1>
+          <p className="text-sm text-slate-500">Talent Marketplace internal jobs • projects • mentors — grade/skills auto-check • API: /v1/jobs</p>
         </div>
         <div className="flex gap-2">
           <button onClick={load} className="glass rounded-xl px-3 py-2 text-sm flex items-center gap-2"><RefreshCw size={14} /> Refresh</button>
@@ -130,7 +130,7 @@ export default function RecruitmentPage() {
               <input placeholder="Resume URL (https://...)" value={applyForm.resumeUrl} onChange={(e) => setApplyForm({ ...applyForm, resumeUrl: e.target.value })} className="w-full border rounded-xl px-3 py-2 text-sm" />
               <textarea placeholder="Cover letter" value={applyForm.coverLetter} onChange={(e) => setApplyForm({ ...applyForm, coverLetter: e.target.value })} className="w-full border rounded-xl px-3 py-2 text-sm" rows={2} />
               <button onClick={apply} className="w-full bg-sky-600 text-white rounded-xl py-2.5 font-semibold flex items-center justify-center gap-2"><Send size={16} />Submit Application</button>
-              <p className="text-xs text-slate-500">POST /v1/jobs/:id/apply • Eligibility auto-checked §28</p>
+              <p className="text-xs text-slate-500">POST /v1/jobs/:id/apply • Eligibility auto-checked</p>
             </div>
           )}
         </GlassCard>
@@ -145,7 +145,7 @@ export default function RecruitmentPage() {
               <div className="bg-sky-50 rounded-xl p-3 text-center border border-sky-100"><div className="text-xl font-bold text-sky-700">{display.reduce((a: number, j: any) => a + (j.applications?.length || 0), 0)}</div><div className="text-xs text-sky-700">Applicants</div></div>
               <div className="bg-slate-900 text-white rounded-xl p-3 text-center"><div className="text-xl font-bold">{display.length}</div><div className="text-xs text-slate-300">Postings</div></div>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-600"><div className="font-semibold flex items-center gap-1"><FileText size={12} />Talent Marketplace §27</div><p className="mt-1">Employees can apply for internal jobs, join projects, find mentors — eligibility auto-checked (grade, performance, skills, disciplinary)</p></div>
+            <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-600"><div className="font-semibold flex items-center gap-1"><FileText size={12} />Talent Marketplace</div><p className="mt-1">Employees can apply for internal jobs, join projects, find mentors — eligibility auto-checked (grade, performance, skills, disciplinary)</p></div>
           </div>
         </GlassCard>
       </div>
@@ -206,7 +206,7 @@ export default function RecruitmentPage() {
             </table>
           </div>
         )}
-        <div className="p-3 bg-slate-50/50 text-xs text-slate-500">Internal mobility §27 — auto eligibility by grade/skills • POST /v1/jobs/:id/apply creates JobApplicationMerged</div>
+        <div className="p-3 bg-slate-50/50 text-xs text-slate-500">Internal mobility — auto eligibility by grade/skills • POST /v1/jobs/:id/apply creates JobApplicationMerged</div>
       </GlassCard>
     </div>
   );

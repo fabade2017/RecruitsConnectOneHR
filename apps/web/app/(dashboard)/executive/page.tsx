@@ -70,9 +70,9 @@ export default function ExecutiveCommand() {
       <GradientCard gradient="from-slate-900 via-indigo-900 to-slate-900">
         <div className="flex flex-col md:flex-row justify-between gap-4">
           <div>
-            <div className="text-white/60 text-xs tracking-widest">EXECUTIVE COMMAND CENTER (§40) — CEO/MD view • Live from /attendance/command-center + /analytics/workforce-scores</div>
+            <div className="text-white/60 text-xs tracking-widest">EXECUTIVE COMMAND CENTER — CEO/MD view • Live from /attendance/command-center + /analytics/workforce-scores</div>
             <h1 className="text-3xl font-black mt-1">One Platform. Complete Workforce Intelligence.</h1>
-            <p className="text-white/70 text-sm">4 pillars: Manage People • Manage Work • Measure • Predict What’s Next (§43)</p>
+            <p className="text-white/70 text-sm">4 pillars: Manage People • Manage Work • Measure • Predict What’s Next </p>
           </div>
           <div className="glass-dark rounded-2xl p-4 text-center min-w-[160px]">
             <div className="text-xs text-white/60">HR HEALTH</div>
@@ -98,21 +98,21 @@ export default function ExecutiveCommand() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <GlassCard className="lg:col-span-2">
-          <h3 className="font-semibold">Workforce Score (§18) — 6 indicators {hrHealth !== null ? `• ${hrHealth}/100` : ''}</h3>
+          <h3 className="font-semibold">Workforce Score — 6 indicators {hrHealth !== null ? `• ${hrHealth}/100` : ''}</h3>
           <p className="text-xs text-slate-500">Live from /analytics/workforce-scores</p>
           <HealthRadar data={healthRadarData} />
         </GlassCard>
         <GlassCard>
           <h3 className="font-semibold">People Mix {dashboard?.employees ? `• ${dashboard.employees} total` : ''}</h3>
           <Donut data={donutData} />
-          <div className="text-xs text-slate-500 text-center">Live from /analytics/dashboard • Digital Twin-ready §30</div>
+          <div className="text-xs text-slate-500 text-center">Live from /analytics/dashboard • Digital Twin-ready</div>
           <div className="text-[11px] text-slate-400 text-center mt-1">{dashboard?.branchDistribution ? dashboard.branchDistribution.map((b: any) => `${b.name}:${b.count}`).join(' • ') : 'Loading...'}</div>
         </GlassCard>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <GlassCard>
-          <h3 className="font-semibold flex items-center gap-2"><ShieldCheck size={16}/> HR Risk (§19) • Early Warning (§20)</h3>
+          <h3 className="font-semibold flex items-center gap-2"><ShieldCheck size={16}/> HR Risk • Early Warning </h3>
           <p className="text-xs text-slate-500">Live from /analytics/risks</p>
           <div className="mt-3 space-y-2 text-sm">
             {risks ? (
@@ -129,7 +129,7 @@ export default function ExecutiveCommand() {
           </div>
         </GlassCard>
         <GlassCard>
-          <h3 className="font-semibold">Decision Simulator (§31) • Digital Twin (§30)</h3>
+          <h3 className="font-semibold">Decision Simulator • Digital Twin </h3>
           <p className="text-xs text-slate-500">Live: POST /analytics/simulate</p>
           <div className="grid grid-cols-1 gap-2 mt-3 text-sm">
             <div className="glass rounded-xl p-3 flex justify-between"><span>Salary +10%</span><span className="font-bold">₦12.5M/mo • ₦150M/yr</span></div>

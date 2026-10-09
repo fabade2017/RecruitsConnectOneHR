@@ -63,6 +63,8 @@ let AttendanceService = class AttendanceService {
         if (existing?.clockInAt)
             throw new common_1.ConflictException('Already clocked in today');
         const clockInAt = dto.timestamp ? new Date(dto.timestamp) : new Date();
+        const policy = await this.prisma.attendancePolicy.findUnique({ where: { organizationId: orgId } });
+        const requireFace = !!policy?.requireFaceSnapshot;
         const session = await this.prisma.workSession.upsert({
             where: { organizationId_employeeId_date: { organizationId: orgId, employeeId: employee.id, date: dateOnly } },
             create: { organizationId: orgId, employeeId: employee.id, date: dateOnly, clockInAt, status: 'working', scheduledMinutes: 480, verificationScore: dto.face_snapshot_base64 ? 98 : 85 },
@@ -169,10 +171,10 @@ let AttendanceService = class AttendanceService {
                 }
                 catch { }
             }
-            else {
-                // No enrolled face yet — flag for enrollment
+            else if (requireFace) {
+                // No enrolled face yet — flag only when org requires face clock-in
                 await this.prisma.attendanceException.create({
-                    data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'low', details: JSON.stringify({ reason: 'no_enrolled_face', hint: 'Ask HR to send face-enroll link' }) },
+                    data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'no_enrolled_face', hint: 'Ask HR to send face-enroll link' }) },
                 });
             }
             // Duplicate face check: same hash from different employee in last 10 min (proxy clock-in)
@@ -188,14 +190,13 @@ let AttendanceService = class AttendanceService {
                 }
             }
         }
-        else if (!isFacial) {
+        else if (!isFacial && requireFace) {
             await this.prisma.attendanceException.create({
-                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'low', details: JSON.stringify({ reason: 'no_face_snapshot', method: dto.method }) },
+                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'no_face_snapshot', method: dto.method, note: 'Face clock-in required by org policy' }) },
             });
         }
         // GPS handling — real geolocation
         try {
-            const policy = await this.prisma.attendancePolicy.findUnique({ where: { organizationId: orgId } });
             const requireGps = policy?.requireGps || false;
             if (requireGps && !loc.str) {
                 await this.prisma.attendanceException.create({
@@ -349,7 +350,32 @@ let AttendanceService = class AttendanceService {
                 where.employeeId = { in: ids };
             }
         }
-        return this.prisma.workSession.findMany({ where, take: 50, orderBy: { date: 'desc' }, include: { employee: true } });
+        const rows = await this.prisma.workSession.findMany({ where, take: 50, orderBy: { date: 'desc' }, include: { employee: true } });
+        // Attach clock-in location details (gps + address) so HR sees where each person clocked from
+        try {
+            const ids = rows.map(r => r.id);
+            const events = await this.prisma.attendanceEvent.findMany({
+                where: { workSessionId: { in: ids }, eventType: { in: ['clock_in', 'clock_out'] } },
+                orderBy: { timestamp: 'asc' },
+            });
+            const bySession = {};
+            for (const e of events) {
+                if (!e.workSessionId)
+                    continue;
+                let meta = {};
+                try {
+                    meta = e.metadata ? JSON.parse(e.metadata) : {};
+                }
+                catch { }
+                bySession[e.workSessionId] = { ...(bySession[e.workSessionId] || {}), [e.eventType]: { location: e.location, gps: meta.gps || null, address: meta.gps?.address || meta.address || null, ip: e.ipAddress } };
+            }
+            for (const r of rows) {
+                r.clockInLocation = bySession[r.id]?.clock_in || null;
+                r.clockOutLocation = bySession[r.id]?.clock_out || null;
+            }
+        }
+        catch { }
+        return rows;
     }
     async commandCenter(orgId, user) {
         const today = new Date(new Date().toISOString().slice(0, 10));
@@ -504,6 +530,40 @@ let AttendanceService = class AttendanceService {
             };
         }).filter(p => p.location && p.location.latitude != null && p.location.longitude != null);
         return { date: dateStr, branches: branches.map(b => ({ id: b.id, name: b.name, latitude: b.latitude, longitude: b.longitude, gpsRadius: b.gpsRadius, address: b.address })), points, total: points.length };
+    }
+    async policies(orgId) {
+        let policy = await this.prisma.attendancePolicy.findUnique({ where: { organizationId: orgId } });
+        if (!policy) {
+            policy = await this.prisma.attendancePolicy.create({
+                data: {
+                    organizationId: orgId,
+                    verificationMethods: '["standard","facial","mobile","web","qr","biometric","nfc","api"]',
+                    requireFaceSnapshot: false,
+                    requireGps: false,
+                    gracePeriodMinutes: 10,
+                    snapshotRetentionDays: 90,
+                },
+            });
+        }
+        return policy;
+    }
+    async updatePolicy(orgId, dto) {
+        const data = {};
+        if (dto.verificationMethods !== undefined)
+            data.verificationMethods = typeof dto.verificationMethods === 'string' ? dto.verificationMethods : JSON.stringify(dto.verificationMethods);
+        if (dto.requireFaceSnapshot !== undefined)
+            data.requireFaceSnapshot = Boolean(dto.requireFaceSnapshot);
+        if (dto.requireGps !== undefined)
+            data.requireGps = Boolean(dto.requireGps);
+        if (dto.gracePeriodMinutes !== undefined)
+            data.gracePeriodMinutes = Number(dto.gracePeriodMinutes);
+        if (dto.snapshotRetentionDays !== undefined)
+            data.snapshotRetentionDays = Number(dto.snapshotRetentionDays);
+        return this.prisma.attendancePolicy.upsert({
+            where: { organizationId: orgId },
+            create: { organizationId: orgId, ...data },
+            update: data,
+        });
     }
 };
 exports.AttendanceService = AttendanceService;

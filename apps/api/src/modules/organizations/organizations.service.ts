@@ -260,8 +260,13 @@ export class OrganizationsService {
     // Seed leave types for new org
     await this.prisma.leaveType.createMany({
       data: [
-        { organizationId: org.id, name: 'Annual', maxDays: 21, accrualRule: JSON.stringify({ perYear: 21 }) },
-        { organizationId: org.id, name: 'Sick', maxDays: 14, accrualRule: JSON.stringify({ perYear: 14 }) },
+        { organizationId: org.id, name: 'Annual Leave', maxDays: 21, accrualRule: JSON.stringify({ perYear: 21 }) },
+        { organizationId: org.id, name: 'Sick Leave', maxDays: 12, accrualRule: JSON.stringify({ perYear: 12 }) },
+        { organizationId: org.id, name: 'Maternity Leave', maxDays: 90, accrualRule: JSON.stringify({ perYear: 90 }) },
+        { organizationId: org.id, name: 'Compassionate Leave', maxDays: 3, accrualRule: JSON.stringify({ perYear: 3 }) },
+        { organizationId: org.id, name: 'Bereavement Leave', maxDays: 3, accrualRule: JSON.stringify({ perYear: 3 }) },
+        { organizationId: org.id, name: 'Marriage Leave', maxDays: 5, accrualRule: JSON.stringify({ perYear: 5 }) },
+        { organizationId: org.id, name: 'Examination Leave', maxDays: 7, accrualRule: JSON.stringify({ perYear: 7 }) },
       ],
     });
 

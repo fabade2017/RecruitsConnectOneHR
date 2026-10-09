@@ -158,8 +158,8 @@ export default function SettingsPage() {
       <GradientCard gradient="from-slate-900 via-slate-800 to-slate-900">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2"><Settings /> Organization Settings <span className="font-normal text-white/70">— Config §42</span></h1>
-            <p className="text-sm text-white/70">Workdays • Grace period • Overtime rules • Industry template • Attendance policies §7 §13</p>
+            <h1 className="text-2xl font-bold flex items-center gap-2"><Settings /> Organization Settings <span className="font-normal text-white/70">— Config</span></h1>
+            <p className="text-sm text-white/70">Workdays • Grace period • Overtime rules • Industry template • Attendance policies</p>
           </div>
           <div className="flex items-center gap-2">
             <Pill tone="blue">RBAC: org_admin / hr_admin</Pill>
@@ -213,11 +213,11 @@ export default function SettingsPage() {
                   <input value={form.workdays} onChange={e=>setForm({...form,workdays:e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm mt-1 font-mono" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold">Grace Period (minutes) §7</label>
+                  <label className="text-xs font-semibold">Grace Period (minutes)</label>
                   <input type="number" value={form.grace} onChange={e=>setForm({...form,grace:Number(e.target.value)})} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold">Overtime Threshold (minutes) §5</label>
+                  <label className="text-xs font-semibold">Overtime Threshold (minutes)</label>
                   <input type="number" value={form.overtimeThreshold} onChange={e=>setForm({...form,overtimeThreshold:Number(e.target.value)})} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" />
                 </div>
                 <div className="md:col-span-2 flex items-center gap-2">
@@ -242,7 +242,7 @@ export default function SettingsPage() {
                 <div className="flex justify-between"><span className="text-slate-500">Overtime</span><span>{form.overtimeThreshold} min ({Math.round(form.overtimeThreshold/60)}h)</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Template</span><Pill tone="blue">{form.industryTemplate || '—'}</Pill></div>
               </div>
-              <div className="mt-3 text-xs text-slate-500">§42 Configuration — net = gross − breaks §13</div>
+              <div className="mt-3 text-xs text-slate-500">Configuration — net = gross − breaks</div>
             </GlassCard>
             <GlassCard>
               <h3 className="font-semibold flex items-center gap-2"><Layers size={16}/> Health Score</h3>
@@ -349,7 +349,7 @@ export default function SettingsPage() {
       {tab==='attendance' && (
         <div className="space-y-4">
           <GlassCard className="p-0 overflow-hidden">
-            <div className="p-4 flex items-center justify-between"><h3 className="font-semibold flex items-center gap-2"><Timer size={16}/> Attendance Policies §7</h3><Pill tone="blue">{policies.length} policies</Pill></div>
+            <div className="p-4 flex items-center justify-between"><h3 className="font-semibold flex items-center gap-2"><Timer size={16}/> Attendance Policies</h3><Pill tone="blue">{policies.length} policies</Pill></div>
             <div className="overflow-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-xs"><tr><th className="text-left p-2">Policy</th><th className="p-2">Methods</th><th className="p-2">Grace</th><th className="p-2">Face Snapshot</th><th className="p-2">Retention</th><th className="p-2">Status</th></tr></thead>
@@ -364,26 +364,26 @@ export default function SettingsPage() {
                       <td className="p-2"><Pill tone="emerald">active</Pill></td>
                     </tr>
                   ))}
-                  {policies.length===0 && <tr><td colSpan={6} className="p-8 text-center text-slate-500">No policies — seed creates default §7</td></tr>}
+                  {policies.length===0 && <tr><td colSpan={6} className="p-8 text-center text-slate-500">No policies — seed creates default</td></tr>}
                 </tbody>
               </table>
             </div>
-            <div className="p-3 bg-slate-50/50 text-xs text-slate-500">API: <code>GET /v1/attendance/policies</code> • Live from API • No mock • Verification 98% §36 • §9 privacy optional</div>
+            <div className="p-3 bg-slate-50/50 text-xs text-slate-500">API: <code>GET /v1/attendance/policies</code> • Live from API • No mock • Verification 98% • privacy optional</div>
           </GlassCard>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <GlassCard>
-              <h4 className="font-semibold text-sm flex items-center gap-2"><CalendarDays size={14}/> Work Session §5</h4>
+              <h4 className="font-semibold text-sm flex items-center gap-2"><CalendarDays size={14}/> Work Session</h4>
               <p className="text-xs text-slate-500 mt-1">Gross − Breaks = Net • Break 60m • Overtime after {form.overtimeThreshold} min</p>
               <div className="mt-2 text-xs bg-slate-50 rounded-xl p-2">Example: 08:00–17:00 (540m) − 60m break = 480m net → threshold {form.overtimeThreshold}m</div>
             </GlassCard>
             <GlassCard>
-              <h4 className="font-semibold text-sm flex items-center gap-2"><Clock size={14}/> 7 Clock Methods §7</h4>
+              <h4 className="font-semibold text-sm flex items-center gap-2"><Clock size={14}/> 7 Clock Methods</h4>
               <div className="mt-2 flex flex-wrap gap-1 text-xs">{['Mobile','Web','QR','Biometric','Facial','NFC','API'].map(m=><span key={m} className="glass rounded-full px-2 py-1">{m}</span>)}</div>
-              <p className="text-xs text-slate-500 mt-2">Face/GPS optional + consent §9</p>
+              <p className="text-xs text-slate-500 mt-2">Face/GPS optional + consent</p>
             </GlassCard>
             <GlassCard>
-              <h4 className="font-semibold text-sm flex items-center gap-2"><AlertTriangle size={14} className="text-amber-500"/> Exceptions §37</h4>
-              <p className="text-xs text-slate-500">Flagged Requires Review — not accused §10</p>
+              <h4 className="font-semibold text-sm flex items-center gap-2"><AlertTriangle size={14} className="text-amber-500"/> Exceptions</h4>
+              <p className="text-xs text-slate-500">Flagged Requires Review — not accused</p>
               <div className="mt-2 text-xs space-y-1"><div>Missing clock-out • Device sharing • Impossible travel</div><div className="text-slate-400">GET /v1/attendance/exceptions</div></div>
             </GlassCard>
           </div>
@@ -393,7 +393,7 @@ export default function SettingsPage() {
       {tab==='compliance' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <GlassCard>
-            <h3 className="font-semibold flex items-center gap-2"><Shield size={16}/> Data Retention §9</h3>
+            <h3 className="font-semibold flex items-center gap-2"><Shield size={16}/> Data Retention</h3>
             <table className="w-full text-sm mt-3">
               <thead className="text-xs bg-slate-50"><tr><th className="text-left p-2">Data</th><th className="p-2">Retention</th><th className="p-2">Status</th></tr></thead>
               <tbody className="divide-y text-xs">
@@ -405,12 +405,12 @@ export default function SettingsPage() {
             </table>
           </GlassCard>
           <GlassCard>
-            <h3 className="font-semibold">44 Modules Ecosystem §44</h3>
+            <h3 className="font-semibold">44 Modules Ecosystem</h3>
             <div className="mt-3 flex flex-wrap gap-1">
               {['people','attendance','leave','payroll','recruitment','performance','shifts','documents','assets','compliance','analytics','ai_copilot','workflow','integrations'].map(m=> <span key={m} className="text-xs bg-slate-50 border rounded-full px-2 py-1">{m}</span>)}
               <span className="text-xs text-slate-500">+30 more</span>
             </div>
-            <p className="text-xs text-slate-500 mt-3">Super admin assigns modules per plan — GET /v1/admin/plans • Health §18</p>
+            <p className="text-xs text-slate-500 mt-3">Super admin assigns modules per plan — GET /v1/admin/plans • Health</p>
           </GlassCard>
         </div>
       )}

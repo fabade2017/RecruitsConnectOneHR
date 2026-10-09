@@ -77,7 +77,7 @@ export default function AssetsPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Package/> Assets <span className="text-slate-500 font-normal">— Inventory §22</span></h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Package/> Assets <span className="text-slate-500 font-normal">— Inventory</span></h1>
           <p className="text-sm text-slate-500">Register → Assign → Return → Lifecycle (available / assigned / maintenance / retired)</p>
         </div>
         <button onClick={load} className="glass rounded-xl px-3 py-2 text-sm flex items-center gap-2"><RefreshCw size={14}/> Refresh</button>

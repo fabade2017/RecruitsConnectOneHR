@@ -85,7 +85,7 @@ export default function IntegrationsPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2"><Plug/> Integrations <span className="font-normal text-white/70">— 44 Modules • Webhooks • API</span></h1>
-            <p className="text-sm text-white/80">Connect Slack, Teams, SAP, Workday, Banks, Zapier — every module exposes integration points §44</p>
+            <p className="text-sm text-white/80">Connect Slack, Teams, SAP, Workday, Banks, Zapier — every module exposes integration points</p>
           </div>
           <div className="flex items-center gap-2">
             <Pill tone="blue">RBAC: org_admin / hr_admin</Pill>
@@ -178,7 +178,7 @@ export default function IntegrationsPage() {
 
       <GlassCard>
         <h3 className="font-semibold flex items-center gap-2"><Layers size={16}/> 44 Modules — Integration Points</h3>
-        <p className="text-xs text-slate-500">Every module exposes REST + webhook + event — ecosystem §44</p>
+        <p className="text-xs text-slate-500">Every module exposes REST + webhook + event — ecosystem</p>
         <div className="mt-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
           {MODULES_44.map(m=>(
             <div key={m} className="border rounded-xl p-2 bg-slate-50/50 hover:bg-white transition">

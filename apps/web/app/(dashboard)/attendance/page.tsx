@@ -122,7 +122,7 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
         <div className="p-4 border-b flex items-center justify-between">
           <div>
             <h3 className="font-bold flex items-center gap-2"><Camera size={18}/> Face Verification • {action}</h3>
-            <p className="text-xs text-slate-500">Motion + liveness for fraud detection §10 • Retention 90d §9</p>
+            <p className="text-xs text-slate-500">Motion + liveness for fraud detection • Retention 90d</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full glass flex items-center justify-center"><X size={16}/></button>
         </div>
@@ -179,7 +179,7 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
                   <Camera size={16}/> Snap & {action}
                 </button>
               </div>
-              <p className="text-xs text-slate-500 text-center">Snapshot base64 encrypted, 90-day retention • Duplicate face → flagged §37 • <span className="font-mono">faceSnapshotRef</span></p>
+              <p className="text-xs text-slate-500 text-center">Snapshot base64 encrypted, 90-day retention • Duplicate face → flagged • <span className="font-mono">faceSnapshotRef</span></p>
             </>
           )}
         </div>
@@ -314,14 +314,14 @@ export default function AttendancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2"><Clock /> Attendance <span className="text-slate-500 font-normal">— Smart Clocking §7 (7 methods)</span></h1>
-        <p className="text-sm text-slate-500">Mobile • Web • QR • Biometric • Facial • NFC • API • Verification 98% §36 • Privacy optional §9 • <span className="font-semibold text-emerald-600">Face + motion liveness enforced</span></p>
+        <h1 className="text-2xl font-bold flex items-center gap-2"><Clock /> Attendance <span className="text-slate-500 font-normal">— Smart Clocking (7 methods)</span></h1>
+        <p className="text-sm text-slate-500">Mobile • Web • QR • Biometric • Facial • NFC • API • Verification 98% • Privacy optional • <span className="font-semibold text-emerald-600">Face + motion liveness enforced</span></p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard title="Verification" value="98%" sub="Face Match + Liveness" icon={Fingerprint} accent="from-emerald-500 to-teal-600" />
-        <StatCard title="Exceptions" value={String(exceptions.length)} sub="Requires Review §37" icon={AlertTriangle} accent="from-red-500 to-orange-600" />
-        <StatCard title="Sessions Today" value={String(sessions.length)} sub="Work Sessions §5" icon={Timer} accent="from-sky-500 to-blue-600" />
+        <StatCard title="Exceptions" value={String(exceptions.length)} sub="Requires Review" icon={AlertTriangle} accent="from-red-500 to-orange-600" />
+        <StatCard title="Sessions Today" value={String(sessions.length)} sub="Work Sessions" icon={Timer} accent="from-sky-500 to-blue-600" />
         <StatCard title="Overtime" value="41" sub="23m avg" icon={CalendarCheck} accent="from-violet-500 to-purple-600" />
       </div>
 
@@ -385,14 +385,14 @@ export default function AttendancePage() {
           <span className="glass rounded-full px-3 py-1 flex items-center gap-1"><ShieldCheck size={12}/> Snapshot 90d</span>
           <span className="glass rounded-full px-3 py-1 flex items-center gap-1"><Smartphone size={12}/> Device fingerprint</span>
         </div>
-        <p className="text-xs text-slate-500 mt-2">Net = Gross − Breaks §13 • Duplicate face / device sharing → flagged “Requires Review” §10 • Snap stored as <code>faceSnapshotRef</code> base64, confidence, retention 90d §9</p>
+        <p className="text-xs text-slate-500 mt-2">Net = Gross − Breaks • Duplicate face / device sharing → flagged “Requires Review” • Snap stored as <code>faceSnapshotRef</code> base64, confidence, retention 90d</p>
       </GlassCard>
 
       <FaceCaptureModal open={!!faceModal?.open} onClose={()=>setFaceModal(null)} action={faceModal?.action || 'clock-in'} onCapture={handleFaceCapture} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <GlassCard className="p-0 overflow-hidden">
-          <div className="p-4 flex items-center justify-between"><h3 className="font-semibold">Work Sessions (Today) §5</h3><Pill tone="blue">{sessions.length} sessions</Pill></div>
+          <div className="p-4 flex items-center justify-between"><h3 className="font-semibold">Work Sessions (Today)</h3><Pill tone="blue">{sessions.length} sessions</Pill></div>
           <div className="overflow-auto max-h-[320px]">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-xs"><tr><th className="text-left p-2">Employee</th><th className="p-2">In</th><th className="p-2">Out</th><th className="p-2">Gross</th><th className="p-2">Net</th><th className="p-2">OT</th><th className="p-2">Status</th><th className="p-2">Face</th></tr></thead>
@@ -415,7 +415,7 @@ export default function AttendancePage() {
           </div>
         </GlassCard>
         <GlassCard>
-          <h3 className="font-semibold flex items-center gap-2"><AlertTriangle size={16} className="text-red-500"/> Exception Center §37 — Fraud Flags</h3>
+          <h3 className="font-semibold flex items-center gap-2"><AlertTriangle size={16} className="text-red-500"/> Exception Center — Fraud Flags</h3>
           <div className="mt-3 space-y-2 max-h-[280px] overflow-auto">
             {exceptions.length===0 ? <div className="text-sm text-slate-500 p-3 bg-slate-50 rounded-xl">No exceptions — HR can resolve bulk</div> :
               exceptions.map((e:any) => (
@@ -425,7 +425,7 @@ export default function AttendancePage() {
                 </div>
               ))}
           </div>
-          <p className="text-xs text-slate-500 mt-2">Device sharing / impossible travel / duplicate face → “Requires Review” §10 • Snap retained 90d</p>
+          <p className="text-xs text-slate-500 mt-2">Device sharing / impossible travel / duplicate face → “Requires Review” • Snap retained 90d</p>
         </GlassCard>
       </div>
 

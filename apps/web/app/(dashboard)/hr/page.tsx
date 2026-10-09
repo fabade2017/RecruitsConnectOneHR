@@ -109,7 +109,7 @@ export default function HRCommandCenter() {
           <div>
             <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-3 py-1 text-xs"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" /> WORKFORCE COMMAND CENTER • TODAY {live?.today ? `• ${live.today}` : ''}</div>
             <h1 className="text-2xl md:text-3xl font-bold mt-2">What is happening across your workforce right now?</h1>
-            <p className="text-white/70 text-sm mt-1">Intelligence Engine • 6 layers: People → Work → Time → Performance → Engagement → Intelligence (§2)</p>
+            <p className="text-white/70 text-sm mt-1">Intelligence Engine • 6 layers: People → Work → Time → Performance → Engagement → Intelligence </p>
             <p className="text-white/50 text-xs mt-1">API: /attendance/command-center • /analytics/workforce-scores • /analytics/dashboard</p>
           </div>
           <div className="glass-dark rounded-2xl p-4 min-w-[220px]">
@@ -132,7 +132,7 @@ export default function HRCommandCenter() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <GlassCard className="lg:col-span-2">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold">Attendance Trend (§38 Executive Report)</h3>
+            <h3 className="font-semibold">Attendance Trend </h3>
             <Pill tone="blue">Live</Pill>
           </div>
           <p className="text-xs text-slate-500 mb-2">Present vs Late — {live ? `${live.clocked_in} present today • ${live.late} late • ${live.absent} absent` : 'Loading...'}</p>
@@ -142,7 +142,7 @@ export default function HRCommandCenter() {
           ] : undefined} />
         </GlassCard>
         <GlassCard>
-          <h3 className="font-semibold">Workforce Health (§18)</h3>
+          <h3 className="font-semibold">Workforce Health </h3>
           <p className="text-xs text-slate-500">{hrHealth ? `HR Health ${hrHealth}/100 • 6 indicators` : 'Loading from /analytics/workforce-scores...'}</p>
           <HealthRadar data={healthRadarData} />
           <div className="grid grid-cols-3 gap-2 text-xs mt-2">
@@ -155,12 +155,12 @@ export default function HRCommandCenter() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <GlassCard>
-          <div className="flex items-center justify-between"><h3 className="font-semibold">Live Workforce Map (§15)</h3><Pill tone="emerald">Live</Pill></div>
+          <div className="flex items-center justify-between"><h3 className="font-semibold">Live Workforce Map </h3><Pill tone="emerald">Live</Pill></div>
           <BranchBar data={branchBarData} />
           <p className="text-xs text-slate-500 mt-2">
             {branchBarData ? branchBarData.map((b: any) => `${b.branch} ${b.count}`).join(' • ') : 'Loading from /analytics/dashboard → branchDistribution'}
           </p>
-          <p className="text-[11px] text-slate-400">Only if GPS consented (§9) • API: /analytics/dashboard</p>
+          <p className="text-[11px] text-slate-400">Only if GPS consented • API: /analytics/dashboard</p>
         </GlassCard>
         <GlassCard>
           <h3 className="font-semibold flex items-center gap-2"><MapPin size={16}/> Workforce Mix</h3>
@@ -169,7 +169,7 @@ export default function HRCommandCenter() {
           <p className="text-[11px] text-slate-400 mt-1">From /analytics/dashboard byArrangement or command-center</p>
         </GlassCard>
         <GlassCard>
-          <h3 className="font-semibold flex items-center gap-2"><AlertTriangle size={16} className="text-red-500"/> Exception Center (§37)</h3>
+          <h3 className="font-semibold flex items-center gap-2"><AlertTriangle size={16} className="text-red-500"/> Exception Center </h3>
           <div className="space-y-2 mt-3 text-sm">
             {exceptionGroups ? exceptionGroups.map(({ type, count }: any) => (
               <div key={type} className="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2">
@@ -187,14 +187,14 @@ export default function HRCommandCenter() {
             {(!exceptionGroups || exceptionGroups.length === 0) && exceptions.length === 0 && <div className="text-xs text-emerald-600 p-2 bg-emerald-50 rounded-xl">✓ No exceptions flagged</div>}
           </div>
           <div className="mt-3 flex gap-2"><button className="flex-1 bg-slate-900 text-white rounded-xl py-2 text-sm">Bulk Resolve</button><button className="flex-1 glass rounded-xl py-2 text-sm">View All</button></div>
-          <p className="text-xs text-slate-500 mt-2">Flagged “Requires Review” not accused (§10) • API: /attendance/exceptions</p>
+          <p className="text-xs text-slate-500 mt-2">Flagged “Requires Review” not accused • API: /attendance/exceptions</p>
         </GlassCard>
       </div>
 
       {/* HR Risk + Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <GlassCard>
-          <h3 className="font-semibold flex items-center gap-2"><ShieldCheck size={16}/> HR Risk Engine (§19)</h3>
+          <h3 className="font-semibold flex items-center gap-2"><ShieldCheck size={16}/> HR Risk Engine </h3>
           <div className="space-y-2 mt-3 text-sm">
             {riskItems ? riskItems.slice(0, 5).map((r: any, i: number) => (
               <div key={i} className={`flex gap-3 p-3 rounded-xl border ${r.tone === 'red' ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}>
@@ -206,8 +206,8 @@ export default function HRCommandCenter() {
           <p className="text-xs text-slate-400 mt-2">API: /analytics/risks • Live computed</p>
         </GlassCard>
         <GlassCard>
-          <h3 className="font-semibold flex items-center gap-2"><Sparkles size={16}/> Workforce Activity (§4-§6)</h3>
-          <p className="text-xs text-slate-500">Recent activity rollups — supporting info, not productivity score (§39) • API: /analytics/activity</p>
+          <h3 className="font-semibold flex items-center gap-2"><Sparkles size={16}/> Workforce Activity </h3>
+          <p className="text-xs text-slate-500">Recent activity rollups — supporting info, not productivity score • API: /analytics/activity</p>
           <div className="mt-3 divide-y text-sm">
             {activity.length ? activity.map((a: any) => (
               <div key={a.id} className="flex gap-3 py-2">
@@ -231,8 +231,8 @@ export default function HRCommandCenter() {
 
       <div className="flex flex-wrap gap-2 text-xs text-slate-500">
         <span className="glass rounded-full px-3 py-1">Live from APIs • {live ? `Employees ${live.employees}` : 'Loading employees...'} • {scores ? `Health ${scores.overall}` : 'Loading health...'}</span>
-        <span className="glass rounded-full px-3 py-1">14 work arrangements (§11) • 7 shift types (§12)</span>
-        <span className="glass rounded-full px-3 py-1">Face/GPS optional + retention (§9) • Verification 98% (§36)</span>
+        <span className="glass rounded-full px-3 py-1">14 work arrangements • 7 shift types </span>
+        <span className="glass rounded-full px-3 py-1">Face/GPS optional + retention • Verification 98% </span>
       </div>
     </div>
   );

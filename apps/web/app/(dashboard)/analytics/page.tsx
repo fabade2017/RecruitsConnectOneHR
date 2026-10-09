@@ -171,7 +171,7 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><BarChart3 className="text-sky-600" /> Analytics <span className="text-slate-500 font-normal">— Workforce Intelligence §32 • Live</span></h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><BarChart3 className="text-sky-600" /> Analytics <span className="text-slate-500 font-normal">— Workforce Intelligence • Live</span></h1>
           <p className="text-sm text-slate-500">Workforce scores → Health radar → Branch distribution • API: /analytics/workforce-scores • /analytics/dashboard</p>
         </div>
         <button onClick={load} className="glass rounded-xl px-3 py-2 text-sm flex items-center gap-2"><RefreshCw size={14} /> Refresh</button>
@@ -249,7 +249,7 @@ export default function AnalyticsPage() {
       </GlassCard>
 
       <GradientCard gradient="from-slate-900 via-sky-900 to-slate-900">
-        <h3 className="font-semibold flex items-center gap-2"><TrendingUp size={18} /> Predictive Insight §32</h3>
+        <h3 className="font-semibold flex items-center gap-2"><TrendingUp size={18} /> Predictive Insight</h3>
         <p className="text-sm text-white/80 mt-2">Model predicts 3.2% attrition next quarter. Engagement + sentiment drives 62% of risk. Use DataGrid slicing by <code>metric = Engagement</code> + <code>status = at-risk</code> to isolate cohort. Live from /analytics/workforce-scores.</p>
         <div className="mt-3 flex gap-2 text-xs"><span className="bg-white/20 rounded-full px-3 py-1">Attrition ↓</span><span className="bg-white/20 rounded-full px-3 py-1">Absenteeism ↓</span><span className="bg-white text-slate-900 rounded-full px-3 py-1">Productivity ↑ 8%</span></div>
       </GradientCard>

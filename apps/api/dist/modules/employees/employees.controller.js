@@ -34,6 +34,10 @@ let EmployeesController = class EmployeesController {
         res.send(Buffer.from(buffer));
     }
     list(req, q) { return this.svc.list(req.orgId, q, req.user); }
+    invite(req, dto) { return this.svc.createInvite(req.orgId, dto, req.user); }
+    invites(req, q) { return this.svc.listInvites(req.orgId, q); }
+    resendInvite(req, id) { return this.svc.resendInvite(req.orgId, id, req.user); }
+    revokeInvite(req, id) { return this.svc.revokeInvite(req.orgId, id); }
     async verifyQr(token) { return this.svc.verifySecureQr(token); }
     async listIdCards(req, q) { return this.svc.listIdCards(req.orgId, q, req.user); }
     get(req, id) { return this.svc.findOne(req.orgId, id, req.user); }
@@ -133,6 +137,51 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], EmployeesController.prototype, "list", null);
+__decorate([
+    (0, common_1.Post)('invites'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('employee:*'),
+    (0, swagger_1.ApiOperation)({ summary: 'Send a staff self-onboarding invite link by email' }),
+    (0, swagger_1.ApiBody)({ schema: { type: 'object', required: ['email'], properties: { email: { type: 'string', example: 'new.staff@company.com' }, role: { type: 'string', example: 'employee' }, job_title: { type: 'string' }, department_id: { type: 'string' }, branch_id: { type: 'string' }, first_name: { type: 'string' }, last_name: { type: 'string' }, phone: { type: 'string' } } } }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], EmployeesController.prototype, "invite", null);
+__decorate([
+    (0, common_1.Get)('invites'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('employee:read'),
+    (0, swagger_1.ApiOperation)({ summary: 'List staff invites' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], EmployeesController.prototype, "invites", null);
+__decorate([
+    (0, common_1.Post)('invites/:id/resend'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('employee:*'),
+    (0, swagger_1.ApiOperation)({ summary: 'Resend a staff invite (rotates token)' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], EmployeesController.prototype, "resendInvite", null);
+__decorate([
+    (0, common_1.Patch)('invites/:id/revoke'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('employee:*'),
+    (0, swagger_1.ApiOperation)({ summary: 'Revoke a staff invite' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], EmployeesController.prototype, "revokeInvite", null);
 __decorate([
     (0, common_1.Get)('qr/verify'),
     (0, swagger_1.ApiOperation)({ summary: 'Verify secured QR token' }),

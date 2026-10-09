@@ -439,7 +439,7 @@ export default function PeoplePage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Users size={22}/> People <span className="text-slate-500 font-normal">— Digital Identity §3</span></h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Users size={22}/> People <span className="text-slate-500 font-normal">— Digital Identity</span></h1>
           <p className="text-sm text-slate-500">OneHR ID <span className="font-mono bg-slate-900 text-white px-2 py-0.5 rounded-full text-xs">RC-000245</span> + QR • Lifecycle: Hire → Alumni</p>
         </div>
         <div className="flex gap-2">
@@ -516,8 +516,8 @@ export default function PeoplePage() {
           </table>
         </div>
         <div className="p-3 bg-slate-50/50 text-xs text-slate-500 flex justify-between">
-          <span>Digital Identity follows lifecycle (§3) • 25+ fields: skills, certs, attendance, leave, performance, assets (§44)</span>
-          <span>14 work arrangements §11 • 6 shift types §12</span>
+          <span>Digital Identity follows lifecycle • 25+ fields: skills, certs, attendance, leave, performance, assets </span>
+          <span>14 work arrangements • 6 shift types</span>
         </div>
       </GlassCard>
 

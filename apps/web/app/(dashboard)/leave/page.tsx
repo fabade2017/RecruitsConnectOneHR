@@ -103,7 +103,7 @@ export default function LeavePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2"><CalendarCheck/> Leave <span className="text-slate-500 font-normal">— Workflow §34</span></h1>
+        <h1 className="text-2xl font-bold flex items-center gap-2"><CalendarCheck/> Leave <span className="text-slate-500 font-normal">— Workflow</span></h1>
         <p className="text-sm text-slate-500">Balance → Manager approval → Calendar → Notification → Dashboard — Edit / Cancel / Delete pending anytime</p>
       </div>
 
@@ -127,7 +127,7 @@ export default function LeavePage() {
             </div>
             <input placeholder="Reason" value={form.reason} onChange={e=>setForm({...form, reason:e.target.value})} className="w-full border rounded-xl px-3 py-2" />
             <button onClick={submit} className="w-full bg-slate-900 text-white rounded-xl py-2.5 font-semibold hover:bg-slate-800">Submit Request</button>
-            <p className="text-xs text-slate-500">→ Manager inbox • HR command center • Auto calendar update §35 (Email/SMS/WhatsApp). Wrong entry? Delete / Cancel / Edit while pending.</p>
+            <p className="text-xs text-slate-500">→ Manager inbox • HR command center • Auto calendar update (Email/SMS/WhatsApp). Wrong entry? Delete / Cancel / Edit while pending.</p>
           </div>
         </GlassCard>
 

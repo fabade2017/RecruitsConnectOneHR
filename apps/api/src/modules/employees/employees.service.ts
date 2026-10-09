@@ -3,6 +3,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import * as QRCode from 'qrcode';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
+import * as crypto from 'crypto';
+import { sendEmail, getStaffInviteTemplate } from '../../lib/email';
 
 function canAccessEmployee(user: any, employeeId: string, employee?: any): boolean {
   const role = user?.role;
@@ -776,5 +778,170 @@ export class EmployeesService {
       }
     }
     return { total: list.length, success: results.length, failed: errors.length, results, errors, credentials, message: credentials.length ? `Created ${results.length} employees. ${credentials.length} logins generated with default password Acronym+MMYYYY+DD (must change on first login).` : `Created ${results.length} employees.` };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Staff invite / self-onboarding
+  // ---------------------------------------------------------------------------
+  private webBaseUrl(): string {
+    return (
+      process.env.WEB_APP_URL ||
+      process.env.NEXT_PUBLIC_WEB_URL ||
+      (process.env.CORS_ORIGIN || '').split(',')[0].trim() ||
+      'http://localhost:3000'
+    ).replace(/\/+$/, '');
+  }
+
+  private async buildInvite(orgId: string, invite: any) {
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { name: true, acronym: true } });
+    const inviteUrl = `${this.webBaseUrl()}/onboard/?token=${invite.token}`;
+    return { ...invite, inviteUrl, organization: org ? { name: org.name, acronym: org.acronym } : null };
+  }
+
+  async createInvite(orgId: string, dto: any, user?: any) {
+    const email = String(dto.email || '').trim().toLowerCase();
+    if (!email) throw new ConflictException('Email is required');
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
+    if (!org) throw new ConflictException('Org not found');
+    // Block if a user with this email already exists in the org
+    const existingUser = await this.prisma.user.findFirst({ where: { email, organizationId: orgId } });
+    if (existingUser) throw new ConflictException('A user with this email already exists in your organization');
+    // Revoke any prior pending invite for the same email
+    await this.prisma.staffInvite.updateMany({
+      where: { organizationId: orgId, email, status: 'pending' },
+      data: { status: 'revoked' },
+    });
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const invite = await this.prisma.staffInvite.create({
+      data: {
+        organizationId: orgId,
+        email,
+        role: dto.role || 'employee',
+        jobTitle: dto.job_title || dto.jobTitle || null,
+        departmentId: dto.department_id || dto.departmentId || null,
+        branchId: dto.branch_id || dto.branchId || null,
+        firstName: dto.first_name || dto.firstName || null,
+        lastName: dto.last_name || dto.lastName || null,
+        phone: dto.phone || null,
+        token,
+        status: 'pending',
+        invitedBy: user?.sub || null,
+        expiresAt,
+      },
+    });
+    const built = await this.buildInvite(orgId, invite);
+    const html = getStaffInviteTemplate(org.name, built.inviteUrl, invite.role, expiresAt.toISOString().slice(0, 10));
+    const sent = await sendEmail({ to: email, subject: `You're invited to join ${org.name} on OneHR`, html }).catch((e: any) => ({ success: false, error: e }));
+    return { invite: built, emailSent: (sent as any).success !== false, inviteUrl: built.inviteUrl };
+  }
+
+  async listInvites(orgId: string, query: any) {
+    const where: any = { organizationId: orgId };
+    if (query?.status) where.status = query.status;
+    const invites = await this.prisma.staffInvite.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200 });
+    // auto-expire past-due pending invites in the response
+    const now = Date.now();
+    return invites.map((i: any) => (i.status === 'pending' && i.expiresAt.getTime() < now ? { ...i, status: 'expired' } : i));
+  }
+
+  async revokeInvite(orgId: string, id: string) {
+    const inv = await this.prisma.staffInvite.findFirst({ where: { id, organizationId: orgId } });
+    if (!inv) throw new NotFoundException('Invite not found');
+    if (inv.status === 'accepted') throw new ConflictException('Invite already accepted — cannot revoke');
+    return this.prisma.staffInvite.update({ where: { id }, data: { status: 'revoked' } });
+  }
+
+  async resendInvite(orgId: string, id: string, user?: any) {
+    const inv = await this.prisma.staffInvite.findFirst({ where: { id, organizationId: orgId } });
+    if (!inv) throw new NotFoundException('Invite not found');
+    if (inv.status === 'accepted') throw new ConflictException('Invite already accepted');
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const updated = await this.prisma.staffInvite.update({ where: { id }, data: { token, status: 'pending', expiresAt, invitedBy: user?.sub || inv.invitedBy } });
+    const built = await this.buildInvite(orgId, updated);
+    const html = getStaffInviteTemplate(org?.name || 'OneHR', built.inviteUrl, updated.role, expiresAt.toISOString().slice(0, 10));
+    const sent = await sendEmail({ to: updated.email, subject: `You're invited to join ${org?.name || 'OneHR'} on OneHR`, html }).catch((e: any) => ({ success: false, error: e }));
+    return { invite: built, emailSent: (sent as any).success !== false, inviteUrl: built.inviteUrl };
+  }
+
+  // Public (no auth) — used by the /onboard page to validate the token before showing the form
+  async getInviteByToken(token: string) {
+    const invite = await this.prisma.staffInvite.findUnique({
+      where: { token },
+      include: { organization: { select: { name: true, acronym: true, logoUrl: true } } },
+    });
+    if (!invite) throw new NotFoundException('Invalid invitation link');
+    if (invite.status === 'revoked') throw new ConflictException('This invitation has been revoked. Contact your HR administrator.');
+    if (invite.status === 'accepted') throw new ConflictException('This invitation has already been used. Please sign in instead.');
+    if (invite.status === 'expired' || invite.expiresAt.getTime() < Date.now()) {
+      await this.prisma.staffInvite.update({ where: { id: invite.id }, data: { status: 'expired' } }).catch(() => {});
+      throw new ConflictException('This invitation link has expired. Contact your HR administrator for a new one.');
+    }
+    return {
+      email: invite.email,
+      role: invite.role,
+      firstName: invite.firstName,
+      lastName: invite.lastName,
+      jobTitle: invite.jobTitle,
+      organization: invite.organization,
+      expiresAt: invite.expiresAt,
+    };
+  }
+
+  // Public (no auth) — the invited staff member creates their profile + password
+  async acceptInvite(token: string, dto: any) {
+    const invite = await this.prisma.staffInvite.findUnique({ where: { token } });
+    if (!invite) throw new NotFoundException('Invalid invitation link');
+    if (invite.status === 'accepted') throw new ConflictException('This invitation has already been used. Please sign in instead.');
+    if (invite.status === 'revoked') throw new ConflictException('This invitation has been revoked. Contact your HR administrator.');
+    if (invite.status === 'expired' || invite.expiresAt.getTime() < Date.now()) {
+      await this.prisma.staffInvite.update({ where: { id: invite.id }, data: { status: 'expired' } }).catch(() => {});
+      throw new ConflictException('This invitation link has expired. Contact your HR administrator for a new one.');
+    }
+    const password = String(dto.password || '');
+    if (password.length < 6) throw new ConflictException('Password must be at least 6 characters');
+    const firstName = (dto.first_name || dto.firstName || invite.firstName || '').trim() || null;
+    const lastName = (dto.last_name || dto.lastName || invite.lastName || '').trim() || null;
+    const phone = (dto.phone || invite.phone || null) || null;
+    const orgId = invite.organizationId;
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
+    if (!org) throw new ConflictException('Organization not found');
+    const email = invite.email;
+    const existingUser = await this.prisma.user.findFirst({ where: { email, organizationId: orgId } });
+    if (existingUser) throw new ConflictException('A user with this email already exists. Please sign in instead.');
+    const hash = await bcrypt.hash(password, 10);
+    const result = await this.prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: { organizationId: orgId, email, phone, passwordHash: hash, role: invite.role || 'employee', mustChangePassword: false },
+      });
+      const count = await tx.employee.count({ where: { organizationId: orgId } });
+      const employeeCode = `${org.acronym}-${String(count + 1).padStart(6, '0')}`;
+      const qrCode = await QRCode.toDataURL(employeeCode).catch(() => null);
+      const employee = await tx.employee.create({
+        data: {
+          organizationId: orgId,
+          employeeCode,
+          firstName,
+          lastName,
+          qrCode,
+          jobTitle: invite.jobTitle || null,
+          departmentId: invite.departmentId || null,
+          branchId: invite.branchId || null,
+          userId: newUser.id,
+          hireDate: new Date(),
+        },
+      });
+      await tx.staffInvite.update({ where: { id: invite.id }, data: { status: 'accepted', acceptedAt: new Date(), employeeId: employee.id, userId: newUser.id } });
+      return { employee, user: newUser };
+    });
+    return {
+      success: true,
+      message: 'Profile created successfully. You can now sign in.',
+      email,
+      acronym: org.acronym,
+      employeeCode: result.employee.employeeCode,
+    };
   }
 }

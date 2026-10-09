@@ -62,8 +62,8 @@ export default function ShiftsPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Clock /> Shifts & Rosters <span className="text-slate-500 font-normal">— Workforce Scheduling §14</span></h1>
-          <p className="text-sm text-slate-500">Shift templates → Roster assignment → Attendance net hours → Overtime §13</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Clock /> Shifts & Rosters <span className="text-slate-500 font-normal">— Workforce Scheduling</span></h1>
+          <p className="text-sm text-slate-500">Shift templates → Roster assignment → Attendance net hours → Overtime</p>
         </div>
         <button onClick={load} className="glass rounded-xl px-3 py-2 text-sm flex items-center gap-2"><RefreshCw size={14}/> Refresh</button>
       </div>
@@ -79,7 +79,7 @@ export default function ShiftsPage() {
             </div>
             <label className="text-xs space-y-1 block"><span className="text-slate-500">Break (mins)</span><input type="number" value={shiftForm.breakMinutes} onChange={(e)=>setShiftForm({...shiftForm, breakMinutes:Number(e.target.value)})} className="w-full border rounded-xl px-3 py-2 text-sm" /></label>
             <button onClick={createShift} disabled={loading} className="w-full bg-slate-900 text-white rounded-xl py-2.5 font-semibold flex items-center justify-center gap-2"><Plus size={16}/>{loading?'Creating...':'Create Shift'}</button>
-            <p className="text-xs text-slate-500">POST /v1/shifts • RBAC: hr_admin • Break deducted in Net §13</p>
+            <p className="text-xs text-slate-500">POST /v1/shifts • RBAC: hr_admin • Break deducted in Net</p>
           </div>
         </GlassCard>
 
@@ -94,7 +94,7 @@ export default function ShiftsPage() {
             <input type="date" value={rosterForm.date} onChange={(e)=>setRosterForm({...rosterForm, date:e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm" />
             <input placeholder="Notes (optional)" value={rosterForm.notes} onChange={(e)=>setRosterForm({...rosterForm, notes:e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm" />
             <button onClick={createRoster} className="w-full bg-sky-600 text-white rounded-xl py-2.5 font-semibold">Assign to Roster</button>
-            <p className="text-xs text-slate-500">POST /v1/rosters • Auto-links Attendance §7</p>
+            <p className="text-xs text-slate-500">POST /v1/rosters • Auto-links Attendance</p>
           </div>
         </GlassCard>
 
@@ -107,7 +107,7 @@ export default function ShiftsPage() {
           <div className="mt-3 text-xs text-slate-500 space-y-1">
             <p>• Night shift cross-midnight handled</p>
             <p>• Roster → Session → Net 8h - break</p>
-            <p>• Overtime auto 41m avg §13</p>
+            <p>• Overtime auto 41m avg</p>
           </div>
         </GlassCard>
       </div>

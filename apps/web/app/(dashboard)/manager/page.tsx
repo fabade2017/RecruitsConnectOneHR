@@ -60,7 +60,7 @@ export default function ManagerDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">My Team <span className="text-slate-500 font-normal">— Manager (§16) • Live from /attendance/command-center</span></h1>
+          <h1 className="text-2xl font-bold">My Team <span className="text-slate-500 font-normal">— Manager • Live from /attendance/command-center</span></h1>
           <p className="text-sm text-slate-500">Team pulse — scoped to your direct reports via RBAC • {teamSize !== null ? `${teamSize} members` : 'Loading...'}</p>
         </div>
         <Pill tone="blue">{teamSize !== null ? `${teamSize} members` : 'Loading...'} • {live?.today ? live.today : ''}</Pill>
@@ -125,7 +125,7 @@ export default function ManagerDashboard() {
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs">
-        <span className="glass rounded-full px-3 py-1">Workload Monitor (§26) {workload || 'Live'}</span>
+        <span className="glass rounded-full px-3 py-1">Workload Monitor {workload || 'Live'}</span>
         <span className="glass rounded-full px-3 py-1">Live from APIs • {teamSize !== null ? `${teamSize} team` : 'Loading...'}</span>
       </div>
     </div>

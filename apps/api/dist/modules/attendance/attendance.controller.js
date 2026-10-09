@@ -27,6 +27,8 @@ let AttendanceController = class AttendanceController {
     clockOut(req, dto) { return this.svc.clockOut(req.orgId, req.user.sub, dto); }
     breakStart(req, dto) { return this.svc.breakStart(req.orgId, req.user.sub, dto); }
     breakEnd(req, dto) { return this.svc.breakEnd(req.orgId, req.user.sub, dto); }
+    policies(req) { return this.svc.policies(req.orgId); }
+    updatePolicy(req, dto) { return this.svc.updatePolicy(req.orgId, dto); }
     sessions(req, q) { return this.svc.sessions(req.orgId, q, req.user); }
     map(req, q) { return this.svc.mapData(req.orgId, q, req.user); }
     commandCenter(req) { return this.svc.commandCenter(req.orgId, req.user); }
@@ -74,6 +76,25 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], AttendanceController.prototype, "breakEnd", null);
+__decorate([
+    (0, common_1.Get)('policies'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('attendance:read'),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AttendanceController.prototype, "policies", null);
+__decorate([
+    (0, common_1.Patch)('policies'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('attendance:*'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], AttendanceController.prototype, "updatePolicy", null);
 __decorate([
     (0, common_1.Get)('sessions'),
     (0, rbac_guard_1.RequirePermissions)('attendance:read'),

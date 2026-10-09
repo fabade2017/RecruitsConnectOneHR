@@ -30,14 +30,14 @@ export default function IntelligencePage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Brain className="text-violet-600" /> Workforce Intelligence <span className="text-slate-500 font-normal">— HR Health §32</span></h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Brain className="text-violet-600" /> Workforce Intelligence <span className="text-slate-500 font-normal">— HR Health</span></h1>
           <p className="text-sm text-slate-500">6 health scores → Risk engine → Early warnings → Simulator → Digital Twin</p>
         </div>
         <button onClick={load} className="glass rounded-xl px-3 py-2 text-sm flex items-center gap-2"><RefreshCw size={14} /> Refresh</button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="HR Health" value={String(scores?.overall ?? scores?.hrHealthOverall ?? 89)} sub="Overall §32" icon={Activity} accent="from-violet-500 to-purple-600" />
+        <StatCard title="HR Health" value={String(scores?.overall ?? scores?.hrHealthOverall ?? 89)} sub="Overall" icon={Activity} accent="from-violet-500 to-purple-600" />
         <StatCard title="Attendance" value={String(scores?.attendance ?? 94)} sub="Health" icon={Users} accent="from-emerald-500 to-teal-600" />
         <StatCard title="Risks" value={String(risks?.critical?.reduce((a: number, c: any) => a + (c.count || 0), 0) ?? 3)} sub="Critical" icon={AlertTriangle} accent="from-amber-500 to-orange-600" />
         <StatCard title="Simulator" value="Live" sub="POST /analytics/simulate" icon={TrendingUp} accent="from-sky-500 to-blue-600" />

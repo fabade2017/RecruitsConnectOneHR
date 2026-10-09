@@ -25,6 +25,14 @@ let PayrollController = class PayrollController {
     }
     list(req, q) { return this.svc.list(req.orgId, q, req.user); }
     create(req, dto) { return this.svc.create(req.orgId, dto); }
+    getConfig(req) { return this.svc.getConfig(req.orgId); }
+    updateConfig(req, dto) { return this.svc.updateConfig(req.orgId, dto); }
+    listProfiles(req) { return this.svc.listProfiles(req.orgId); }
+    getProfile(req, employeeId) { return this.svc.getProfile(req.orgId, employeeId); }
+    upsertProfile(req, employeeId, dto) { return this.svc.upsertProfile(req.orgId, employeeId, dto); }
+    preview(req, dto) { return this.svc.preview(req.orgId, dto.employeeId, dto); }
+    run(req, dto) { return this.svc.run(req.orgId, dto); }
+    summary(req, month, year) { return this.svc.statutorySummary(req.orgId, month, year); }
     update(id, dto) { return this.svc.update(id, dto); }
     payslip(req, id) { return this.svc.payslip(id, req.user); }
     bankList(req, eid) { return this.svc.bankDetails(req.orgId, eid, req.user); }
@@ -52,6 +60,93 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], PayrollController.prototype, "create", null);
+__decorate([
+    (0, common_1.Get)('config'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('payroll:read'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get Nigeria statutory config' }),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], PayrollController.prototype, "getConfig", null);
+__decorate([
+    (0, common_1.Patch)('config'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('payroll:*'),
+    (0, swagger_1.ApiOperation)({ summary: 'Update Nigeria statutory config' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], PayrollController.prototype, "updateConfig", null);
+__decorate([
+    (0, common_1.Get)('profiles'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('payroll:read'),
+    (0, swagger_1.ApiOperation)({ summary: 'List employee statutory profiles' }),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], PayrollController.prototype, "listProfiles", null);
+__decorate([
+    (0, common_1.Get)('profiles/:employeeId'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('payroll:read'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('employeeId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], PayrollController.prototype, "getProfile", null);
+__decorate([
+    (0, common_1.Put)('profiles/:employeeId'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('payroll:*'),
+    (0, swagger_1.ApiOperation)({ summary: 'Create/update employee statutory profile' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('employeeId')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", void 0)
+], PayrollController.prototype, "upsertProfile", null);
+__decorate([
+    (0, common_1.Post)('preview'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('payroll:read'),
+    (0, swagger_1.ApiOperation)({ summary: 'Preview computed Nigeria payroll for an employee' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], PayrollController.prototype, "preview", null);
+__decorate([
+    (0, common_1.Post)('run'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('payroll:*'),
+    (0, swagger_1.ApiOperation)({ summary: 'Run Nigeria statutory payroll for a period' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], PayrollController.prototype, "run", null);
+__decorate([
+    (0, common_1.Get)('statutory-summary'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'hr_manager', 'executive', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('payroll:read'),
+    (0, swagger_1.ApiOperation)({ summary: 'Nigeria statutory summary totals' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)('month')),
+    __param(2, (0, common_1.Query)('year')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String]),
+    __metadata("design:returntype", void 0)
+], PayrollController.prototype, "summary", null);
 __decorate([
     (0, common_1.Patch)(':id'),
     (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),

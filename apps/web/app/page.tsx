@@ -232,7 +232,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-14">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div>
-              <div className="text-xs tracking-widest font-semibold text-violet-600">INDUSTRY TEMPLATES §41</div>
+              <div className="text-xs tracking-widest font-semibold text-violet-600">INDUSTRY TEMPLATES</div>
               <h2 className="text-3xl font-black mt-1">Built for how you work</h2>
               <p className="text-slate-600 mt-1">Banking, schools, hospitals, manufacturing, retail, NGO, tech — each with shifts, compliance & workflows tuned.</p>
             </div>

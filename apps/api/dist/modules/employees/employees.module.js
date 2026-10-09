@@ -9,10 +9,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.EmployeesModule = void 0;
 const common_1 = require("@nestjs/common");
 const employees_controller_1 = require("./employees.controller");
+const invites_public_controller_1 = require("./invites-public.controller");
 const employees_service_1 = require("./employees.service");
 let EmployeesModule = class EmployeesModule {
 };
 exports.EmployeesModule = EmployeesModule;
 exports.EmployeesModule = EmployeesModule = __decorate([
-    (0, common_1.Module)({ controllers: [employees_controller_1.EmployeesController], providers: [employees_service_1.EmployeesService] })
+    (0, common_1.Module)({ controllers: [employees_controller_1.EmployeesController, invites_public_controller_1.InvitesPublicController], providers: [employees_service_1.EmployeesService] })
 ], EmployeesModule);

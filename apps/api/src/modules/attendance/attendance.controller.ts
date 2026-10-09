@@ -13,6 +13,8 @@ export class AttendanceController {
   @Post('clock-out') @RequirePermissions('attendance:clock') clockOut(@Req() req: any, @Body() dto: any) { return this.svc.clockOut(req.orgId, req.user.sub, dto); }
   @Post('break/start') @RequirePermissions('attendance:clock') breakStart(@Req() req: any, @Body() dto: any) { return this.svc.breakStart(req.orgId, req.user.sub, dto); }
   @Post('break/end') @RequirePermissions('attendance:clock') breakEnd(@Req() req: any, @Body() dto: any) { return this.svc.breakEnd(req.orgId, req.user.sub, dto); }
+  @Get('policies') @Roles('hr_admin','org_admin','super_admin') @RequirePermissions('attendance:read') policies(@Req() req: any) { return this.svc.policies(req.orgId); }
+  @Patch('policies') @Roles('hr_admin','org_admin','super_admin') @RequirePermissions('attendance:*') updatePolicy(@Req() req: any, @Body() dto: any) { return this.svc.updatePolicy(req.orgId, dto); }
   @Get('sessions') @RequirePermissions('attendance:read') sessions(@Req() req: any, @Query() q: any) { return this.svc.sessions(req.orgId, q, req.user); }
   @Get('map') @RequirePermissions('attendance:read') map(@Req() req: any, @Query() q: any) { return this.svc.mapData(req.orgId, q, req.user); }
   @Get('command-center') @Roles('hr_admin','org_admin','hr_manager','manager','executive','super_admin') @RequirePermissions('attendance:read') commandCenter(@Req() req: any) { return this.svc.commandCenter(req.orgId, req.user); }

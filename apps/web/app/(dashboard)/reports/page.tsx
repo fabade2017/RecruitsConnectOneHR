@@ -197,7 +197,7 @@ export default function ReportsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FileText className="text-slate-700" /> Reports <span className="text-slate-500 font-normal">— Export Center §32</span>
+            <FileText className="text-slate-700" /> Reports <span className="text-slate-500 font-normal">— Export Center</span>
           </h1>
           <p className="text-sm text-slate-500">GET /v1/analytics/reports • XLSX / PDF / JSON • Live from API • No mock</p>
         </div>
@@ -212,13 +212,13 @@ export default function ReportsPage() {
         <StatCard title="Total Reports" value={String(reports.length)} sub="Available to download" icon={Table2} accent="from-slate-700 to-slate-900" />
         <StatCard title="Formats" value="PDF/XLSX" sub="+ JSON/CSV" icon={FileSpreadsheet} accent="from-emerald-500 to-teal-600" />
         <StatCard title="Filtered View" value={`${pagination.page}/${Math.max(1, Math.ceil(reports.length / pagination.pageSize))}`} sub={`Page size ${pagination.pageSize}`} icon={Filter} accent="from-sky-500 to-blue-600" />
-        <StatCard title="Retention" value="90d" sub="Auto archive §9" icon={ShieldCheck} accent="from-amber-500 to-orange-600" />
+        <StatCard title="Retention" value="90d" sub="Auto archive" icon={ShieldCheck} accent="from-amber-500 to-orange-600" />
       </div>
 
       <GradientCard gradient="from-slate-900 via-slate-800 to-slate-900">
         <h3 className="font-semibold flex items-center gap-2"><FileSpreadsheet size={18} /> One-Click Exports — Slicing & Dicing Enabled</h3>
         <p className="text-sm text-white/80 mt-1">
-          Powered by <code>xlsx</code> & <code>jspdf</code> — payroll (§31), attendance (§7), workforce scores §32. Use <strong>Group by</strong> to aggregate by <code>type</code>, <strong>Slice</strong> to filter by any column value, <strong>Pivot</strong> to cross-tab type × status.
+          Powered by <code>xlsx</code> & <code>jspdf</code> — payroll , attendance , workforce scores. Use <strong>Group by</strong> to aggregate by <code>type</code>, <strong>Slice</strong> to filter by any column value, <strong>Pivot</strong> to cross-tab type × status.
         </p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <span className="bg-white/15 rounded-full px-3 py-1">Group by: type</span>

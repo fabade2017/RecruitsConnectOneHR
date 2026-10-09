@@ -44,8 +44,8 @@ export default function CompliancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2"><Shield/> Compliance <span className="text-slate-500 font-normal">— Policies & Audits §27</span></h1>
-        <p className="text-sm text-slate-500">Policies → Versioning → Audits trail → Gap analysis • Retention §9</p>
+        <h1 className="text-2xl font-bold flex items-center gap-2"><Shield/> Compliance <span className="text-slate-500 font-normal">— Policies & Audits</span></h1>
+        <p className="text-sm text-slate-500">Policies → Versioning → Audits trail → Gap analysis • Retention</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -75,9 +75,9 @@ export default function CompliancePage() {
             <div className="bg-emerald-50 rounded-xl p-3 text-center"><div className="text-2xl font-bold">{policies.filter((p:any)=>p.status==='active' || !p.status).length}</div><div className="text-xs text-slate-500">Active</div></div>
           </div>
           <div className="mt-3 flex gap-2 text-xs">
-            <span className="glass rounded-full px-3 py-1.5 flex items-center gap-1"><ClipboardCheck size={12}/> Audit trail §27</span>
+            <span className="glass rounded-full px-3 py-1.5 flex items-center gap-1"><ClipboardCheck size={12}/> Audit trail</span>
             <span className="glass rounded-full px-3 py-1.5 flex items-center gap-1"><AlertTriangle size={12}/> Gap: {policies.length===0?'No data':'Checked'}</span>
-            <span className="glass rounded-full px-3 py-1.5">Retention 90d §9</span>
+            <span className="glass rounded-full px-3 py-1.5">Retention 90d</span>
           </div>
           {selectedId && <p className="text-xs text-slate-500 mt-2">Viewing audits for: <span className="font-mono">{selectedId.slice(0,8)}</span> <button onClick={()=>{setSelectedId(''); setAudits([])}} className="ml-2 underline">clear</button></p>}
         </GlassCard>
@@ -125,7 +125,7 @@ export default function CompliancePage() {
             </tbody>
           </table>
         </div>
-        <div className="p-3 bg-slate-50/50 text-xs text-slate-500">GET /v1/compliance/policies • POST • GET /:id/audits • Immutable trail §27</div>
+        <div className="p-3 bg-slate-50/50 text-xs text-slate-500">GET /v1/compliance/policies • POST • GET /:id/audits • Immutable trail</div>
       </GlassCard>
     </div>
   );

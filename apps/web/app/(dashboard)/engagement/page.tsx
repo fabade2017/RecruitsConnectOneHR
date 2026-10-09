@@ -53,7 +53,7 @@ export default function EngagementPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Heart className="text-pink-500" /> Engagement <span className="text-slate-500 font-normal">— Pulse §23</span></h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Heart className="text-pink-500" /> Engagement <span className="text-slate-500 font-normal">— Pulse</span></h1>
           <p className="text-sm text-slate-500">Surveys → Anonymous response → eNPS → Action plans → Retention</p>
         </div>
         <button onClick={load} className="glass rounded-xl px-3 py-2 text-sm flex items-center gap-2"><RefreshCw size={14} /> Refresh</button>
@@ -63,7 +63,7 @@ export default function EngagementPage() {
         <StatCard title="Surveys" value={String(surveys.length)} sub="GET /v1/engagement/surveys" icon={BarChart3} accent="from-pink-500 to-rose-600" />
         <StatCard title="Response Rate" value={surveys.length ? '74%' : '—'} sub="Target 80%" icon={Vote} accent="from-sky-500 to-blue-600" />
         <StatCard title="eNPS" value={surveys.length ? '+32' : '—'} sub="Health ≥ +30" icon={Heart} accent="from-emerald-500 to-teal-600" />
-        <StatCard title="Anonymous" value="ON" sub="Privacy §9" icon={MessageCircle} accent="from-violet-500 to-purple-600" />
+        <StatCard title="Anonymous" value="ON" sub="Privacy" icon={MessageCircle} accent="from-violet-500 to-purple-600" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

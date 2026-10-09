@@ -163,8 +163,8 @@ export default function DocumentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2"><FileText/> Documents <span className="text-slate-500 font-normal">— S3 Vault §18</span></h1>
-        <p className="text-sm text-slate-500">Organization vs Employee attached • Upload → S3 → Verification (pending/verified/rejected) • Auto drives Onboarding §24</p>
+        <h1 className="text-2xl font-bold flex items-center gap-2"><FileText/> Documents <span className="text-slate-500 font-normal">— S3 Vault</span></h1>
+        <p className="text-sm text-slate-500">Organization vs Employee attached • Upload → S3 → Verification (pending/verified/rejected) • Auto drives Onboarding</p>
         <p className="text-xs text-slate-400 mt-1">Organization docs: policies/handbooks (visible to all) • Employee docs: ID, contract, certificate, payslip (per hire)</p>
       </div>
 

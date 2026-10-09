@@ -121,7 +121,7 @@ export default function OnboardingPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><ClipboardCheck className="text-emerald-600" /> Onboarding <span className="text-slate-500 font-normal">— Per-Employee Journey §24</span></h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><ClipboardCheck className="text-emerald-600" /> Onboarding <span className="text-slate-500 font-normal">— Per-Employee Journey</span></h1>
           <p className="text-sm text-slate-500">Each employee has a separate checklist — progress tracked per hire • API: /onboarding/:employeeId</p>
           {selectedEmployee && <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1"><UserCheck size={12}/> Viewing: {selectedEmployee.employeeCode} • {selectedEmployee.jobTitle || ''}</p>}
         </div>
@@ -164,7 +164,7 @@ export default function OnboardingPage() {
 
         <GradientCard gradient="from-emerald-600 via-teal-600 to-emerald-700">
           <h3 className="font-semibold flex items-center gap-2"><Users size={18} /> Buddy System</h3>
-          <p className="text-sm text-white/90 mt-2">Every new hire gets a buddy + 30-60-90 plan. Completion unlocks payroll & shift assignment §14.</p>
+          <p className="text-sm text-white/90 mt-2">Every new hire gets a buddy + 30-60-90 plan. Completion unlocks payroll & shift assignment.</p>
           <div className="mt-4 bg-white/20 rounded-xl p-3 text-sm">
             <div className="font-semibold">Selected employee</div>
             <div className="text-white/80 text-xs">{selectedEmployee ? `${selectedEmployee.employeeCode} • ${selectedEmployee.jobTitle || ''} • ${progress}%` : 'No selection'}</div>

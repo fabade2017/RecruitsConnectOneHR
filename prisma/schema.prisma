@@ -49,9 +49,12 @@ model Organization {
   leaveRequests        LeaveRequest[]
   leaveTypes           LeaveType[]
   notifications        Notification[]
+  staffInvites         StaffInvite[]
   subscriptions        OrganizationSubscription[]
   companyGroup         CompanyGroup?              @relation(fields: [companyGroupId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   payrollsMerged       PayrollMerged[]
+  payrollStatutoryProfiles PayrollStatutoryProfile[]
+  payrollStatutoryConfig   PayrollStatutoryConfig?
   performanceReviews   PerformanceReview[]
   policies             Policy[]
   projects             Project[]
@@ -137,6 +140,8 @@ model Employee {
   id                  String                @id @default(uuid())
   organizationId      String                @map("organization_id")
   employeeCode        String                @map("employee_code")
+  firstName           String?               @map("first_name")
+  lastName            String?               @map("last_name")
   qrCode              String?               @map("qr_code")
   userId              String?               @unique @map("user_id")
   photoUrl            String?               @map("photo_url")
@@ -180,6 +185,7 @@ model Employee {
   leaveApprovals      LeaveRequest[]        @relation("Approver")
   leaveRequests       LeaveRequest[]        @relation("Requester")
   payrollsMerged      PayrollMerged[]
+  payrollStatutoryProfile PayrollStatutoryProfile?
   performanceReviews  PerformanceReview[]
   tasksAssigned       Task[]                @relation("Assignee")
   workSessions        WorkSession[]
@@ -705,6 +711,24 @@ model PayrollMerged {
   netPay         Decimal      @map("net_pay") @db.Decimal(12, 2)
   status         String       @default("DRAFT")
   paidAt         DateTime?    @map("paid_at")
+  currency       String       @default("NGN")
+  grossPay       Decimal      @default(0) @map("gross_pay") @db.Decimal(12, 2)
+  housingAllowance    Decimal @default(0) @map("housing_allowance") @db.Decimal(12, 2)
+  transportAllowance  Decimal @default(0) @map("transport_allowance") @db.Decimal(12, 2)
+  otherTaxable        Decimal @default(0) @map("other_taxable") @db.Decimal(12, 2)
+  nonTaxable          Decimal @default(0) @map("non_taxable") @db.Decimal(12, 2)
+  employeePension     Decimal @default(0) @map("employee_pension") @db.Decimal(12, 2)
+  employerPension     Decimal @default(0) @map("employer_pension") @db.Decimal(12, 2)
+  nhf                 Decimal @default(0) @db.Decimal(12, 2)
+  nhisEmployee        Decimal @default(0) @map("nhis_employee") @db.Decimal(12, 2)
+  nhisEmployer        Decimal @default(0) @map("nhis_employer") @db.Decimal(12, 2)
+  nsitf               Decimal @default(0) @db.Decimal(12, 2)
+  itf                 Decimal @default(0) @db.Decimal(12, 2)
+  rentRelief          Decimal @default(0) @map("rent_relief") @db.Decimal(12, 2)
+  chargeableIncome    Decimal @default(0) @map("chargeable_income") @db.Decimal(12, 2)
+  loanRepayment       Decimal @default(0) @map("loan_repayment") @db.Decimal(12, 2)
+  groupLifeCover      Decimal @default(0) @map("group_life_cover") @db.Decimal(12, 2)
+  employerCost        Decimal @default(0) @map("employer_cost") @db.Decimal(12, 2)
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
   employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -713,6 +737,55 @@ model PayrollMerged {
   @@unique([employeeId, month, year])
   @@index([organizationId, status])
   @@map("payrolls_merged")
+}
+
+model PayrollStatutoryProfile {
+  id                 String       @id @default(uuid())
+  organizationId     String       @map("organization_id")
+  employeeId         String       @unique @map("employee_id")
+  tin                String?
+  pfa                String?
+  rsaPin             String?      @map("rsa_pin")
+  stateOfResidence   String?      @map("state_of_residence")
+  basicSalary        Decimal      @default(0) @map("basic_salary") @db.Decimal(12, 2)
+  housingAllowance   Decimal      @default(0) @map("housing_allowance") @db.Decimal(12, 2)
+  transportAllowance Decimal      @default(0) @map("transport_allowance") @db.Decimal(12, 2)
+  otherTaxable       Decimal      @default(0) @map("other_taxable") @db.Decimal(12, 2)
+  nonTaxable         Decimal      @default(0) @map("non_taxable") @db.Decimal(12, 2)
+  annualRentPaid     Decimal      @default(0) @map("annual_rent_paid") @db.Decimal(14, 2)
+  nhisEnrolled       Boolean      @default(false) @map("nhis_enrolled")
+  nhfEnrolled        Boolean      @default(true) @map("nhf_enrolled")
+  otherDeductions    Decimal      @default(0) @map("other_deductions") @db.Decimal(12, 2)
+  loanRepayment      Decimal      @default(0) @map("loan_repayment") @db.Decimal(12, 2)
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  employee           Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("payroll_statutory_profiles")
+}
+
+model PayrollStatutoryConfig {
+  id                  String       @id @default(uuid())
+  organizationId      String       @unique @map("organization_id")
+  currency            String       @default("NGN")
+  employeePensionRate Decimal      @default(0.08) @map("employee_pension_rate") @db.Decimal(6, 4)
+  employerPensionRate Decimal      @default(0.10) @map("employer_pension_rate") @db.Decimal(6, 4)
+  nhfRate             Decimal      @default(0.025) @map("nhf_rate") @db.Decimal(6, 4)
+  nhisEmployeeRate    Decimal      @default(0.05) @map("nhis_employee_rate") @db.Decimal(6, 4)
+  nhisEmployerRate    Decimal      @default(0.10) @map("nhis_employer_rate") @db.Decimal(6, 4)
+  nsitfRate           Decimal      @default(0.01) @map("nsitf_rate") @db.Decimal(6, 4)
+  itfRate             Decimal      @default(0.01) @map("itf_rate") @db.Decimal(6, 4)
+  rentReliefRate      Decimal      @default(0.20) @map("rent_relief_rate") @db.Decimal(6, 4)
+  rentReliefCap       Decimal      @default(500000) @map("rent_relief_cap") @db.Decimal(14, 2)
+  employerItfLiable   Boolean      @default(true) @map("employer_itf_liable")
+  payeBands           String       @default("[{\"lower\":0,\"upper\":800000,\"rate\":0},{\"lower\":800000,\"upper\":3000000,\"rate\":0.15},{\"lower\":3000000,\"upper\":12000000,\"rate\":0.18},{\"lower\":12000000,\"upper\":25000000,\"rate\":0.21},{\"lower\":25000000,\"upper\":50000000,\"rate\":0.23},{\"lower\":50000000,\"upper\":null,\"rate\":0.25}]") @map("paye_bands")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("payroll_statutory_configs")
 }
 
 model BankDetail {
@@ -1139,4 +1212,31 @@ model MessageRead {
   @@unique([messageId, userId])
   @@index([userId])
   @@map("message_reads")
+}
+
+model StaffInvite {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  email          String
+  role           String       @default("employee")
+  jobTitle       String?      @map("job_title")
+  departmentId   String?      @map("department_id")
+  branchId       String?      @map("branch_id")
+  firstName      String?      @map("first_name")
+  lastName       String?      @map("last_name")
+  phone          String?
+  token          String       @unique
+  status         String       @default("pending") // pending | accepted | revoked | expired
+  invitedBy      String?      @map("invited_by")
+  employeeId     String?      @map("employee_id")
+  userId         String?      @map("user_id")
+  expiresAt      DateTime     @map("expires_at")
+  acceptedAt     DateTime?    @map("accepted_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([email])
+  @@map("staff_invites")
 }

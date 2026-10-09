@@ -211,8 +211,8 @@ export default function WorkflowsPage() {
       <GradientCard gradient="from-slate-900 via-indigo-900 to-slate-900">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2"><Workflow/> Workflows <span className="font-normal text-white/70">— Automation §34</span></h1>
-            <p className="text-sm text-white/70">Trigger → Steps → Approvals → Notifications → Audit §34 • Builder + Execution log</p>
+            <h1 className="text-2xl font-bold flex items-center gap-2"><Workflow/> Workflows <span className="font-normal text-white/70">— Automation</span></h1>
+            <p className="text-sm text-white/70">Trigger → Steps → Approvals → Notifications → Audit • Builder + Execution log</p>
           </div>
           <div className="flex items-center gap-2">
             <Pill tone="blue">{workflows.length} workflows</Pill>
@@ -223,14 +223,14 @@ export default function WorkflowsPage() {
           <span className="bg-white/15 rounded-full px-3 py-1">GET /v1/workflows</span>
           <span className="bg-white/15 rounded-full px-3 py-1">POST /v1/workflows {`{name, trigger, steps}`}</span>
           <span className="bg-white/15 rounded-full px-3 py-1">PATCH /v1/workflows/:id {`{name, trigger, steps}`}</span>
-          <span className="bg-white/15 rounded-full px-3 py-1">§34: leave → manager → HR → notification</span>
+          <span className="bg-white/15 rounded-full px-3 py-1">leave → manager → HR → notification</span>
         </div>
       </GradientCard>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <GlassCard>
           <h3 className="font-semibold flex items-center gap-2">{editingId ? <><Edit2 size={16}/> Edit Workflow</> : <><Plus size={16}/> Create Workflow</>}</h3>
-          <p className="text-xs text-slate-500">{editingId ? 'Update name, trigger, step order, types and assignees — saved via PATCH' : 'Define trigger + steps — §34 engine'}</p>
+          <p className="text-xs text-slate-500">{editingId ? 'Update name, trigger, step order, types and assignees — saved via PATCH' : 'Define trigger + steps — engine'}</p>
           <div className="mt-3 space-y-3">
             <div>
               <label className="text-xs font-semibold">Workflow Name</label>
@@ -348,7 +348,7 @@ export default function WorkflowsPage() {
               </tbody>
             </table>
           </div>
-          <div className="p-3 bg-slate-50/50 text-xs text-slate-500 flex items-center gap-2"><Settings2 size={12}/> Execution log: <code>GET /v1/workflows/:id/runs</code> • Audit: assignment → approval → notification → §34</div>
+          <div className="p-3 bg-slate-50/50 text-xs text-slate-500 flex items-center gap-2"><Settings2 size={12}/> Execution log: <code>GET /v1/workflows/:id/runs</code> • Audit: assignment → approval → notification →</div>
         </GlassCard>
       </div>
 
@@ -371,11 +371,11 @@ export default function WorkflowsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <GlassCard>
-          <h4 className="font-semibold text-sm">§34 Leave Flow</h4>
+          <h4 className="font-semibold text-sm">Leave Flow</h4>
           <div className="mt-2 flex items-center gap-1 text-xs flex-wrap">
             <span className="bg-slate-900 text-white rounded-full px-2 py-1">Request</span><ArrowRight size={12}/><span className="glass rounded-full px-2 py-1">Manager</span><ArrowRight size={12}/><span className="glass rounded-full px-2 py-1">HR</span><ArrowRight size={12}/><span className="bg-emerald-500 text-white rounded-full px-2 py-1">Approved</span>
           </div>
-          <p className="text-xs text-slate-500 mt-2">Balance check → approval → calendar → notification (§35 email/SMS/WhatsApp)</p>
+          <p className="text-xs text-slate-500 mt-2">Balance check → approval → calendar → notification </p>
         </GlassCard>
         <GlassCard>
           <h4 className="font-semibold text-sm">Onboarding Flow</h4>
@@ -387,7 +387,7 @@ export default function WorkflowsPage() {
         </GlassCard>
         <GlassCard>
           <h4 className="font-semibold text-sm">Compliance</h4>
-          <p className="text-xs text-slate-500">Every step audit-logged • Tenant isolated • Retention 7y §9 • RBAC enforced</p>
+          <p className="text-xs text-slate-500">Every step audit-logged • Tenant isolated • Retention 7y • RBAC enforced</p>
           <div className="mt-2 flex gap-2"><Pill tone="emerald">audit</Pill><Pill tone="blue">tenant</Pill><Pill tone="slate">RBAC</Pill></div>
         </GlassCard>
       </div>

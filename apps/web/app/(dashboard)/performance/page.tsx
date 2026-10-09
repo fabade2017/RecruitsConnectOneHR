@@ -47,8 +47,8 @@ export default function PerformancePage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Trophy className="text-amber-500" /> Performance Reviews <span className="text-slate-500 font-normal">— Cycle §22</span></h1>
-          <p className="text-sm text-slate-500">KPI → Manager assessment → Rating → Calibration → Promotion eligibility §27</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Trophy className="text-amber-500" /> Performance Reviews <span className="text-slate-500 font-normal">— Cycle</span></h1>
+          <p className="text-sm text-slate-500">KPI → Manager assessment → Rating → Calibration → Promotion eligibility</p>
         </div>
         <button onClick={load} className="glass rounded-xl px-3 py-2 text-sm flex items-center gap-2"><RefreshCw size={14} /> Refresh</button>
       </div>
@@ -80,8 +80,8 @@ export default function PerformancePage() {
         </GlassCard>
 
         <GradientCard className="lg:col-span-2 flex flex-col justify-center">
-          <h3 className="font-semibold text-lg flex items-center gap-2"><Trophy size={18} /> Performance Workflow §22</h3>
-          <p className="text-sm text-white/80 mt-2">OKR & KPI cascade → Self → Manager → Calibration committee → Final rating. Top 10% → promotion fast-track §27.</p>
+          <h3 className="font-semibold text-lg flex items-center gap-2"><Trophy size={18} /> Performance Workflow</h3>
+          <p className="text-sm text-white/80 mt-2">OKR & KPI cascade → Self → Manager → Calibration committee → Final rating. Top 10% → promotion fast-track.</p>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="bg-white/20 rounded-full px-3 py-1">Needs Improvement</span>
             <span className="bg-white/20 rounded-full px-3 py-1">Meets Expectations</span>

@@ -222,7 +222,7 @@ export default function EmployeeHome() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <GlassCard className="md:col-span-2">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold flex items-center gap-2"><Clock size={16}/> Attendance (§5 Work Session) {session?.date ? `• ${new Date(session.date).toLocaleDateString()}` : ''}</h3>
+            <h3 className="font-semibold flex items-center gap-2"><Clock size={16}/> Attendance {session?.date ? `• ${new Date(session.date).toLocaleDateString()}` : ''}</h3>
             <Pill tone="blue">Net {net} • OT {overtime}</Pill>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-3 text-center">
@@ -248,11 +248,11 @@ export default function EmployeeHome() {
             </button>
             <button onClick={handleClock} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-semibold hover:bg-slate-800">Clock {session?.clockInAt && !session?.clockOutAt ? 'Out' : 'In'}</button>
           </div>
-          <p className="text-xs text-slate-500 mt-2 text-center">Net = Gross − Breaks (§13) • {session ? `Scheduled ${session.scheduledMinutes ?? 480}m • Overtime ${overtime}` : 'Live from /attendance/sessions'} • 7 methods (§7)</p>
+          <p className="text-xs text-slate-500 mt-2 text-center">Net = Gross − Breaks • {session ? `Scheduled ${session.scheduledMinutes ?? 480}m • Overtime ${overtime}` : 'Live from /attendance/sessions'} • 7 methods </p>
         </GlassCard>
 
         <GlassCard>
-          <h3 className="font-semibold">Quick Actions (§17)</h3>
+          <h3 className="font-semibold">Quick Actions </h3>
           <div className="grid grid-cols-2 gap-3 mt-3">
             {quickActions.map(([Icon, label, href]: any) => (
               <Link key={label} href={href} className="bg-slate-50 hover:bg-white border border-transparent hover:border-slate-200 rounded-2xl p-4 flex flex-col items-center gap-2 hover:shadow-glass transition">
@@ -266,7 +266,7 @@ export default function EmployeeHome() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <GlassCard>
-          <h4 className="font-semibold">Activity Timeline (§4) • {timeline.length ? `${timeline.length} events` : 'Live'}</h4>
+          <h4 className="font-semibold">Activity Timeline • {timeline.length ? `${timeline.length} events` : 'Live'}</h4>
           <div className="mt-3 space-y-2 text-sm">
             {timeline.length ? timeline.map((ev: any, i: number) => (
               <div key={i} className="flex gap-2"><span className="font-mono text-xs bg-slate-900 text-white px-2 py-1 rounded-full h-fit">{ev.time || new Date(ev.timestamp || ev.createdAt).toLocaleTimeString('en-NG', {hour:'2-digit', minute:'2-digit'})}</span><span>{ev.activity || ev.eventType || ev.title || JSON.stringify(ev).slice(0,60)}</span></div>
@@ -277,7 +277,7 @@ export default function EmployeeHome() {
           {session && <div className="mt-2 text-[11px] text-slate-400">WorkSession {session.id.slice(0,8)} • {session.status} • {session.verificationScore ? `Score ${session.verificationScore}` : ''}</div>}
         </GlassCard>
         <GlassCard>
-          <h4 className="font-semibold">My Passport (§29 Career Passport™)</h4>
+          <h4 className="font-semibold">My Passport </h4>
           <div className="mt-3 text-sm space-y-1">
             <div>ID: <b>{employee?.employeeCode || passport?.employeeCode || '—'}</b> {passport?.qrCode ? '• QR ✓' : ''}</div>
             <div>Dept: {dept} • Grade {employee?.grade || '—'}</div>
@@ -294,7 +294,7 @@ export default function EmployeeHome() {
           </div>
         </GlassCard>
         <GlassCard>
-          <h4 className="font-semibold">Life Events (§32)</h4>
+          <h4 className="font-semibold">Life Events </h4>
           <div className="mt-3 space-y-2 text-sm">
             {lifeEvents.map((e, i) => (
               <div key={i} className={`p-3 rounded-xl border ${i===0 ? 'bg-gradient-to-r from-sky-50 to-blue-50' : 'bg-gradient-to-r from-violet-50 to-purple-50'}`}>{e}</div>

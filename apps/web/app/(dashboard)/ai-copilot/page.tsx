@@ -7,7 +7,7 @@ type Msg = { role: 'user' | 'assistant'; content: string; provider?: string; cit
 
 export default function AICopilotPage() {
   const [messages, setMessages] = useState<Msg[]>([
-    { role: 'assistant', content: 'Hi! I am OneHR AI Copilot — ask about leave balance, payroll, attendance, or policies. Powered by POST /v1/ai/chat §33. Auto-detects Ollama/Groq/OpenAI.' },
+    { role: 'assistant', content: 'Hi! I am OneHR AI Copilot — ask about leave balance, payroll, attendance, or policies. Powered by POST /v1/ai/chat. Auto-detects Ollama/Groq/OpenAI.' },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -72,13 +72,13 @@ export default function AICopilotPage() {
     setLoading(false);
   };
 
-  const quick = ['What is my leave balance?', 'Explain payroll calculation §31', 'Show attendance exceptions §37', 'Draft a performance review for KPI'];
+  const quick = ['What is my leave balance?', 'Explain payroll calculation', 'Show attendance exceptions', 'Draft a performance review for KPI'];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Bot className="text-violet-600" /> AI Copilot <span className="text-slate-500 font-normal">— OneHR Intelligence §33</span></h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Bot className="text-violet-600" /> AI Copilot <span className="text-slate-500 font-normal">— OneHR Intelligence</span></h1>
           <p className="text-sm text-slate-500">POST /v1/ai/chat • /v1/ai/copilot • RAG over policies • Provider: {provider?.provider || 'loading...'} {provider?.models?.[provider?.provider] ? `• ${provider.models[provider.provider]}` : ''}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -129,9 +129,9 @@ export default function AICopilotPage() {
           <GradientCard gradient="from-violet-600 via-indigo-600 to-violet-700">
             <h3 className="font-semibold flex items-center gap-2"><Sparkles size={16} /> Capabilities</h3>
             <ul className="text-sm text-white/90 mt-2 space-y-1 list-disc list-inside">
-              <li>Answer HR policy Qs §34 (RAG)</li>
+              <li>Answer HR policy Qs (RAG)</li>
               <li>Draft reviews & goals</li>
-              <li>Summarize reports §32</li>
+              <li>Summarize reports</li>
               <li>Nudge managers (engagement)</li>
             </ul>
             <div className="mt-3 bg-white/10 rounded-xl p-2 text-xs">
@@ -157,7 +157,7 @@ export default function AICopilotPage() {
                 <button key={q} onClick={() => setInput(q)} className="w-full text-left text-xs bg-slate-50 hover:bg-slate-100 rounded-xl px-3 py-2">{q}</button>
               ))}
             </div>
-            <p className="text-xs text-slate-500 mt-3">RBAC: {mode} • audit logged §10 • RAG citations • conf%</p>
+            <p className="text-xs text-slate-500 mt-3">RBAC: {mode} • audit logged • RAG citations • conf%</p>
           </GlassCard>
         </div>
       </div>

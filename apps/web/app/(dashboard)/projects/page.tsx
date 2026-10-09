@@ -69,8 +69,8 @@ export default function ProjectsPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><FolderKanban /> Projects <span className="text-slate-500 font-normal">— Tasks §34 • Config §42</span></h1>
-          <p className="text-sm text-slate-500">Projects → Tasks → Workflow §34 — 44-module ecosystem §44 • API: /v1/projects • RBAC: hr_admin / org_admin</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><FolderKanban /> Projects <span className="text-slate-500 font-normal">— Tasks • Config</span></h1>
+          <p className="text-sm text-slate-500">Projects → Tasks → Workflow — 44-module ecosystem • API: /v1/projects • RBAC: hr_admin / org_admin</p>
         </div>
         <div className="flex gap-2">
           <button onClick={load} className="glass rounded-xl px-3 py-2 text-sm flex items-center gap-2"><RefreshCw size={14} /> Refresh</button>
@@ -106,7 +106,7 @@ export default function ProjectsPage() {
               <div className="bg-slate-50 rounded-xl p-3 text-center"><div className="text-xl font-bold">{display.filter((p: any) => p.status === 'completed').length}</div><div className="text-xs text-slate-500">Completed</div></div>
               <div className="bg-slate-900 text-white rounded-xl p-3 text-center"><div className="text-xl font-bold">{display.length}</div><div className="text-xs text-slate-300">Total</div></div>
             </div>
-            <p className="text-xs text-slate-500">Workflow §34 • Config §42 • Docs: docs/PRD.md</p>
+            <p className="text-xs text-slate-500">Workflow • Config • Docs: docs/PRD.md</p>
           </div>
         </GlassCard>
 
@@ -154,7 +154,7 @@ export default function ProjectsPage() {
             </tbody>
           </table>
         </div>
-        <div className="p-3 bg-slate-50/50 text-xs text-slate-500">GET /v1/projects • POST /v1/projects (name/description/status) • GET /v1/projects/:id/tasks • RBAC: hr_admin / org_admin • Workflow §34</div>
+        <div className="p-3 bg-slate-50/50 text-xs text-slate-500">GET /v1/projects • POST /v1/projects (name/description/status) • GET /v1/projects/:id/tasks • RBAC: hr_admin / org_admin • Workflow</div>
       </GlassCard>
     </div>
   );
