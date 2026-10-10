@@ -40,25 +40,33 @@ exports.getWelcomeTemplate = getWelcomeTemplate;
 exports.getStaffInviteTemplate = getStaffInviteTemplate;
 // @ts-ignore - nodemailer types optional for build
 const nodemailer = __importStar(require("nodemailer"));
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
-const SMTP_USER = process.env.SMTP_USER || '';
-const SMTP_PASS = process.env.SMTP_PASS || '';
-const FROM_EMAIL = process.env.FROM_EMAIL || 'supports@rconehr.com';
-const FROM_NAME = process.env.FROM_NAME || 'RecruitConnect OneHR';
-const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
-    auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
-});
+// Read config at call time (not module load) so late-loaded .env / platform env is honoured.
+function smtpConfig() {
+    const port = parseInt(process.env.SMTP_PORT || '587');
+    return {
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port,
+        secure: port === 465,
+        user: process.env.SMTP_USER || '',
+        pass: process.env.SMTP_PASS || '',
+        fromEmail: process.env.FROM_EMAIL || 'supports@rconehr.com',
+        fromName: process.env.FROM_NAME || 'RecruitConnect OneHR',
+    };
+}
 async function sendEmail({ to, subject, html, text }) {
-    if (!SMTP_USER || !SMTP_PASS) {
-        console.log('[EMAIL MOCK] To:', to, 'Subject:', subject);
-        return { messageId: 'mock-' + Date.now(), success: true };
+    const cfg = smtpConfig();
+    if (!cfg.user || !cfg.pass) {
+        console.error('[EMAIL NOT SENT] SMTP_USER/SMTP_PASS not configured — set them in the deployment environment. To:', to, 'Subject:', subject);
+        return { messageId: null, success: false, notConfigured: true, error: new Error('SMTP not configured (SMTP_USER/SMTP_PASS missing)') };
     }
     try {
-        const info = await transporter.sendMail({ from: `"${FROM_NAME}" <${FROM_EMAIL}>`, to, subject, html, text: text || html.replace(/<[^>]*>/g, '') });
+        const transporter = nodemailer.createTransport({
+            host: cfg.host,
+            port: cfg.port,
+            secure: cfg.secure,
+            auth: { user: cfg.user, pass: cfg.pass },
+        });
+        const info = await transporter.sendMail({ from: `"${cfg.fromName}" <${cfg.fromEmail}>`, to, subject, html, text: text || html.replace(/<[^>]*>/g, '') });
         console.log('Email sent:', info.messageId);
         return { messageId: info.messageId, success: true };
     }

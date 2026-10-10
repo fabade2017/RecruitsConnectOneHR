@@ -832,8 +832,8 @@ export class EmployeesService {
     });
     const built = await this.buildInvite(orgId, invite);
     const html = getStaffInviteTemplate(org.name, built.inviteUrl, invite.role, expiresAt.toISOString().slice(0, 10));
-    const sent = await sendEmail({ to: email, subject: `You're invited to join ${org.name} on OneHR`, html }).catch((e: any) => ({ success: false, error: e }));
-    return { invite: built, emailSent: (sent as any).success !== false, inviteUrl: built.inviteUrl };
+    const sent: any = await sendEmail({ to: email, subject: `You're invited to join ${org.name} on OneHR`, html }).catch((e: any) => ({ success: false, error: e }));
+    return { invite: built, emailSent: sent.success === true, emailError: sent.success === true ? undefined : (sent.notConfigured ? 'Email not configured on the server (SMTP_USER/SMTP_PASS missing) — share the invite link manually.' : String(sent.error?.message || sent.error || 'Email failed to send')), inviteUrl: built.inviteUrl };
   }
 
   async listInvites(orgId: string, query: any) {
@@ -862,8 +862,8 @@ export class EmployeesService {
     const updated = await this.prisma.staffInvite.update({ where: { id }, data: { token, status: 'pending', expiresAt, invitedBy: user?.sub || inv.invitedBy } });
     const built = await this.buildInvite(orgId, updated);
     const html = getStaffInviteTemplate(org?.name || 'OneHR', built.inviteUrl, updated.role, expiresAt.toISOString().slice(0, 10));
-    const sent = await sendEmail({ to: updated.email, subject: `You're invited to join ${org?.name || 'OneHR'} on OneHR`, html }).catch((e: any) => ({ success: false, error: e }));
-    return { invite: built, emailSent: (sent as any).success !== false, inviteUrl: built.inviteUrl };
+    const sent: any = await sendEmail({ to: updated.email, subject: `You're invited to join ${org?.name || 'OneHR'} on OneHR`, html }).catch((e: any) => ({ success: false, error: e }));
+    return { invite: built, emailSent: sent.success === true, emailError: sent.success === true ? undefined : (sent.notConfigured ? 'Email not configured on the server (SMTP_USER/SMTP_PASS missing) — share the invite link manually.' : String(sent.error?.message || sent.error || 'Email failed to send')), inviteUrl: built.inviteUrl };
   }
 
   // Public (no auth) — used by the /onboard page to validate the token before showing the form

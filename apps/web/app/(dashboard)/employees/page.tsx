@@ -389,14 +389,6 @@ export default function PeoplePage() {
     const opts = branchId ? deptOptionsForForm.filter((d:any)=> !d.branchId || d.branchId===branchId || departments.some(x=>x.id===d.id)) : deptOptionsForForm;
     // if branch selected and filtered empty, show empty state linked
     const isLinkedEmpty = branchId && !deptState.loading && opts.length===0;
-    const sendInvite = async () => {
-    if (!invite.email) return setInviteMsg('Email required');
-    setInviteMsg('Sending...');
-    const res = await fetch(`${api}/employees/invites`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(invite) });
-    const t = await res.text();
-    try { const j = JSON.parse(t); setInviteMsg(j.emailSent ? 'Invite sent ✓' : (j.inviteUrl ? `Link: ${j.inviteUrl}` : t.slice(0,120))); } catch { setInviteMsg(t.slice(0,120)); }
-    setTimeout(()=>setInviteMsg(''), 8000);
-  };
   return (
       <label className="text-sm font-medium">Department
         <select value={value} onChange={e=>onChange(e.target.value)} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50" disabled={deptState.loading}>
@@ -432,14 +424,6 @@ export default function PeoplePage() {
       if (value && !map.has(value)) map.set(value, { id:`cur-${value}`, slug:value, name:value });
       return Array.from(map.values());
     })();
-    const sendInvite = async () => {
-    if (!invite.email) return setInviteMsg('Email required');
-    setInviteMsg('Sending...');
-    const res = await fetch(`${api}/employees/invites`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(invite) });
-    const t = await res.text();
-    try { const j = JSON.parse(t); setInviteMsg(j.emailSent ? 'Invite sent ✓' : (j.inviteUrl ? `Link: ${j.inviteUrl}` : t.slice(0,120))); } catch { setInviteMsg(t.slice(0,120)); }
-    setTimeout(()=>setInviteMsg(''), 8000);
-  };
   return (
       <label className="text-sm font-medium">Role
         <select value={value} onChange={e=>onChange(e.target.value)} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50" disabled={roleState.loading}>
@@ -459,8 +443,12 @@ export default function PeoplePage() {
     setInviteMsg('Sending...');
     const res = await fetch(`${api}/employees/invites`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(invite) });
     const t = await res.text();
-    try { const j = JSON.parse(t); setInviteMsg(j.emailSent ? 'Invite sent ✓' : (j.inviteUrl ? `Link: ${j.inviteUrl}` : t.slice(0,120))); } catch { setInviteMsg(t.slice(0,120)); }
-    setTimeout(()=>setInviteMsg(''), 8000);
+    try {
+      const j = JSON.parse(t);
+      if (j.emailSent) setInviteMsg('Invite sent ✓');
+      else setInviteMsg(`${j.emailError ? j.emailError + ' ' : ''}Share this link: ${j.inviteUrl || t.slice(0,120)}`);
+    } catch { setInviteMsg(t.slice(0,120)); }
+    setTimeout(()=>setInviteMsg(''), 12000);
   };
   return (
     <div className="space-y-6">
