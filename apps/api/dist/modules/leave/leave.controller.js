@@ -25,6 +25,8 @@ let LeaveController = class LeaveController {
     }
     types(req) { return this.svc.types(req.orgId); }
     createType(req, dto) { return this.svc.createType(req.orgId, dto); }
+    updateType(req, id, dto) { return this.svc.updateType(req.orgId, id, dto); }
+    removeType(req, id) { return this.svc.removeType(req.orgId, id); }
     request(req, dto) { return this.svc.request(req.orgId, req.user.sub, dto); }
     list(req, q) { return this.svc.list(req.orgId, q, req.user); }
     getOne(req, id) { return this.svc.getOne(req.orgId, id, req.user); }
@@ -54,6 +56,27 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], LeaveController.prototype, "createType", null);
+__decorate([
+    (0, common_1.Patch)('types/:id'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('leave:*'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", void 0)
+], LeaveController.prototype, "updateType", null);
+__decorate([
+    (0, common_1.Delete)('types/:id'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('leave:*'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], LeaveController.prototype, "removeType", null);
 __decorate([
     (0, common_1.Post)('requests'),
     (0, rbac_guard_1.RequirePermissions)('leave:request:self'),

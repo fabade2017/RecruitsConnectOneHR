@@ -19,6 +19,24 @@ let LeaveService = class LeaveService {
     }
     types(orgId) { return this.prisma.leaveType.findMany({ where: { organizationId: orgId } }); }
     createType(orgId, dto) { return this.prisma.leaveType.create({ data: { organizationId: orgId, name: dto.name, maxDays: dto.max_days ?? dto.maxDays } }); }
+    async updateType(orgId, id, dto) {
+        const exists = await this.prisma.leaveType.findFirst({ where: { id, organizationId: orgId } });
+        if (!exists)
+            throw new common_1.NotFoundException('Leave type not found');
+        const data = {};
+        if (dto.name !== undefined)
+            data.name = dto.name;
+        if (dto.max_days !== undefined || dto.maxDays !== undefined)
+            data.maxDays = dto.max_days ?? dto.maxDays;
+        return this.prisma.leaveType.update({ where: { id }, data });
+    }
+    async removeType(orgId, id) {
+        const exists = await this.prisma.leaveType.findFirst({ where: { id, organizationId: orgId } });
+        if (!exists)
+            throw new common_1.NotFoundException('Leave type not found');
+        await this.prisma.leaveType.delete({ where: { id } });
+        return { success: true, id };
+    }
     async request(orgId, userId, dto) {
         const emp = await this.prisma.employee.findUnique({ where: { userId } });
         if (!emp)

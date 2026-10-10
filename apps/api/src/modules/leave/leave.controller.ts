@@ -11,6 +11,8 @@ export class LeaveController {
   constructor(private svc: LeaveService) {}
   @Get('types') @RequirePermissions('leave:read') types(@Req() req:any){ return this.svc.types(req.orgId); }
   @Post('types') @Roles('hr_admin','org_admin','super_admin') @RequirePermissions('leave:*') createType(@Req() req:any, @Body() dto:any){ return this.svc.createType(req.orgId, dto); }
+  @Patch('types/:id') @Roles('hr_admin','org_admin','super_admin') @RequirePermissions('leave:*') updateType(@Req() req:any, @Param('id') id:string, @Body() dto:any){ return this.svc.updateType(req.orgId, id, dto); }
+  @Delete('types/:id') @Roles('hr_admin','org_admin','super_admin') @RequirePermissions('leave:*') removeType(@Req() req:any, @Param('id') id:string){ return this.svc.removeType(req.orgId, id); }
   @Post('requests') @RequirePermissions('leave:request:self') request(@Req() req:any, @Body() dto:any){ return this.svc.request(req.orgId, req.user.sub, dto); }
   @Get('requests') @RequirePermissions('leave:read') list(@Req() req:any, @Query() q:any){ return this.svc.list(req.orgId, q, req.user); }
   @Get('requests/:id') @RequirePermissions('leave:read') getOne(@Req() req:any, @Param('id') id:string){ return this.svc.getOne(req.orgId, id, req.user); }

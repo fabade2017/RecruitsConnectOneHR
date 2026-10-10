@@ -2,8 +2,22 @@ import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/commo
 import { PrismaService } from '../../prisma/prisma.service';
 @Injectable() export class LeaveService {
   constructor(private prisma: PrismaService) {}
-  types(orgId:string){ return this.prisma.leaveType.findMany({ where:{ organizationId: orgId }}); }
-  createType(orgId:string, dto:any){ return this.prisma.leaveType.create({ data:{ organizationId: orgId, name: dto.name, maxDays: dto.max_days ?? dto.maxDays }}); }
+  types(orgId:string){ return this.prisma.leaveType.findMany({ where:{ organizationId: orgId } }); }
+  createType(orgId:string, dto:any){ return this.prisma.leaveType.create({ data:{ organizationId: orgId, name: dto.name, maxDays: dto.max_days ?? dto.maxDays } }); }
+  async updateType(orgId:string, id:string, dto:any){
+    const exists = await this.prisma.leaveType.findFirst({ where:{ id, organizationId: orgId }});
+    if (!exists) throw new NotFoundException('Leave type not found');
+    const data:any={};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.max_days !== undefined || dto.maxDays !== undefined) data.maxDays = dto.max_days ?? dto.maxDays;
+    return this.prisma.leaveType.update({ where:{ id }, data });
+  }
+  async removeType(orgId:string, id:string){
+    const exists = await this.prisma.leaveType.findFirst({ where:{ id, organizationId: orgId }});
+    if (!exists) throw new NotFoundException('Leave type not found');
+    await this.prisma.leaveType.delete({ where:{ id }});
+    return { success:true, id };
+  }
   async request(orgId:string, userId:string, dto:any){
     const emp = await this.prisma.employee.findUnique({ where:{ userId }});
     if (!emp) throw new ForbiddenException('Employee not found');

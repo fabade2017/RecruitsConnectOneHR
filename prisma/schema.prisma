@@ -9,68 +9,68 @@ datasource db {
 }
 
 model Organization {
-  id                   String                     @id @default(uuid())
-  name                 String
-  acronym              String                     @unique
-  industryTemplate     String                     @default("generic") @map("industry_template")
-  country              String                     @default("NG") @db.VarChar(2)
-  timezone             String                     @default("Africa/Lagos")
-  config               String                     @default("{}")
-  logoUrl              String?                    @map("logo_url")
-  watermarkEnabled     Boolean                    @default(false) @map("watermark_enabled")
-  watermarkText        String?                    @map("watermark_text") @db.VarChar(200)
-  watermarkOpacity     Float                      @default(0.08) @map("watermark_opacity")
-  watermarkPosition    String                     @default("center") @map("watermark_position")
-  primaryColor         String?                    @map("primary_color") @db.VarChar(20)
-  createdAt            DateTime                   @default(now()) @map("created_at")
-  updatedAt            DateTime                   @updatedAt @map("updated_at")
-  companyGroupId       String?                    @map("company_group_id")
-  status               String                     @default("pending") // pending | active | suspended
-  isActive             Boolean                    @default(false) @map("is_active")
-  assets               Asset[]
-  attendanceEvents     AttendanceEvent[]
-  attendanceExceptions AttendanceException[]
-  attendancePolicy     AttendancePolicy?
-  attendanceRecords    AttendanceRecords[]
-  auditLogs            AuditLog[]
-  bankDetails          BankDetail[]
-  branches             Branch[]
-  certifications       Certification[]
-  compliancePolicies   CompliancePolicy[]
-  courses              Course[]
-  departments          Department[]
-  devices              Device[]
-  documents            Document[]
-  employees            Employee[]
-  engagementSurveys    EngagementSurvey[]
-  vacancies            InternalVacancy[]
-  jobPostings          JobPosting[]
-  knowledgeArticles    KnowledgeArticle[]
-  leaveRequests        LeaveRequest[]
-  leaveTypes           LeaveType[]
-  notifications        Notification[]
-  staffInvites         StaffInvite[]
-  subscriptions        OrganizationSubscription[]
-  companyGroup         CompanyGroup?              @relation(fields: [companyGroupId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  payrollsMerged       PayrollMerged[]
-  payrollStatutoryProfiles PayrollStatutoryProfile[]
+  id                       String                     @id @default(uuid())
+  name                     String
+  acronym                  String                     @unique
+  industryTemplate         String                     @default("generic") @map("industry_template")
+  country                  String                     @default("NG") @db.VarChar(2)
+  timezone                 String                     @default("Africa/Lagos")
+  config                   String                     @default("{}")
+  logoUrl                  String?                    @map("logo_url")
+  watermarkEnabled         Boolean                    @default(false) @map("watermark_enabled")
+  watermarkText            String?                    @map("watermark_text") @db.VarChar(200)
+  watermarkOpacity         Float                      @default(0.08) @map("watermark_opacity")
+  watermarkPosition        String                     @default("center") @map("watermark_position")
+  primaryColor             String?                    @map("primary_color") @db.VarChar(20)
+  createdAt                DateTime                   @default(now()) @map("created_at")
+  updatedAt                DateTime                   @updatedAt @map("updated_at")
+  companyGroupId           String?                    @map("company_group_id")
+  isActive                 Boolean                    @default(false) @map("is_active")
+  status                   String                     @default("pending")
+  assets                   Asset[]
+  attendanceEvents         AttendanceEvent[]
+  attendanceExceptions     AttendanceException[]
+  attendancePolicy         AttendancePolicy?
+  attendanceRecords        AttendanceRecords[]
+  auditLogs                AuditLog[]
+  bankDetails              BankDetail[]
+  branches                 Branch[]
+  certifications           Certification[]
+  compliancePolicies       CompliancePolicy[]
+  conversations            Conversation[]
+  courses                  Course[]
+  departments              Department[]
+  devices                  Device[]
+  documents                Document[]
+  employees                Employee[]
+  engagementSurveys        EngagementSurvey[]
+  vacancies                InternalVacancy[]
+  jobPostings              JobPosting[]
+  knowledgeArticles        KnowledgeArticle[]
+  leaveRequests            LeaveRequest[]
+  leaveTypes               LeaveType[]
+  messages                 Message[]
+  notifications            Notification[]
+  subscriptions            OrganizationSubscription[]
+  companyGroup             CompanyGroup?              @relation(fields: [companyGroupId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   payrollStatutoryConfig   PayrollStatutoryConfig?
-  performanceReviews   PerformanceReview[]
-  policies             Policy[]
-  projects             Project[]
-  customRoles          RoleDefinition[]
-  shifts               Shift[]
-  talentOpportunities  TalentOpportunity[]
-  tasks                Task[]
-  users                User[]
-  workSessions         WorkSession[]
-  workflowInstances    WorkflowInstance[]
-  workflows            Workflow[]
-  workforceScores      WorkforceScore[]
-  permissions          Permission[]               @relation("OrgPermissions")
-  conversations        Conversation[]
-  messages             Message[]
-  renewals             SubscriptionRenewal[]
+  payrollStatutoryProfiles PayrollStatutoryProfile[]
+  payrollsMerged           PayrollMerged[]
+  performanceReviews       PerformanceReview[]
+  policies                 Policy[]
+  projects                 Project[]
+  customRoles              RoleDefinition[]
+  shifts                   Shift[]
+  staffInvites             StaffInvite[]
+  renewals                 SubscriptionRenewal[]
+  talentOpportunities      TalentOpportunity[]
+  tasks                    Task[]
+  users                    User[]
+  workSessions             WorkSession[]
+  workflowInstances        WorkflowInstance[]
+  workflows                Workflow[]
+  workforceScores          WorkforceScore[]
+  permissions              Permission[]               @relation("OrgPermissions")
 
   @@map("organizations")
 }
@@ -81,11 +81,11 @@ model Branch {
   name           String
   address        String?
   location       String?
-  latitude       Float?       @map("latitude")
-  longitude      Float?       @map("longitude")
-  gpsRadius      Int?         @default(200) @map("gps_radius") // meters geofence
   isHeadOffice   Boolean      @default(false) @map("is_head_office")
   createdAt      DateTime     @default(now()) @map("created_at")
+  gpsRadius      Int?         @default(200) @map("gps_radius")
+  latitude       Float?       @map("latitude")
+  longitude      Float?       @map("longitude")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   departments    Department[]
   employees      Employee[]
@@ -113,82 +113,82 @@ model Department {
 }
 
 model User {
-  id             String          @id @default(uuid())
-  organizationId String          @map("organization_id")
-  email          String
-  phone          String?
-  passwordHash   String          @map("password_hash")
-  role           String          @default("employee")
-  customRoleId   String?         @map("custom_role_id")
-  mfaEnabled     Boolean         @default(false) @map("mfa_enabled")
-  mustChangePassword Boolean     @default(false) @map("must_change_password")
-  lastLoginAt    DateTime?       @map("last_login_at")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  employee       Employee?
-  customRole     RoleDefinition? @relation(fields: [customRoleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  conversationsCreated Conversation[]
+  id                       String                    @id @default(uuid())
+  organizationId           String                    @map("organization_id")
+  email                    String
+  phone                    String?
+  passwordHash             String                    @map("password_hash")
+  role                     String                    @default("employee")
+  customRoleId             String?                   @map("custom_role_id")
+  mfaEnabled               Boolean                   @default(false) @map("mfa_enabled")
+  lastLoginAt              DateTime?                 @map("last_login_at")
+  createdAt                DateTime                  @default(now()) @map("created_at")
+  mustChangePassword       Boolean                   @default(false) @map("must_change_password")
   conversationParticipants ConversationParticipant[]
-  messagesSent   Message[]
-  messageReads   MessageRead[]
+  conversationsCreated     Conversation[]
+  employee                 Employee?
+  messageReads             MessageRead[]
+  messagesSent             Message[]
+  customRole               RoleDefinition?           @relation(fields: [customRoleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organization             Organization              @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([organizationId, email])
   @@map("users")
 }
 
 model Employee {
-  id                  String                @id @default(uuid())
-  organizationId      String                @map("organization_id")
-  employeeCode        String                @map("employee_code")
-  firstName           String?               @map("first_name")
-  lastName            String?               @map("last_name")
-  qrCode              String?               @map("qr_code")
-  userId              String?               @unique @map("user_id")
-  photoUrl            String?               @map("photo_url")
-  faceProfileRef      String?               @map("face_profile_ref")
-  departmentId        String?               @map("department_id")
-  branchId            String?               @map("branch_id")
-  jobTitle            String?               @map("job_title")
-  grade               String?
-  managerId           String?               @map("manager_id")
-  employmentType      String                @default("permanent") @map("employment_type")
-  workArrangement     String                @default("office") @map("work_arrangement")
-  status              String                @default("active")
-  hireDate            DateTime?             @map("hire_date") @db.Date
-  probationEndDate    DateTime?             @map("probation_end_date") @db.Date
-  dateOfBirth         DateTime?             @map("date_of_birth") @db.Date
-  skills              String                @default("[]")
-  metadata            String                @default("{}")
-  consentFace         Boolean               @default(false) @map("consent_face")
-  consentGps          Boolean               @default(false) @map("consent_gps")
-  createdAt           DateTime              @default(now()) @map("created_at")
-  updatedAt           DateTime              @updatedAt @map("updated_at")
-  deletedAt           DateTime?             @map("deleted_at")
-  activityRollups     ActivityRollup[]
-  assets              Asset[]
-  attendanceEvents    AttendanceEvent[]
-  exceptionAssignee   AttendanceException[] @relation("ExceptionAssignee")
-  exceptionEmployee   AttendanceException[] @relation("ExceptionEmployee")
-  attendanceRecords   AttendanceRecords[]
-  bankDetail          BankDetail?
-  certifications      Certification[]
-  devices             Device[]
-  documents           Document[]
-  branch              Branch?               @relation(fields: [branchId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  department          Department?           @relation(fields: [departmentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  manager             Employee?             @relation("Manager", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  subordinates        Employee[]            @relation("Manager")
-  organization        Organization          @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  user                User?                 @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  engagementResponses EngagementResponse[]
-  learningEnrollments LearningEnrollment[]
-  leaveApprovals      LeaveRequest[]        @relation("Approver")
-  leaveRequests       LeaveRequest[]        @relation("Requester")
-  payrollsMerged      PayrollMerged[]
+  id                      String                   @id @default(uuid())
+  organizationId          String                   @map("organization_id")
+  employeeCode            String                   @map("employee_code")
+  qrCode                  String?                  @map("qr_code")
+  userId                  String?                  @unique @map("user_id")
+  photoUrl                String?                  @map("photo_url")
+  faceProfileRef          String?                  @map("face_profile_ref")
+  departmentId            String?                  @map("department_id")
+  branchId                String?                  @map("branch_id")
+  jobTitle                String?                  @map("job_title")
+  grade                   String?
+  managerId               String?                  @map("manager_id")
+  employmentType          String                   @default("permanent") @map("employment_type")
+  workArrangement         String                   @default("office") @map("work_arrangement")
+  status                  String                   @default("active")
+  hireDate                DateTime?                @map("hire_date") @db.Date
+  probationEndDate        DateTime?                @map("probation_end_date") @db.Date
+  skills                  String                   @default("[]")
+  metadata                String                   @default("{}")
+  consentFace             Boolean                  @default(false) @map("consent_face")
+  consentGps              Boolean                  @default(false) @map("consent_gps")
+  createdAt               DateTime                 @default(now()) @map("created_at")
+  updatedAt               DateTime                 @updatedAt @map("updated_at")
+  deletedAt               DateTime?                @map("deleted_at")
+  dateOfBirth             DateTime?                @map("date_of_birth") @db.Date
+  firstName               String?                  @map("first_name")
+  lastName                String?                  @map("last_name")
+  activityRollups         ActivityRollup[]
+  assets                  Asset[]
+  attendanceEvents        AttendanceEvent[]
+  exceptionAssignee       AttendanceException[]    @relation("ExceptionAssignee")
+  exceptionEmployee       AttendanceException[]    @relation("ExceptionEmployee")
+  attendanceRecords       AttendanceRecords[]
+  bankDetail              BankDetail?
+  certifications          Certification[]
+  devices                 Device[]
+  documents               Document[]
+  branch                  Branch?                  @relation(fields: [branchId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  department              Department?              @relation(fields: [departmentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manager                 Employee?                @relation("Manager", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subordinates            Employee[]               @relation("Manager")
+  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user                    User?                    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  engagementResponses     EngagementResponse[]
+  learningEnrollments     LearningEnrollment[]
+  leaveApprovals          LeaveRequest[]           @relation("Approver")
+  leaveRequests           LeaveRequest[]           @relation("Requester")
   payrollStatutoryProfile PayrollStatutoryProfile?
-  performanceReviews  PerformanceReview[]
-  tasksAssigned       Task[]                @relation("Assignee")
-  workSessions        WorkSession[]
+  payrollsMerged          PayrollMerged[]
+  performanceReviews      PerformanceReview[]
+  tasksAssigned           Task[]                   @relation("Assignee")
+  workSessions            WorkSession[]
 
   @@unique([organizationId, employeeCode])
   @@index([organizationId, status])
@@ -699,40 +699,40 @@ model ConsentLog {
 }
 
 model PayrollMerged {
-  id             String       @id @default(uuid())
-  organizationId String       @map("organization_id")
-  employeeId     String       @map("employee_id")
-  month          Int
-  year           Int
-  basicSalary    Decimal      @map("basic_salary") @db.Decimal(12, 2)
-  allowances     Decimal      @default(0) @db.Decimal(12, 2)
-  deductions     Decimal      @default(0) @db.Decimal(12, 2)
-  tax            Decimal      @default(0) @db.Decimal(12, 2)
-  netPay         Decimal      @map("net_pay") @db.Decimal(12, 2)
-  status         String       @default("DRAFT")
-  paidAt         DateTime?    @map("paid_at")
-  currency       String       @default("NGN")
-  grossPay       Decimal      @default(0) @map("gross_pay") @db.Decimal(12, 2)
-  housingAllowance    Decimal @default(0) @map("housing_allowance") @db.Decimal(12, 2)
-  transportAllowance  Decimal @default(0) @map("transport_allowance") @db.Decimal(12, 2)
-  otherTaxable        Decimal @default(0) @map("other_taxable") @db.Decimal(12, 2)
-  nonTaxable          Decimal @default(0) @map("non_taxable") @db.Decimal(12, 2)
-  employeePension     Decimal @default(0) @map("employee_pension") @db.Decimal(12, 2)
-  employerPension     Decimal @default(0) @map("employer_pension") @db.Decimal(12, 2)
-  nhf                 Decimal @default(0) @db.Decimal(12, 2)
-  nhisEmployee        Decimal @default(0) @map("nhis_employee") @db.Decimal(12, 2)
-  nhisEmployer        Decimal @default(0) @map("nhis_employer") @db.Decimal(12, 2)
-  nsitf               Decimal @default(0) @db.Decimal(12, 2)
-  itf                 Decimal @default(0) @db.Decimal(12, 2)
-  rentRelief          Decimal @default(0) @map("rent_relief") @db.Decimal(12, 2)
-  chargeableIncome    Decimal @default(0) @map("chargeable_income") @db.Decimal(12, 2)
-  loanRepayment       Decimal @default(0) @map("loan_repayment") @db.Decimal(12, 2)
-  groupLifeCover      Decimal @default(0) @map("group_life_cover") @db.Decimal(12, 2)
-  employerCost        Decimal @default(0) @map("employer_cost") @db.Decimal(12, 2)
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id                 String       @id @default(uuid())
+  organizationId     String       @map("organization_id")
+  employeeId         String       @map("employee_id")
+  month              Int
+  year               Int
+  basicSalary        Decimal      @map("basic_salary") @db.Decimal(12, 2)
+  allowances         Decimal      @default(0) @db.Decimal(12, 2)
+  deductions         Decimal      @default(0) @db.Decimal(12, 2)
+  tax                Decimal      @default(0) @db.Decimal(12, 2)
+  netPay             Decimal      @map("net_pay") @db.Decimal(12, 2)
+  status             String       @default("DRAFT")
+  paidAt             DateTime?    @map("paid_at")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  chargeableIncome   Decimal      @default(0) @map("chargeable_income") @db.Decimal(12, 2)
+  currency           String       @default("NGN")
+  employeePension    Decimal      @default(0) @map("employee_pension") @db.Decimal(12, 2)
+  employerCost       Decimal      @default(0) @map("employer_cost") @db.Decimal(12, 2)
+  employerPension    Decimal      @default(0) @map("employer_pension") @db.Decimal(12, 2)
+  grossPay           Decimal      @default(0) @map("gross_pay") @db.Decimal(12, 2)
+  groupLifeCover     Decimal      @default(0) @map("group_life_cover") @db.Decimal(12, 2)
+  housingAllowance   Decimal      @default(0) @map("housing_allowance") @db.Decimal(12, 2)
+  itf                Decimal      @default(0) @db.Decimal(12, 2)
+  loanRepayment      Decimal      @default(0) @map("loan_repayment") @db.Decimal(12, 2)
+  nhf                Decimal      @default(0) @db.Decimal(12, 2)
+  nhisEmployee       Decimal      @default(0) @map("nhis_employee") @db.Decimal(12, 2)
+  nhisEmployer       Decimal      @default(0) @map("nhis_employer") @db.Decimal(12, 2)
+  nonTaxable         Decimal      @default(0) @map("non_taxable") @db.Decimal(12, 2)
+  nsitf              Decimal      @default(0) @db.Decimal(12, 2)
+  otherTaxable       Decimal      @default(0) @map("other_taxable") @db.Decimal(12, 2)
+  rentRelief         Decimal      @default(0) @map("rent_relief") @db.Decimal(12, 2)
+  transportAllowance Decimal      @default(0) @map("transport_allowance") @db.Decimal(12, 2)
+  employee           Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([employeeId, month, year])
   @@index([organizationId, status])
@@ -1047,8 +1047,8 @@ model PlanModule {
   planId    String           @map("plan_id")
   moduleKey String           @map("module_key")
   enabled   Boolean          @default(true)
-  price     Decimal?         @db.Decimal(12, 2) // per-module price override (NGN)
   config    String?
+  price     Decimal?         @db.Decimal(12, 2)
   plan      SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   @@unique([planId, moduleKey])
@@ -1061,11 +1061,11 @@ model ModuleCatalog {
   key         String   @unique @map("module_key")
   name        String
   description String?
-  category    String   @default("core") // core | add_on | premium
+  category    String   @default("core")
   basePrice   Decimal  @default(0) @map("base_price") @db.Decimal(12, 2)
   currency    String   @default("NGN")
   isActive    Boolean  @default(true) @map("is_active")
-  icon        String?  // lucide icon name
+  icon        String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -1073,20 +1073,20 @@ model ModuleCatalog {
 }
 
 model OrganizationSubscription {
-  id             String           @id @default(uuid())
-  organizationId String           @map("organization_id")
-  companyGroupId String?          @map("company_group_id")
-  planId         String           @map("plan_id")
-  status         String           @default("active")
-  startDate      DateTime         @default(now()) @map("start_date")
-  endDate        DateTime?        @map("end_date")
-  billingCycle   String           @default("yearly") @map("billing_cycle")
-  autoRenew      Boolean          @default(true) @map("auto_renew")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
-  companyGroup   CompanyGroup?    @relation(fields: [companyGroupId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  plan           SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id             String                @id @default(uuid())
+  organizationId String                @map("organization_id")
+  companyGroupId String?               @map("company_group_id")
+  planId         String                @map("plan_id")
+  status         String                @default("active")
+  startDate      DateTime              @default(now()) @map("start_date")
+  endDate        DateTime?             @map("end_date")
+  billingCycle   String                @default("yearly") @map("billing_cycle")
+  autoRenew      Boolean               @default(true) @map("auto_renew")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  companyGroup   CompanyGroup?         @relation(fields: [companyGroupId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  plan           SubscriptionPlan      @relation(fields: [planId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   renewals       SubscriptionRenewal[]
 
   @@unique([organizationId, planId])
@@ -1096,25 +1096,25 @@ model OrganizationSubscription {
 }
 
 model SubscriptionRenewal {
-  id               String               @id @default(uuid())
-  organizationId   String               @map("organization_id")
-  planId           String               @map("plan_id")
-  subscriptionId   String?              @map("subscription_id")
-  status           String               @default("pending") // pending | approved | rejected | expired
-  requestedAt      DateTime             @default(now()) @map("requested_at")
-  approvedAt       DateTime?            @map("approved_at")
-  previousEndDate  DateTime?            @map("previous_end_date")
-  newEndDate       DateTime?            @map("new_end_date")
-  amount           Decimal              @db.Decimal(12,2)
-  receiptNumber    String?              @unique @map("receipt_number")
-  receiptUrl       String?              @map("receipt_url")
-  requestedBy      String?              @map("requested_by")
-  approvedBy       String?              @map("approved_by")
-  createdAt        DateTime             @default(now()) @map("created_at")
-  updatedAt        DateTime             @updatedAt @map("updated_at")
-  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  plan             SubscriptionPlan     @relation(fields: [planId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  subscription     OrganizationSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  id              String                    @id @default(uuid())
+  organizationId  String                    @map("organization_id")
+  planId          String                    @map("plan_id")
+  subscriptionId  String?                   @map("subscription_id")
+  status          String                    @default("pending")
+  requestedAt     DateTime                  @default(now()) @map("requested_at")
+  approvedAt      DateTime?                 @map("approved_at")
+  previousEndDate DateTime?                 @map("previous_end_date")
+  newEndDate      DateTime?                 @map("new_end_date")
+  amount          Decimal                   @db.Decimal(12, 2)
+  receiptNumber   String?                   @unique @map("receipt_number")
+  receiptUrl      String?                   @map("receipt_url")
+  requestedBy     String?                   @map("requested_by")
+  approvedBy      String?                   @map("approved_by")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  updatedAt       DateTime                  @updatedAt @map("updated_at")
+  organization    Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan            SubscriptionPlan          @relation(fields: [planId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subscription    OrganizationSubscription? @relation(fields: [subscriptionId], references: [id])
 
   @@index([organizationId])
   @@index([status])
@@ -1135,22 +1135,21 @@ model OnboardingProgress {
   @@map("onboarding_progress")
 }
 
-// ===================== CHAT MODULE =====================
 model Conversation {
-  id             String                    @id @default(uuid())
-  organizationId String                    @map("organization_id")
-  type           String                    @default("direct") // direct | group
-  name           String?                   // group name
-  avatarUrl      String?                   @map("avatar_url")
-  createdById    String?                   @map("created_by")
-  lastMessageAt  DateTime?                 @map("last_message_at")
-  lastMessagePreview String?               @map("last_message_preview") @db.VarChar(255)
-  createdAt      DateTime                  @default(now()) @map("created_at")
-  updatedAt      DateTime                  @updatedAt @map("updated_at")
-  organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  participants   ConversationParticipant[]
-  messages       Message[]
-  createdBy      User?                     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  id                 String                    @id @default(uuid())
+  organizationId     String                    @map("organization_id")
+  type               String                    @default("direct")
+  name               String?
+  avatarUrl          String?                   @map("avatar_url")
+  createdById        String?                   @map("created_by")
+  lastMessageAt      DateTime?                 @map("last_message_at")
+  lastMessagePreview String?                   @map("last_message_preview") @db.VarChar(255)
+  createdAt          DateTime                  @default(now()) @map("created_at")
+  updatedAt          DateTime                  @updatedAt @map("updated_at")
+  participants       ConversationParticipant[]
+  createdBy          User?                     @relation(fields: [createdById], references: [id])
+  organization       Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages           Message[]
 
   @@index([organizationId, updatedAt])
   @@index([organizationId, lastMessageAt])
@@ -1158,16 +1157,16 @@ model Conversation {
 }
 
 model ConversationParticipant {
-  id             String       @id @default(uuid())
-  conversationId String       @map("conversation_id")
-  userId         String       @map("user_id")
-  role           String       @default("member") // admin | member
-  joinedAt       DateTime     @default(now()) @map("joined_at")
-  lastReadAt     DateTime?    @map("last_read_at")
-  lastReadMessageId String?   @map("last_read_message_id")
-  isMuted        Boolean      @default(false) @map("is_muted")
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String       @id @default(uuid())
+  conversationId    String       @map("conversation_id")
+  userId            String       @map("user_id")
+  role              String       @default("member")
+  joinedAt          DateTime     @default(now()) @map("joined_at")
+  lastReadAt        DateTime?    @map("last_read_at")
+  lastReadMessageId String?      @map("last_read_message_id")
+  isMuted           Boolean      @default(false) @map("is_muted")
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, userId])
   @@index([userId])
@@ -1175,25 +1174,25 @@ model ConversationParticipant {
 }
 
 model Message {
-  id             String       @id @default(uuid())
-  organizationId String       @map("organization_id")
-  conversationId String       @map("conversation_id")
-  senderId       String       @map("sender_id")
-  content        String       @db.Text
-  messageType    String       @default("text") @map("message_type") // text | image | file | system
-  attachments    String?      // JSON stringified array of {url, name, type, size}
-  replyToId      String?      @map("reply_to_id")
-  isEdited       Boolean      @default(false) @map("is_edited")
-  isDeleted      Boolean      @default(false) @map("is_deleted")
-  expiresAt      DateTime?    @map("expires_at") // for file attachments auto-delete after 7 days
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  replyTo        Message?     @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
-  replies        Message[]    @relation("MessageReply")
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  conversationId String        @map("conversation_id")
+  senderId       String        @map("sender_id")
+  content        String
+  messageType    String        @default("text") @map("message_type")
+  attachments    String?
+  replyToId      String?       @map("reply_to_id")
+  isEdited       Boolean       @default(false) @map("is_edited")
+  isDeleted      Boolean       @default(false) @map("is_deleted")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  expiresAt      DateTime?     @map("expires_at")
   reads          MessageRead[]
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  replyTo        Message?      @relation("MessageReply", fields: [replyToId], references: [id])
+  replies        Message[]     @relation("MessageReply")
+  sender         User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
   @@index([organizationId, conversationId])
@@ -1226,7 +1225,7 @@ model StaffInvite {
   lastName       String?      @map("last_name")
   phone          String?
   token          String       @unique
-  status         String       @default("pending") // pending | accepted | revoked | expired
+  status         String       @default("pending")
   invitedBy      String?      @map("invited_by")
   employeeId     String?      @map("employee_id")
   userId         String?      @map("user_id")

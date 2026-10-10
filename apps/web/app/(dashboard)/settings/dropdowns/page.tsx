@@ -1,10 +1,10 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { GlassCard, Pill } from '../../../../components/ui/GlassCard';
-import { Building2, Layers, Shield, Boxes, Plus, Edit2, Trash2, Save, X, RefreshCw, AlertTriangle, Search } from 'lucide-react';
+import { Building2, Layers, Shield, Boxes, Plus, Edit2, Trash2, Save, X, RefreshCw, AlertTriangle, Search, Calendar } from 'lucide-react';
 import { getApiUrl, getAuthHeaders, parseApiList } from '../../../../lib/api';
 
-type Tab = 'branches' | 'departments' | 'roles' | 'modules';
+type Tab = 'branches' | 'departments' | 'roles' | 'modules' | 'leave_types';
 
 export default function DropdownsPage() {
   const api = getApiUrl();
@@ -14,9 +14,10 @@ export default function DropdownsPage() {
   const [roles, setRoles] = useState<any[]>([]);
   const [groupedPerms, setGroupedPerms] = useState<Record<string,any[]>>({});
   const [modules, setModules] = useState<string[]>([]);
+  const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
   const [perms, setPerms] = useState<any[]>([]);
-  const [loading, setLoading] = useState({ branches:false, departments:false, roles:false, modules:false });
-  const [error, setError] = useState({ branches:'', departments:'', roles:'', modules:'' });
+  const [loading, setLoading] = useState({ branches:false, departments:false, roles:false, modules:false, leave_types:false });
+  const [error, setError] = useState({ branches:'', departments:'', roles:'', modules:'', leave_types:'' });
   const [search, setSearch] = useState('');
 
   // forms
@@ -26,6 +27,8 @@ export default function DropdownsPage() {
   const [editingBranch, setEditingBranch] = useState<any>(null);
   const [editingDept, setEditingDept] = useState<any>(null);
   const [editingRole, setEditingRole] = useState<any>(null);
+  const [newLeaveType, setNewLeaveType] = useState({ name:'', maxDays:'' });
+  const [editingLeaveType, setEditingLeaveType] = useState<any>(null);
   const [permFilterModule, setPermFilterModule] = useState<string>('');
 
   const auth = ()=> getAuthHeaders() as any;
@@ -99,12 +102,37 @@ export default function DropdownsPage() {
     } catch(e:any){ setError(s=>({...s, modules:e.message})); } finally { setLoading(s=>({...s, modules:false})); }
   };
 
-  const loadAll = ()=> { fetchBranches(); fetchDepartments(); fetchRoles(); fetchModules(); };
+  const fetchLeaveTypes = async () => {
+    setLoading(s=>({...s, leave_types:true})); setError(s=>({...s, leave_types:''}));
+    try {
+      const res = await fetch(`${api}/leave/types`, { headers: auth()});
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text().then(t=>t.slice(0,120))}`);
+      const json = await res.json(); const list = parseApiList(json);
+      setLeaveTypes(list);
+    } catch(e:any){ setError(s=>({...s, leave_types:e.message})); } finally { setLoading(s=>({...s, leave_types:false})); }
+  };
+  const loadAll = ()=> { fetchBranches(); fetchDepartments(); fetchRoles(); fetchModules(); fetchLeaveTypes(); };
   useEffect(()=>{ loadAll(); },[]);
 
   // linked: when department branch filter changes refetch
   const [deptBranchFilter, setDeptBranchFilter] = useState<string>('');
-  useEffect(()=> {
+  const createLeaveType = async()=> {
+    if (!newLeaveType.name) return alert('Name required');
+    const res = await fetch(`${api}/leave/types`, { method:'POST', headers:{'Content-Type':'application/json', ...auth()}, body: JSON.stringify({ name: newLeaveType.name, max_days: newLeaveType.maxDays ? Number(newLeaveType.maxDays) : null })});
+    if (!res.ok) return alert('Failed: '+(await res.text()).slice(0,200));
+    setNewLeaveType({ name:'', maxDays:'' }); fetchLeaveTypes();
+  };
+  const updateLeaveType = async()=> {
+    const res = await fetch(`${api}/leave/types/${editingLeaveType.id}`, { method:'PATCH', headers:{'Content-Type':'application/json', ...auth()}, body: JSON.stringify({ name: editingLeaveType.name, max_days: editingLeaveType.maxDays ? Number(editingLeaveType.maxDays) : null })});
+    if (!res.ok) return alert('Failed: '+(await res.text()).slice(0,200));
+    setEditingLeaveType(null); fetchLeaveTypes();
+  };
+  const deleteLeaveType = async(id:string)=> {
+    if (!confirm('Delete leave type?')) return;
+    const res = await fetch(`${api}/leave/types/${id}`, { method:'DELETE', headers: auth()});
+    if (!res.ok) return alert('Failed: '+(await res.text()).slice(0,200));
+    fetchLeaveTypes();
+  };  useEffect(()=> {
     if (tab==='departments') {
       fetchDepartments(deptBranchFilter || undefined);
     }
@@ -193,6 +221,7 @@ export default function DropdownsPage() {
           ['departments','Departments',Layers],
           ['roles','Roles',Shield],
           ['modules','Modules',Boxes],
+          ['leave_types','Leave Types',Calendar],
         ].map(([k,label,Icon]:any)=> (
           <button key={k} onClick={()=>setTab(k as Tab)} className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${tab===k?'bg-slate-900 text-white':'glass'}`}>
             <Icon size={16}/>{label}
@@ -200,6 +229,7 @@ export default function DropdownsPage() {
             {k==='departments' && ` (${departments.length})`}
             {k==='roles' && ` (${roles.length})`}
             {k==='modules' && ` (${modules.length})`}
+            {k==='leave_types' && ` (${leaveTypes.length})`}
           </button>
         ))}
         <div className="ml-auto relative">
@@ -511,6 +541,52 @@ export default function DropdownsPage() {
               <div><code>Branch → Department</code>: Departments filtered by <code>?branchId=&lt;id&gt;</code>. In People Add/Edit, changing Branch refetches Departments. Empty shows “No departments for this branch”.</div>
               <div><code>Module → Permissions</code>: Selecting a module filters permission checkboxes (Roles tab). Grouped view via <code>GET /v1/admin/permissions/grouped</code> or <code>GET /v1/admin/modules</code>.</div>
               <div>All fetches use <code>NEXT_PUBLIC_API_URL</code> + <code>localStorage.getItem(&apos;onehr_token&apos;)</code> JWT with org scope. Loading/error/empty states handled generically.</div>
+            </div>
+          </GlassCard>
+        </div>
+      )}
+      {tab==='leave_types' && (
+        <div className="space-y-4">
+          <GlassCard>
+            <div className="flex flex-wrap gap-3 items-end">
+              <label className="text-sm font-medium">Name
+                <input value={newLeaveType.name} onChange={e=>setNewLeaveType({...newLeaveType, name:e.target.value})} className="mt-1 px-3 py-2 rounded-xl border w-56"/>
+              </label>
+              <label className="text-sm font-medium">Max Days
+                <input type="number" value={newLeaveType.maxDays} onChange={e=>setNewLeaveType({...newLeaveType, maxDays:e.target.value})} className="mt-1 px-3 py-2 rounded-xl border w-32"/>
+              </label>
+              <button disabled={!isSuperAdmin} onClick={createLeaveType} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm disabled:opacity-50 flex items-center gap-2"><Plus size={14}/> Add</button>
+            </div>
+          </GlassCard>
+          <GlassCard className="p-0 overflow-hidden">
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="text-left p-3">Name</th><th className="text-left p-3">Max Days</th><th className="text-right p-3">Actions</th></tr></thead>
+                <tbody className="divide-y">
+                  {loading.leave_types && <tr><td colSpan={3} className="p-6 text-center text-slate-500">Loading…</td></tr>}
+                  {error.leave_types && <tr><td colSpan={3} className="p-4 text-red-600">{error.leave_types}</td></tr>}
+                  {!loading.leave_types && !error.leave_types && leaveTypes.filter((x:any)=>!search||x.name?.toLowerCase().includes(search.toLowerCase())).map((lt:any)=> (
+                    <tr key={lt.id} className="hover:bg-slate-50/50">
+                      <td className="p-3">{editingLeaveType?.id===lt.id ? <input value={editingLeaveType.name} onChange={e=>setEditingLeaveType({...editingLeaveType,name:e.target.value})} className="px-2 py-1 rounded border text-sm"/> : lt.name}</td>
+                      <td className="p-3">{editingLeaveType?.id===lt.id ? <input type="number" value={editingLeaveType.maxDays} onChange={e=>setEditingLeaveType({...editingLeaveType,maxDays:e.target.value})} className="px-2 py-1 rounded border text-sm w-24"/> : lt.maxDays||'-'}</td>
+                      <td className="p-3 text-right">
+                        {editingLeaveType?.id===lt.id ? (
+                          <div className="flex gap-2 justify-end">
+                            <button onClick={updateLeaveType} className="p-2 bg-emerald-600 text-white rounded-lg"><Save size={14}/></button>
+                            <button onClick={()=>setEditingLeaveType(null)} className="p-2 glass rounded-lg"><X size={14}/></button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2 justify-end">
+                            <button disabled={!isSuperAdmin} onClick={()=>setEditingLeaveType({id:lt.id,name:lt.name,maxDays:lt.maxDays})} className="p-2 glass rounded-lg disabled:opacity-50"><Edit2 size={14}/></button>
+                            <button disabled={!isSuperAdmin} onClick={()=>deleteLeaveType(lt.id)} className="p-2 glass rounded-lg disabled:opacity-50"><Trash2 size={14}/></button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {!loading.leave_types && !error.leave_types && leaveTypes.length===0 && <tr><td colSpan={3} className="p-6 text-center text-slate-500">No leave types — add one</td></tr>}
+                </tbody>
+              </table>
             </div>
           </GlassCard>
         </div>
