@@ -26,6 +26,9 @@ export default function PeoplePage() {
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState({ jobTitle:'', grade:'L1', workArrangement:'office', employmentType:'permanent', status:'active', departmentId:'', branchId:'', skills:'', role:'', email:'', phone:'', dob:'', hireDate: new Date().toISOString().slice(0,10) });
   const [showBulk, setShowBulk] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [invite, setInvite] = useState({ email: '', role: 'employee', first_name: '', last_name: '', job_title: '', phone: '' });
+  const [inviteMsg, setInviteMsg] = useState('');
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkPreview, setBulkPreview] = useState<any[]>([]);
   const [bulkResult, setBulkResult] = useState<any>(null);
@@ -386,7 +389,15 @@ export default function PeoplePage() {
     const opts = branchId ? deptOptionsForForm.filter((d:any)=> !d.branchId || d.branchId===branchId || departments.some(x=>x.id===d.id)) : deptOptionsForForm;
     // if branch selected and filtered empty, show empty state linked
     const isLinkedEmpty = branchId && !deptState.loading && opts.length===0;
-    return (
+    const sendInvite = async () => {
+    if (!invite.email) return setInviteMsg('Email required');
+    setInviteMsg('Sending...');
+    const res = await fetch(`${api}/employees/invites`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(invite) });
+    const t = await res.text();
+    try { const j = JSON.parse(t); setInviteMsg(j.emailSent ? 'Invite sent ✓' : (j.inviteUrl ? `Link: ${j.inviteUrl}` : t.slice(0,120))); } catch { setInviteMsg(t.slice(0,120)); }
+    setTimeout(()=>setInviteMsg(''), 8000);
+  };
+  return (
       <label className="text-sm font-medium">Department
         <select value={value} onChange={e=>onChange(e.target.value)} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50" disabled={deptState.loading}>
           <option value="">{deptState.loading ? 'Loading departments…' : isLinkedEmpty ? '— No departments for this branch —' : '— No department —'}</option>
@@ -421,7 +432,15 @@ export default function PeoplePage() {
       if (value && !map.has(value)) map.set(value, { id:`cur-${value}`, slug:value, name:value });
       return Array.from(map.values());
     })();
-    return (
+    const sendInvite = async () => {
+    if (!invite.email) return setInviteMsg('Email required');
+    setInviteMsg('Sending...');
+    const res = await fetch(`${api}/employees/invites`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(invite) });
+    const t = await res.text();
+    try { const j = JSON.parse(t); setInviteMsg(j.emailSent ? 'Invite sent ✓' : (j.inviteUrl ? `Link: ${j.inviteUrl}` : t.slice(0,120))); } catch { setInviteMsg(t.slice(0,120)); }
+    setTimeout(()=>setInviteMsg(''), 8000);
+  };
+  return (
       <label className="text-sm font-medium">Role
         <select value={value} onChange={e=>onChange(e.target.value)} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50" disabled={roleState.loading}>
           <option value="">{roleState.loading ? 'Loading roles…' : '— No role change —'}</option>
@@ -435,6 +454,14 @@ export default function PeoplePage() {
     );
   };
 
+  const sendInvite = async () => {
+    if (!invite.email) return setInviteMsg('Email required');
+    setInviteMsg('Sending...');
+    const res = await fetch(`${api}/employees/invites`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(invite) });
+    const t = await res.text();
+    try { const j = JSON.parse(t); setInviteMsg(j.emailSent ? 'Invite sent ✓' : (j.inviteUrl ? `Link: ${j.inviteUrl}` : t.slice(0,120))); } catch { setInviteMsg(t.slice(0,120)); }
+    setTimeout(()=>setInviteMsg(''), 8000);
+  };
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -446,6 +473,7 @@ export default function PeoplePage() {
           <a href="/api/seed" className="hidden" />
           <button onClick={downloadTemplate} className="glass rounded-xl px-4 py-2 text-sm flex items-center gap-2"><Download size={16}/> Template</button>
           <button onClick={() => setShowBulk(true)} className="bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm flex items-center gap-2 hover:bg-emerald-700"><Download size={16}/> Bulk Upload (300+)</button>
+          <button onClick={() => setInviteOpen(true)} className="bg-violet-600 text-white rounded-xl px-4 py-2 text-sm flex items-center gap-2 hover:bg-violet-700">Send Invite Link</button>
           <button onClick={() => setShowAdd(true)} className="bg-slate-900 text-white rounded-xl px-4 py-2 text-sm flex items-center gap-2 hover:bg-slate-800"><Plus size={16}/> Add Employee</button>
         </div>
       </div>
@@ -703,6 +731,26 @@ export default function PeoplePage() {
                 <button onClick={uploadBulk} disabled={!bulkFile || bulkLoading} className="flex-1 bg-emerald-600 text-white rounded-xl py-2.5 font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">{bulkLoading ? 'Uploading…' : `Upload ${bulkFile ? 'CSV' : ''} → Create`}</button>
               </div>
               <p className="text-xs text-slate-500">Department/branch by name auto-creates if not found • Skills in quotes "React,Node" • Phone/email optional creates login (Employee@123) • Generic slicing: filter by work_arrangement/grade in People grid</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inviteOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl space-y-3">
+            <h3 className="font-bold text-lg">Send Invite Link</h3>
+            <input value={invite.email} onChange={e=>setInvite({...invite,email:e.target.value})} placeholder="Email" className="w-full border rounded-xl px-3 py-2 text-sm"/>
+            <input value={invite.first_name} onChange={e=>setInvite({...invite,first_name:e.target.value})} placeholder="First name (optional)" className="w-full border rounded-xl px-3 py-2 text-sm"/>
+            <input value={invite.last_name} onChange={e=>setInvite({...invite,last_name:e.target.value})} placeholder="Last name (optional)" className="w-full border rounded-xl px-3 py-2 text-sm"/>
+            <input value={invite.job_title} onChange={e=>setInvite({...invite,job_title:e.target.value})} placeholder="Job title (optional)" className="w-full border rounded-xl px-3 py-2 text-sm"/>
+            <select value={invite.role} onChange={e=>setInvite({...invite,role:e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm">
+              <option value="employee">employee</option><option value="hr_admin">hr_admin</option><option value="manager">manager</option><option value="org_admin">org_admin</option>
+            </select>
+            {inviteMsg && <div className="text-xs text-slate-600 break-all">{inviteMsg}</div>}
+            <div className="flex gap-2 pt-2">
+              <button onClick={sendInvite} className="flex-1 bg-violet-600 text-white rounded-xl py-2 text-sm">Send</button>
+              <button onClick={()=>setInviteOpen(false)} className="flex-1 border rounded-xl py-2 text-sm">Close</button>
             </div>
           </div>
         </div>
