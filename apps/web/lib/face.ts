@@ -36,6 +36,38 @@ export async function loadFaceModels() {
   return loadPromise;
 }
 
+// Lightweight detector + landmark models for per-frame liveness sampling.
+// These are tiny (KB) and fast enough to run several times per second; the
+// heavy SSD + recognition nets are only used for one-shot descriptor capture.
+let fastLoaded = false;
+let fastPromise: Promise<void> | null = null;
+export async function loadFastModels() {
+  if (fastLoaded) return;
+  if (fastPromise) return fastPromise;
+  fastPromise = (async () => {
+    const faceapi = await import('@vladmandic/face-api');
+    const urls = [
+      '/models',
+      'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model',
+      'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights',
+    ];
+    for (const url of urls) {
+      try {
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(url),
+          faceapi.nets.faceLandmark68TinyNet.loadFromUri(url),
+        ]);
+        fastLoaded = true;
+        console.log('fast face models loaded from', url);
+        return;
+      } catch (e) { console.warn('fast models failed at', url, e); }
+    }
+    throw new Error('fast face models unavailable');
+  })();
+  try { await fastPromise; } catch (e) { fastPromise = null; throw e; }
+}
+export function fastModelsReady() { return fastLoaded; }
+
 export async function getDescriptorFromCanvas(canvas: HTMLCanvasElement): Promise<Float32Array | null> {
   try {
     const faceapi = await import('@vladmandic/face-api');
@@ -68,7 +100,7 @@ export type FaceMetrics = {
   smile: number;
   yaw: number;
 };
-export type FaceSample = { descriptor: number[]; metrics: FaceMetrics };
+export type FaceSample = { metrics: FaceMetrics };
 
 export type ChallengeType = 'blink' | 'open_mouth' | 'turn_left' | 'turn_right';
 export type Challenge = { type: ChallengeType; label: string; hint: string };
@@ -115,10 +147,11 @@ function earOf(eye: any[]) {
 
 export async function detectFaceSample(video: HTMLVideoElement): Promise<FaceSample | null> {
   try {
-    const faceapi = await import('@vladmandic/face-api');
-    if (!modelsLoaded) await loadFaceModels();
-    const det: any = await (faceapi as any).detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
-    if (!det || !det.descriptor) return null;
+    const faceapi: any = await import('@vladmandic/face-api');
+    if (!fastLoaded) await loadFastModels();
+    const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 });
+    const det: any = await faceapi.detectSingleFace(video, opts).withFaceLandmarks(true);
+    if (!det || !det.landmarks) return null;
     const L = det.landmarks;
     const le = L.getLeftEye(); const re = L.getRightEye();
     const nose = L.getNose(); const mouth = L.getMouth();
@@ -130,7 +163,7 @@ export async function detectFaceSample(video: HTMLVideoElement): Promise<FaceSam
     const noseTip = nose[3] || nose[Math.floor(nose.length/2)];
     const yaw = (noseTip.x - eyeMid.x) / interocular;
     const smile = mouthW / interocular;
-    return { descriptor: Array.from(det.descriptor), metrics: { ear, mouthOpen, smile, yaw } };
+    return { metrics: { ear, mouthOpen, smile, yaw } };
   } catch (e) {
     console.warn('detectFaceSample failed', e);
     return null;

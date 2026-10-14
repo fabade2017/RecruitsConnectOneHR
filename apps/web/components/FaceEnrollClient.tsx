@@ -46,7 +46,11 @@ export default function FaceEnrollClient() {
   const blinkClosed = useRef(false);
   const deadline = useRef(0);
   const loadModels = async () => {
-    try { const { loadFaceModels } = await import('../lib/face'); await loadFaceModels(); setFaceModelReady(true); } catch { setFaceModelReady(false); }
+    try {
+      const m = await import('../lib/face');
+      await Promise.all([m.loadFaceModels(), m.loadFastModels()]);
+      setFaceModelReady(true);
+    } catch { setFaceModelReady(false); }
   };
 
   const auth = () => ({ Authorization: `Bearer ${localStorage.getItem('onehr_token')}` });
@@ -114,19 +118,21 @@ export default function FaceEnrollClient() {
   useEffect(() => {
     if (phase !== 'active' || !challenges[idx] || featureEnabled !== true) return;
     baseSamples.current = []; baseline.current = null; blinkClosed.current = false;
-    deadline.current = Date.now() + 9000; setProgress(0);
+    deadline.current = Date.now() + 20000; setProgress(0);
+    let firstSeen = false;
     let stopped = false;
     const run = async () => {
       if (stopped) return;
       const v = videoRef.current;
       if (v && v.readyState >= 2) {
         const remain = deadline.current - Date.now();
-        setProgress(Math.max(0, Math.min(1, 1 - remain / 9000)));
+        setProgress(Math.max(0, Math.min(1, 1 - remain / (firstSeen ? 12000 : 20000))));
         if (remain <= 0) { setPhase('failed'); setHint('Time expired — tap Retry'); return; }
         const s = await detectFaceSample(v);
         if (stopped) return;
         if (!s) { setHint('Face not detected — center your face and hold still'); }
         else {
+          if (!firstSeen) { firstSeen = true; deadline.current = Date.now() + 12000; setHint('Hold still… calibrating'); }
           setFaceDetected(true);
           setYawDir(s.metrics.yaw > 0.12 ? 'left' : s.metrics.yaw < -0.12 ? 'right' : 'center');
           if (baseSamples.current.length < 6) {
@@ -140,7 +146,7 @@ export default function FaceEnrollClient() {
           }
         }
       }
-      setTimeout(run, 180);
+      setTimeout(run, 80);
     };
     run();
     return () => { stopped = true; };

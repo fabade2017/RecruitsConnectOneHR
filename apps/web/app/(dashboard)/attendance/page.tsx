@@ -64,8 +64,11 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
   useEffect(() => {
     if (!open || phase !== 'active' || !challenges[idx]) return;
     baseSamples.current = []; baseline.current = null; blinkClosed.current = false;
-    deadline.current = Date.now() + 9000;
-    setHint('Hold still… calibrating');
+    // Guard timeout while we wait for the first detection; the real action
+    // window starts only once the engine is up and a face is visible.
+    deadline.current = Date.now() + 20000;
+    let firstSeen = false;
+    setHint('Preparing camera…');
     setProgress(0);
     let stopped = false;
     const run = async () => {
@@ -73,13 +76,14 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
       const v = videoRef.current;
       if (v && v.readyState >= 2) {
         const remain = deadline.current - Date.now();
-        setProgress(Math.max(0, Math.min(1, 1 - remain / 9000)));
+        setProgress(Math.max(0, Math.min(1, 1 - remain / (firstSeen ? 12000 : 20000))));
         if (remain <= 0) { setPhase('failed'); setHint('Time expired — try again'); return; }
         const { detectFaceSample } = await import('../../../lib/face');
         const s = await detectFaceSample(v);
         if (stopped) return;
         if (!s) { setHint('Face not detected — center your face and hold still'); }
         else {
+          if (!firstSeen) { firstSeen = true; deadline.current = Date.now() + 12000; setHint('Hold still… calibrating'); }
           setFaceDetected(true);
           setYawDir(s.metrics.yaw > 0.12 ? 'left' : s.metrics.yaw < -0.12 ? 'right' : 'center');
           if (baseSamples.current.length < 6) {
@@ -102,7 +106,7 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
           }
         }
       }
-      setTimeout(run, 180);
+      setTimeout(run, 80);
     };
     run();
     return () => { stopped = true; };
@@ -134,7 +138,7 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
   }, [open]);
 
   const [descriptor, setDescriptor] = useState<number[] | null>(null);
-  useEffect(()=>{ import('../../../lib/face').then(m=> m.loadFaceModels().catch(()=>{})).catch(()=>{}); }, []);
+  useEffect(()=>{ import('../../../lib/face').then(m=> { m.loadFaceModels().catch(()=>{}); m.loadFastModels().catch(()=>{}); }).catch(()=>{}); }, []);
   const snap = async () => {
     if (!videoRef.current || !canvasRef.current) return;
     const v = videoRef.current;
