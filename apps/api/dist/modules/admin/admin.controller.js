@@ -74,6 +74,9 @@ let AdminController = class AdminController {
     // ===== Per-organization feature toggles (facial enrollment / clock-in / clock-out) =====
     orgFeatures(orgId) { return this.svc.getOrgFeatures(orgId); }
     updateOrgFeatures(orgId, dto) { return this.svc.updateOrgFeatures(orgId, dto); }
+    // ===== Email diagnostics (platform Super Admin) =====
+    emailStatus() { return this.svc.emailStatus(); }
+    emailTest(dto) { return this.svc.sendTestEmail(dto?.to); }
 };
 exports.AdminController = AdminController;
 __decorate([
@@ -451,6 +454,25 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "updateOrgFeatures", null);
+__decorate([
+    (0, common_1.Get)('email/status'),
+    (0, rbac_guard_1.PlatformOnly)(),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    (0, swagger_1.ApiOperation)({ summary: 'Show which email provider is active and whether it is configured' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "emailStatus", null);
+__decorate([
+    (0, common_1.Post)('email/test'),
+    (0, rbac_guard_1.PlatformOnly)(),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    (0, swagger_1.ApiOperation)({ summary: 'Send a test email to verify delivery config' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "emailTest", null);
 exports.AdminController = AdminController = __decorate([
     (0, swagger_1.ApiTags)('admin'),
     (0, module_guard_1.RequireModule)('administration'),

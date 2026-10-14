@@ -14,10 +14,39 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
 const org_features_1 = require("../../common/org-features");
+const email_1 = require("../../lib/email");
 let AdminService = class AdminService {
     prisma;
     constructor(prisma) {
         this.prisma = prisma;
+    }
+    // ===== Email diagnostics (platform Super Admin) =====
+    emailStatus() {
+        const provider = (0, email_1.emailProviderName)();
+        const configured = provider === 'resend'
+            ? !!process.env.RESEND_API_KEY
+            : provider === 'sendgrid'
+                ? !!process.env.SENDGRID_API_KEY
+                : !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+        return {
+            provider,
+            configured,
+            fromEmail: process.env.FROM_EMAIL || 'supports@rconehr.com',
+            fromName: process.env.FROM_NAME || 'RecruitConnect OneHR',
+            note: provider === 'smtp'
+                ? 'SMTP is used — this is BLOCKED on Render free tier. Set RESEND_API_KEY or SENDGRID_API_KEY instead.'
+                : 'HTTPS provider — works on Render free tier.',
+        };
+    }
+    async sendTestEmail(to) {
+        if (!to)
+            throw new common_1.ForbiddenException('Recipient email (to) is required');
+        const result = await (0, email_1.sendEmail)({
+            to,
+            subject: 'RecruitConnect OneHR — email test',
+            html: `<div style="font-family: Arial, sans-serif"><h2>Email delivery test</h2><p>If you can read this, OneHR email is configured correctly.</p><p style="color:#64748b;font-size:12px">Provider: <b>${(0, email_1.emailProviderName)()}</b> • ${new Date().toISOString()}</p></div>`,
+        });
+        return { ...this.emailStatus(), to, sent: result.success === true, error: result.success ? undefined : String(result.error?.message || result.error || 'send failed') };
     }
     // ===== Roles (Super Admin can create/assign) =====
     listRoles(orgId) {

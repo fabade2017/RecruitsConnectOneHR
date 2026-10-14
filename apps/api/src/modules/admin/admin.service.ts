@@ -2,10 +2,40 @@ import { Injectable, ForbiddenException, NotFoundException, ConflictException } 
 import { PrismaService } from '../../prisma/prisma.service';
 import { isPlatformSuperAdmin } from '../../common/guards/rbac.guard';
 import { parseOrgFeatures, mergeOrgFeatures } from '../../common/org-features';
+import { sendEmail, emailProviderName } from '../../lib/email';
 
 @Injectable()
 export class AdminService {
   constructor(private prisma: PrismaService) {}
+
+  // ===== Email diagnostics (platform Super Admin) =====
+  emailStatus() {
+    const provider = emailProviderName();
+    const configured = provider === 'resend'
+      ? !!process.env.RESEND_API_KEY
+      : provider === 'sendgrid'
+        ? !!process.env.SENDGRID_API_KEY
+        : !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+    return {
+      provider,
+      configured,
+      fromEmail: process.env.FROM_EMAIL || 'supports@rconehr.com',
+      fromName: process.env.FROM_NAME || 'RecruitConnect OneHR',
+      note: provider === 'smtp'
+        ? 'SMTP is used — this is BLOCKED on Render free tier. Set RESEND_API_KEY or SENDGRID_API_KEY instead.'
+        : 'HTTPS provider — works on Render free tier.',
+    };
+  }
+
+  async sendTestEmail(to: string) {
+    if (!to) throw new ForbiddenException('Recipient email (to) is required');
+    const result: any = await sendEmail({
+      to,
+      subject: 'RecruitConnect OneHR — email test',
+      html: `<div style="font-family: Arial, sans-serif"><h2>Email delivery test</h2><p>If you can read this, OneHR email is configured correctly.</p><p style="color:#64748b;font-size:12px">Provider: <b>${emailProviderName()}</b> • ${new Date().toISOString()}</p></div>`,
+    });
+    return { ...this.emailStatus(), to, sent: result.success === true, error: result.success ? undefined : String(result.error?.message || result.error || 'send failed') };
+  }
 
   // ===== Roles (Super Admin can create/assign) =====
   listRoles(orgId?: string) {

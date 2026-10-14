@@ -222,4 +222,17 @@ export class AdminController {
   @RequirePermissions('admin:manage')
   @ApiOperation({ summary: 'Enable/disable per-org features: faceEnrollment, clockIn, clockOut (super admin)' })
   updateOrgFeatures(@Param('orgId') orgId: string, @Body() dto: any) { return this.svc.updateOrgFeatures(orgId, dto); }
+
+  // ===== Email diagnostics (platform Super Admin) =====
+  @Get('email/status')
+  @PlatformOnly()
+  @RequirePermissions('admin:manage')
+  @ApiOperation({ summary: 'Show which email provider is active and whether it is configured' })
+  emailStatus() { return this.svc.emailStatus(); }
+
+  @Post('email/test')
+  @PlatformOnly()
+  @RequirePermissions('admin:manage')
+  @ApiOperation({ summary: 'Send a test email to verify delivery config' })
+  emailTest(@Body() dto: { to: string }) { return this.svc.sendTestEmail(dto?.to); }
 }
