@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { GlassCard, Pill } from './ui/GlassCard';
 import { Camera, Check, X, AlertTriangle, ShieldCheck, ArrowLeft, RefreshCw, Eye } from 'lucide-react';
+import { fetchOrgFeatures } from '../lib/features';
+import { makeChallenges, evaluateChallenge, calibrate, detectFaceSample, type Challenge, type FaceMetrics } from '../lib/face';
 
 export default function FaceEnrollClient() {
   const router = useRouter();
@@ -31,7 +33,18 @@ export default function FaceEnrollClient() {
   const [consent, setConsent] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
   const [faceModelReady, setFaceModelReady] = useState(false);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [phase, setPhase] = useState<'idle' | 'active' | 'passed' | 'failed'>('idle');
+  const [hint, setHint] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [yawDir, setYawDir] = useState<'left' | 'center' | 'right'>('center');
+  const baseSamples = useRef<FaceMetrics[]>([]);
+  const baseline = useRef<Partial<FaceMetrics> | null>(null);
+  const blinkClosed = useRef(false);
+  const deadline = useRef(0);
   const loadModels = async () => {
     try { const { loadFaceModels } = await import('../lib/face'); await loadFaceModels(); setFaceModelReady(true); } catch { setFaceModelReady(false); }
   };
@@ -56,7 +69,9 @@ export default function FaceEnrollClient() {
   }, [stream, employee]);
 
   useEffect(() => { loadModels(); }, []);
+  useEffect(() => { fetchOrgFeatures().then(f => setFeatureEnabled(f.faceEnrollment)).catch(()=> setFeatureEnabled(true)); }, []);
   useEffect(() => {
+    if (featureEnabled !== true) return;
     let s: MediaStream | null = null;
     (async () => {
       try {
@@ -83,12 +98,62 @@ export default function FaceEnrollClient() {
       } catch (e:any) { setError(e.message); }
     })();
     return () => { if (s) s.getTracks().forEach(t=>t.stop()); };
-  }, []);
+  }, [featureEnabled]);
+
+  const startChallenge = () => {
+    setChallenges(makeChallenges(1)); setIdx(0); setPhase('active');
+    setHint('Hold still… calibrating'); setProgress(0); setYawDir('center');
+  };
+
+  // Auto-start a fresh live challenge whenever we still have angles to capture
+  useEffect(() => {
+    if (featureEnabled === true && stream && faceModelReady && phase === 'idle' && captures.length < 3) startChallenge();
+  }, [featureEnabled, stream, faceModelReady, phase, captures.length]);
+
+  // Live challenge engine — a recorded video/photo cannot answer a random prompt
+  useEffect(() => {
+    if (phase !== 'active' || !challenges[idx] || featureEnabled !== true) return;
+    baseSamples.current = []; baseline.current = null; blinkClosed.current = false;
+    deadline.current = Date.now() + 9000; setProgress(0);
+    let stopped = false;
+    const run = async () => {
+      if (stopped) return;
+      const v = videoRef.current;
+      if (v && v.readyState >= 2) {
+        const remain = deadline.current - Date.now();
+        setProgress(Math.max(0, Math.min(1, 1 - remain / 9000)));
+        if (remain <= 0) { setPhase('failed'); setHint('Time expired — tap Retry'); return; }
+        const s = await detectFaceSample(v);
+        if (stopped) return;
+        if (!s) { setHint('Face not detected — center your face and hold still'); }
+        else {
+          setFaceDetected(true);
+          setYawDir(s.metrics.yaw > 0.12 ? 'left' : s.metrics.yaw < -0.12 ? 'right' : 'center');
+          if (baseSamples.current.length < 6) {
+            baseSamples.current.push(s.metrics);
+            if (baseSamples.current.length === 6) { baseline.current = calibrate(baseSamples.current); setHint(challenges[idx].hint); }
+          } else if (evaluateChallenge(challenges[idx].type, s.metrics, baseline.current, blinkClosed)) {
+            setPhase('passed'); setHint('');
+            return;
+          } else {
+            setHint(challenges[idx].hint);
+          }
+        }
+      }
+      setTimeout(run, 180);
+    };
+    run();
+    return () => { stopped = true; };
+  }, [phase, idx, challenges, featureEnabled]);
 
   const snap = async () => {
     if (!videoRef.current) return;
     if (!faceModelReady) {
       setError('Face model still loading — please wait a moment and retry');
+      return;
+    }
+    if (phase !== 'passed') {
+      setError('Complete the live challenge shown on camera before capturing');
       return;
     }
     const v = videoRef.current;
@@ -113,11 +178,13 @@ export default function FaceEnrollClient() {
     setCaptures([...captures, b64]);
     setDescriptors(prev=> [...prev, desc!]);
     setError('');
+    if (captures.length + 1 < 3) startChallenge();
+    else { setPhase('idle'); setHint(''); }
   };
 
   const upload = async () => {
     if (captures.length < 1) return setError('Capture at least 1 face image');
-    if (faceModelReady && descriptors.length===0) return setError('No face descriptors captured — ensure good lighting, face centered, and retry. Model ready but no face detected.');
+    if (descriptors.length === 0) return setError('No face descriptors captured — ensure good lighting, face centered, and retry. Biometric enrollment requires a descriptor.');
     if (!consent) return setError('Consent required');
     setSaving(true); setError('');
     try {
@@ -135,10 +202,27 @@ export default function FaceEnrollClient() {
       const refreshed = await fetch(`${api}/employees/${id}/face-profile`, { headers: auth() }).then(r=>r.json()).catch(()=>null);
       if (refreshed) setEnrolled(refreshed);
       setCaptures([]); setDescriptors([]);
+      setPhase('idle'); setHint('');
       alert(`Face enrolled ${data.enrolled || captures.length} images with descriptors! Clock-in will now do intelligent biometric matching (Euclidean <0.40).`);
       // Stay on page to show updated enrolled count, user can go to attendance when ready
     } catch (e:any) { setError(e.message); } finally { setSaving(false); }
   };
+
+  if (featureEnabled === false) return (
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-violet-50/30 p-6">
+      <GlassCard className="max-w-lg text-center border-amber-200 bg-amber-50/50">
+        <AlertTriangle className="mx-auto text-amber-600" size={28}/>
+        <h1 className="text-xl font-bold mt-3">Face enrollment disabled</h1>
+        <p className="text-sm text-slate-600 mt-2">
+          Facial enrollment has been turned off for your organization by the platform administrator.
+          Contact your HR admin if you believe this is a mistake.
+        </p>
+        <Link href="/employees" className="inline-flex mt-4 items-center gap-2 bg-slate-900 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-slate-800">
+          <ArrowLeft size={16}/> Back to People
+        </Link>
+      </GlassCard>
+    </main>
+  );
 
   if (!employee) return <div className="min-h-screen flex items-center justify-center p-6">Loading employee {id}… {error && <span className="text-red-500">{error}</span>}</div>;
 
@@ -168,16 +252,31 @@ export default function FaceEnrollClient() {
             <div className="mt-3 relative rounded-2xl overflow-hidden bg-slate-900 aspect-[4/3] flex items-center justify-center">
               <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className={`w-[180px] h-[240px] rounded-[36px] border-2 ${faceDetected ? 'border-emerald-400 bg-emerald-500/10' : 'border-white/40'} transition-all`} />
+                <div className={`w-[180px] h-[240px] rounded-[36px] border-2 ${phase==='passed' ? 'border-emerald-400 bg-emerald-500/10' : faceDetected ? 'border-amber-400 bg-amber-500/10' : 'border-white/40'} transition-all`} />
               </div>
-              <div className="absolute top-3 left-3 bg-black/60 text-white rounded-full px-3 py-1 text-xs">{faceDetected ? '● Face detected' : '○ Searching…'}</div>
+              <div className="absolute top-3 left-3 bg-black/60 text-white rounded-full px-3 py-1 text-xs">{phase==='passed' ? '✓ Liveness verified' : phase==='failed' ? 'Challenge failed' : faceDetected ? '● Face detected' : '○ Searching…'}</div>
+              {phase !== 'passed' && challenges[idx] && (
+                <div className="absolute top-12 left-3 right-3 bg-black/70 backdrop-blur text-white rounded-xl p-3">
+                  <div className="flex items-center justify-between text-xs text-white/70"><span>Live check</span><span>{phase==='failed' ? '✕' : '● LIVE'}</span></div>
+                  {phase === 'failed' ? (
+                    <div className="mt-1 text-sm font-semibold flex items-center gap-2"><AlertTriangle size={14} className="text-red-400"/> {hint || 'Challenge failed'}</div>
+                  ) : (
+                    <>
+                      <div className="mt-1 text-base font-bold tracking-tight">{challenges[idx].label}</div>
+                      <div className="text-xs text-white/70">{hint}</div>
+                      <div className="mt-2 h-1.5 rounded-full bg-white/20 overflow-hidden"><div className="h-full bg-amber-400 transition-all" style={{ width: `${Math.round(progress*100)}%` }} /></div>
+                    </>
+                  )}
+                  {phase === 'failed' && <button onClick={startChallenge} className="mt-2 w-full bg-white/15 rounded-lg py-1.5 text-xs font-semibold flex items-center justify-center gap-1"><RefreshCw size={12}/> Retry challenge</button>}
+                </div>
+              )}
             </div>
             <div className="mt-3 flex gap-2">
-              <button onClick={snap} disabled={!faceDetected || captures.length>=3 || !faceModelReady} className="flex-1 bg-slate-900 text-white rounded-xl py-2.5 font-semibold disabled:opacity-40 flex items-center justify-center gap-2"><Camera size={16}/> Snap {captures.length+1}/3 {!faceModelReady && '(loading model...)'} </button>
-              <button onClick={()=>{setCaptures([]); setDescriptors([]);}} className="glass rounded-xl px-4 py-2.5"><RefreshCw size={16}/></button>
+              <button onClick={snap} disabled={phase!=='passed' || captures.length>=3 || !faceModelReady} className="flex-1 bg-slate-900 text-white rounded-xl py-2.5 font-semibold disabled:opacity-40 flex items-center justify-center gap-2"><Camera size={16}/> {phase==='passed' ? `Snap ${captures.length+1}/3` : 'Answer live prompt'} {!faceModelReady && '(loading model...)'} </button>
+              <button onClick={()=>{setCaptures([]); setDescriptors([]); setPhase('idle');}} className="glass rounded-xl px-4 py-2.5"><RefreshCw size={16}/></button>
             </div>
             {!faceModelReady && <div className="text-xs text-amber-600 mt-1">Face model loading… please wait before capturing</div>}
-            <p className="text-xs text-slate-500 mt-2 text-center">Move slightly between snaps: front, left, right. Motion 0.8–12% required for liveness.</p>
+            <p className="text-xs text-slate-500 mt-2 text-center">A random live prompt must be performed before each snap (blink / open mouth / turn head). A recorded video cannot answer it.</p>
             {error && <div className="mt-3 bg-red-50 text-red-700 text-sm p-2 rounded">{error}</div>}
           </GlassCard>
 
@@ -203,9 +302,10 @@ export default function FaceEnrollClient() {
         <GlassCard>
           <h3 className="font-semibold">How fraud detection uses this</h3>
           <ul className="mt-2 text-sm text-slate-600 space-y-1 list-disc list-inside">
-            <li>Clock-in captures live snapshot + motion (0.8–12%) → liveness.</li>
-            <li>Live face compared with enrolled 3 images via string similarity (first 500 chars). &lt;60% → <code>duplicate_face</code> critical, &lt;80% → <code>suspicious</code>.</li>
+            <li>Enrolment and clock-in require completing a random live prompt (blink / open mouth / turn head) — a photo or recorded video cannot answer it.</li>
+            <li>Live face descriptor compared with enrolled descriptors via Euclidean distance. Distance &gt;0.6 → <code>duplicate_face</code> critical, &gt;0.4 → <code>suspicious</code>. Descriptor is required — image-only captures are rejected.</li>
             <li>No enrolled face → flagged <code>no_enrolled_face</code> for HR to send this link.</li>
+            <li>Clock-out is verified against the enrolled face too.</li>
             <li>HR can view enrollment status in People → Face column and resend link.</li>
           </ul>
         </GlassCard>

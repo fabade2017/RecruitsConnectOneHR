@@ -4,6 +4,8 @@ import { GlassCard, Pill } from '../../../components/ui/GlassCard';
 import { StatCard } from '../../../components/ui/StatCard';
 import { Clock, Timer, AlertTriangle, CalendarCheck, MapPin, Fingerprint, QrCode, Smartphone, Building2, Camera, Eye, ShieldCheck, Activity, X, Check, RefreshCw } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { useOrgFeatures } from '../../../lib/features';
+import { makeChallenges, evaluateChallenge, median, type Challenge } from '../../../lib/face';
 const AttendanceMap = dynamic(() => import('../../../components/AttendanceMap'), { ssr: false });
 
 function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean; onClose: () => void; onCapture: (base64: string, meta: any) => void; action: string }) {
@@ -12,16 +14,25 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [faceDetected, setFaceDetected] = useState(false);
   const [motion, setMotion] = useState(0);
-  const [liveness, setLiveness] = useState<'idle'|'scanning'|'verified'|'failed'>('idle');
   const [error, setError] = useState('');
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [phase, setPhase] = useState<'idle' | 'active' | 'passed' | 'failed'>('idle');
+  const [hint, setHint] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [yawDir, setYawDir] = useState<'left' | 'center' | 'right'>('center');
   const prevFrame = useRef<ImageData | null>(null);
   const raf = useRef<number | null>(null);
+  const baseSamples = useRef<any[]>([]);
+  const baseline = useRef<any>(null);
+  const blinkClosed = useRef(false);
+  const deadline = useRef(0);
 
   useEffect(() => {
     if (!open) {
       if (stream) stream.getTracks().forEach(t=>t.stop());
       if (raf.current) cancelAnimationFrame(raf.current);
-      setStream(null); setFaceDetected(false); setMotion(0); setLiveness('idle'); prevFrame.current=null;
+      setStream(null); setFaceDetected(false); setMotion(0); prevFrame.current=null;
       return;
     }
     let mounted = true;
@@ -31,66 +42,96 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
         if (!mounted) { s.getTracks().forEach(t=>t.stop()); return; }
         setStream(s);
         if (videoRef.current) videoRef.current.srcObject = s;
-        setLiveness('scanning');
       } catch (e:any) {
         setError(e.message || 'Camera permission denied');
-        setLiveness('failed');
+        setPhase('failed');
       }
     })();
     return () => { mounted=false; };
   }, [open]);
 
-  // Motion + face detection loop
+  // Reset the challenge session every time the modal opens
+  useEffect(() => {
+    if (open) { setChallenges(makeChallenges(2)); setIdx(0); setError(''); setPhase('idle'); setHint(''); setProgress(0); setYawDir('center'); }
+  }, [open]);
+
+  // Kick off when camera is ready
+  useEffect(() => {
+    if (open && phase === 'idle' && !error && stream && challenges.length > 0) setPhase('active');
+  }, [open, phase, error, stream, challenges]);
+
+  // Challenge engine — samples landmarks and verifies the requested live action
+  useEffect(() => {
+    if (!open || phase !== 'active' || !challenges[idx]) return;
+    baseSamples.current = []; baseline.current = null; blinkClosed.current = false;
+    deadline.current = Date.now() + 9000;
+    setHint('Hold still… calibrating');
+    setProgress(0);
+    let stopped = false;
+    const run = async () => {
+      if (stopped) return;
+      const v = videoRef.current;
+      if (v && v.readyState >= 2) {
+        const remain = deadline.current - Date.now();
+        setProgress(Math.max(0, Math.min(1, 1 - remain / 9000)));
+        if (remain <= 0) { setPhase('failed'); setHint('Time expired — try again'); return; }
+        const { detectFaceSample } = await import('../../../lib/face');
+        const s = await detectFaceSample(v);
+        if (stopped) return;
+        if (!s) { setHint('Face not detected — center your face and hold still'); }
+        else {
+          setFaceDetected(true);
+          setYawDir(s.metrics.yaw > 0.12 ? 'left' : s.metrics.yaw < -0.12 ? 'right' : 'center');
+          if (baseSamples.current.length < 6) {
+            baseSamples.current.push(s.metrics);
+            if (baseSamples.current.length === 6) {
+              baseline.current = {
+                ear: median(baseSamples.current.map((m: any) => m.ear)),
+                mouthOpen: median(baseSamples.current.map((m: any) => m.mouthOpen)),
+                smile: median(baseSamples.current.map((m: any) => m.smile)),
+                yaw: median(baseSamples.current.map((m: any) => m.yaw)),
+              };
+              setHint(challenges[idx].hint);
+            }
+          } else if (evaluateChallenge(challenges[idx].type, s.metrics, baseline.current, blinkClosed)) {
+            if (idx + 1 < challenges.length) setIdx(idx + 1);
+            else setPhase('passed');
+            return;
+          } else {
+            setHint(challenges[idx].hint);
+          }
+        }
+      }
+      setTimeout(run, 180);
+    };
+    run();
+    return () => { stopped = true; };
+  }, [open, phase, idx, challenges]);
+
+  // Motion + face detection loop (visual feedback only; gating handled by challenges)
   useEffect(() => {
     if (!open || !videoRef.current || !canvasRef.current) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
-    let frames = 0;
     const tick = async () => {
       if (!videoRef.current || videoRef.current.readyState < 2) { raf.current = requestAnimationFrame(tick); return; }
       canvas.width = 160; canvas.height = 120;
       ctx.drawImage(videoRef.current, 0, 0, 160, 120);
       const curr = ctx.getImageData(0,0,160,120);
-      // Motion detection via frame diff
       if (prevFrame.current) {
         let diff = 0;
         for (let i=0; i< curr.data.length; i+=4) {
           diff += Math.abs(curr.data[i] - prevFrame.current.data[i]) + Math.abs(curr.data[i+1] - prevFrame.current.data[i+1]) + Math.abs(curr.data[i+2] - prevFrame.current.data[i+2]);
         }
-        const motionScore = diff / (160*120*3*255) * 100;
-        setMotion(Math.round(motionScore*100)/100);
-        // Liveness: require some motion (1-15%) for 20 frames = blink/head move
-        frames++;
-        if (frames > 15 && motionScore > 0.8 && motionScore < 12) {
-          setFaceDetected(true);
-          if (frames > 25) setLiveness('verified');
-        } else if (frames > 60) {
-          setFaceDetected(motionScore > 0.5);
-          if (motionScore < 0.3) setLiveness('failed');
-        }
+        setMotion(Math.round(diff / (160*120*3*255) * 100 * 100) / 100);
       }
       prevFrame.current = curr;
-
-      // Try FaceDetector API if available
-      try {
-        // @ts-ignore
-        if (window.FaceDetector) {
-          // @ts-ignore
-          const detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-          const faces = await detector.detect(videoRef.current);
-          if (faces && faces.length > 0) {
-            setFaceDetected(true);
-            if (liveness !== 'verified' && frames > 10) setLiveness('verified');
-          }
-        }
-      } catch {}
-
       raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);
     return () => { if (raf.current) cancelAnimationFrame(raf.current); };
-  }, [open, liveness]);
+  }, [open]);
 
   const [descriptor, setDescriptor] = useState<number[] | null>(null);
   useEffect(()=>{ import('../../../lib/face').then(m=> m.loadFaceModels().catch(()=>{})).catch(()=>{}); }, []);
@@ -110,7 +151,7 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
       const d = await gdc(c);
       if (d) { desc = dta(d); setDescriptor(desc); }
     } catch {}
-    const meta: any = { motion, faceDetected, liveness, timestamp: new Date().toISOString(), width: c.width, height: c.height, descriptor: desc };
+    const meta: any = { motion, faceDetected: true, liveness: 'verified', challenges: challenges.map(c => c.type), yaw: yawDir, timestamp: new Date().toISOString(), width: c.width, height: c.height, descriptor: desc };
     onCapture(base64, meta);
   };
 
@@ -122,7 +163,7 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
         <div className="p-4 border-b flex items-center justify-between">
           <div>
             <h3 className="font-bold flex items-center gap-2"><Camera size={18}/> Face Verification • {action}</h3>
-            <p className="text-xs text-slate-500">Motion + liveness for fraud detection • Retention 90d</p>
+            <p className="text-xs text-slate-500">Random live challenge • defeats recorded video • Retention 90d</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full glass flex items-center justify-center"><X size={16}/></button>
         </div>
@@ -142,18 +183,40 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
                 <canvas ref={canvasRef} className="hidden" />
                 {/* Overlay */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className={`w-[200px] h-[260px] rounded-[40px] border-2 ${liveness==='verified' ? 'border-emerald-400 bg-emerald-500/10' : faceDetected ? 'border-amber-400 bg-amber-500/10' : 'border-white/50'} flex items-center justify-center transition-all`}>
-                    <div className={`w-3 h-3 rounded-full ${liveness==='verified' ? 'bg-emerald-400 animate-pulse' : 'bg-white/70'}`} />
+                  <div className={`w-[200px] h-[260px] rounded-[40px] border-2 ${phase==='passed' ? 'border-emerald-400 bg-emerald-500/10' : faceDetected ? 'border-amber-400 bg-amber-500/10' : 'border-white/50'} flex items-center justify-center transition-all`}>
+                    <div className={`w-3 h-3 rounded-full ${phase==='passed' ? 'bg-emerald-400 animate-pulse' : 'bg-white/70'}`} />
                   </div>
                 </div>
                 <div className="absolute top-3 left-3 bg-black/60 text-white rounded-full px-3 py-1 text-xs flex items-center gap-2">
-                  <Activity size={12} className={faceDetected ? 'text-emerald-400' : 'text-white/60'} />
-                  {liveness==='verified' ? '✓ Liveness verified' : liveness==='failed' ? 'No motion — move slightly' : faceDetected ? 'Face detected — hold still' : 'Scanning…'}
+                  <Activity size={12} className={phase==='passed' ? 'text-emerald-400' : 'text-white/60'} />
+                  {phase==='passed' ? '✓ Liveness verified' : phase==='failed' ? 'Challenge failed' : faceDetected ? 'Face detected' : 'Scanning…'}
                 </div>
+
+                {/* Live challenge banner */}
+                {phase !== 'passed' && challenges[idx] && (
+                  <div className="absolute top-14 left-3 right-3 bg-black/70 backdrop-blur text-white rounded-xl p-3">
+                    <div className="flex items-center justify-between text-xs text-white/70">
+                      <span>Step {Math.min(idx + 1, challenges.length)} of {challenges.length}</span>
+                      <span>{phase==='failed' ? '✕' : '●'} LIVE</span>
+                    </div>
+                    {phase === 'failed' ? (
+                      <div className="mt-1 text-sm font-semibold flex items-center gap-2"><AlertTriangle size={14} className="text-red-400"/> {hint || 'Challenge failed'}</div>
+                    ) : (
+                      <>
+                        <div className="mt-1 text-lg font-bold tracking-tight">{challenges[idx].label}</div>
+                        <div className="text-xs text-white/70">{hint}</div>
+                        <div className="mt-2 h-1.5 rounded-full bg-white/20 overflow-hidden">
+                          <div className="h-full bg-amber-400 transition-all" style={{ width: `${Math.round(progress*100)}%` }} />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 <div className="absolute bottom-3 left-3 right-3 bg-black/60 text-white rounded-xl p-2 text-xs flex justify-between">
                   <span>Motion: {motion}%</span>
                   <span className={faceDetected ? 'text-emerald-300' : 'text-amber-300'}>{faceDetected ? '● Face' : '○ No face'}</span>
-                  <span>{liveness}</span>
+                  <span className="capitalize">Head: {yawDir}</span>
                 </div>
               </div>
 
@@ -161,25 +224,30 @@ function FaceCaptureModal({ open, onClose, onCapture, action }: { open: boolean;
                 <div className={`rounded-xl p-2 text-center border ${faceDetected ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50'}`}>
                   <Fingerprint size={16} className="mx-auto"/>{faceDetected ? 'Face OK' : 'No face'}
                 </div>
-                <div className={`rounded-xl p-2 text-center border ${motion>0.8 && motion<12 ? 'bg-emerald-50 border-emerald-200' : motion>12 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
-                  <Activity size={16} className="mx-auto"/>{motion>12 ? 'Too much' : motion>0.8 ? 'Motion OK' : 'Hold steady'}
+                <div className={`rounded-xl p-2 text-center border ${phase==='active' ? 'bg-amber-50 border-amber-200' : phase==='passed' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50'}`}>
+                  <Activity size={16} className="mx-auto"/>{phase==='passed' ? 'Responded' : phase==='failed' ? 'Failed' : 'Awaiting action'}
                 </div>
-                <div className={`rounded-xl p-2 text-center border ${liveness==='verified' ? 'bg-emerald-500 text-white' : 'bg-slate-50'}`}>
-                  <ShieldCheck size={16} className="mx-auto"/>{liveness==='verified' ? 'Verified' : 'Verifying'}
+                <div className={`rounded-xl p-2 text-center border ${phase==='passed' ? 'bg-emerald-500 text-white' : 'bg-slate-50'}`}>
+                  <ShieldCheck size={16} className="mx-auto"/>{phase==='passed' ? 'Verified' : 'Verifying'}
                 </div>
               </div>
 
               <div className="flex gap-2">
                 <button onClick={onClose} className="flex-1 glass rounded-xl py-2.5 font-semibold">Cancel</button>
+                {phase === 'failed' && (
+                  <button onClick={() => { setChallenges(makeChallenges(2)); setIdx(0); setHint(''); setProgress(0); setPhase('active'); }} className="flex-1 glass rounded-xl py-2.5 font-semibold flex items-center justify-center gap-2">
+                    <RefreshCw size={16}/> Try again
+                  </button>
+                )}
                 <button
                   onClick={snap}
-                  disabled={liveness!=='verified' && !faceDetected}
-                  className={`flex-1 rounded-xl py-2.5 font-semibold flex items-center justify-center gap-2 ${liveness==='verified' ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : faceDetected ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-slate-200 text-slate-500 cursor-not-allowed'}`}
+                  disabled={phase !== 'passed'}
+                  className={`flex-1 rounded-xl py-2.5 font-semibold flex items-center justify-center gap-2 ${phase === 'passed' ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500 cursor-not-allowed'}`}
                 >
                   <Camera size={16}/> Snap & {action}
                 </button>
               </div>
-              <p className="text-xs text-slate-500 text-center">Snapshot base64 encrypted, 90-day retention • Duplicate face → flagged • <span className="font-mono">faceSnapshotRef</span></p>
+              <p className="text-xs text-slate-500 text-center">Random challenge must be completed live • Replay/photo fails • Duplicate face → flagged</p>
             </>
           )}
         </div>
@@ -198,6 +266,7 @@ export default function AttendancePage() {
   const [adminTime, setAdminTime] = useState<{ [id:string]: string }>({});
   const [mapData, setMapData] = useState<{ points:any[]; branches:any[]; total:number } | null>(null);
   const [showMap, setShowMap] = useState(false);
+  const { features } = useOrgFeatures();
   const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
 
   const load = () => {
@@ -300,6 +369,8 @@ export default function AttendancePage() {
   };
 
   const requestClock = (type: string) => {
+    // When facial enrollment is disabled by the Super Admin, clock without the face step.
+    if (!features.faceEnrollment) { doClock(type); return; }
     // Open face capture first for fraud detection
     setFaceModal({ open: true, action: type });
   };
@@ -315,7 +386,7 @@ export default function AttendancePage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Clock /> Attendance <span className="text-slate-500 font-normal">— Smart Clocking (7 methods)</span></h1>
-        <p className="text-sm text-slate-500">Mobile • Web • QR • Biometric • Facial • NFC • API • Verification 98% • Privacy optional • <span className="font-semibold text-emerald-600">Face + motion liveness enforced</span></p>
+        <p className="text-sm text-slate-500">Mobile • Web • QR • Biometric • Facial • NFC • API • Verification 98% • Privacy optional • {features.faceEnrollment ? <span className="font-semibold text-emerald-600">Face + motion liveness enforced</span> : <span className="font-semibold text-amber-600">Facial enrollment disabled by admin</span>}</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -353,10 +424,12 @@ export default function AttendancePage() {
           <Pill tone="emerald">Fraud detection ON</Pill>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-          <button onClick={()=>requestClock('clock-in')} disabled={!!pending} className="bg-slate-900 text-white rounded-2xl py-3 font-semibold hover:bg-slate-800 flex flex-col items-center gap-1 disabled:opacity-50">
-            <span className="flex items-center gap-2"><Camera size={16}/> Clock In</span>
-            <span className="text-[11px] opacity-70 font-normal">Face + motion snap</span>
-          </button>
+          {features.clockIn && (
+            <button onClick={()=>requestClock('clock-in')} disabled={!!pending} className="bg-slate-900 text-white rounded-2xl py-3 font-semibold hover:bg-slate-800 flex flex-col items-center gap-1 disabled:opacity-50">
+              <span className="flex items-center gap-2"><Camera size={16}/> Clock In</span>
+              <span className="text-[11px] opacity-70 font-normal">{features.faceEnrollment ? 'Face + motion snap' : 'Mobile check-in'}</span>
+            </button>
+          )}
           <button onClick={()=>requestClock('break/start')} disabled={!!pending} className="glass rounded-2xl py-3 font-semibold flex flex-col items-center gap-1">
             <span className="flex items-center gap-2"><Timer size={16}/> Start Break</span>
             <span className="text-[11px] opacity-60 font-normal">Optional face</span>
@@ -365,11 +438,16 @@ export default function AttendancePage() {
             <span>End Break</span>
             <span className="text-[11px] opacity-60">Resume</span>
           </button>
-          <button onClick={()=>requestClock('clock-out')} disabled={!!pending} className="bg-red-600 text-white rounded-2xl py-3 font-semibold hover:bg-red-700 flex flex-col items-center gap-1 disabled:opacity-50">
-            <span className="flex items-center gap-2"><Eye size={16}/> Clock Out</span>
-            <span className="text-[11px] opacity-80 font-normal">Face + liveness</span>
-          </button>
+          {features.clockOut && (
+            <button onClick={()=>requestClock('clock-out')} disabled={!!pending} className="bg-red-600 text-white rounded-2xl py-3 font-semibold hover:bg-red-700 flex flex-col items-center gap-1 disabled:opacity-50">
+              <span className="flex items-center gap-2"><Eye size={16}/> Clock Out</span>
+              <span className="text-[11px] opacity-80 font-normal">{features.faceEnrollment ? 'Face + liveness' : 'Mobile check-out'}</span>
+            </button>
+          )}
         </div>
+        {!features.clockIn && !features.clockOut && (
+          <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">Clock-in and clock-out are disabled for your organization by the platform administrator.</div>
+        )}
         {pending && <div className="mt-3 flex items-center gap-2 text-sm text-slate-600"><RefreshCw size={14} className="animate-spin"/> Processing {pending}…</div>}
         <div className="mt-2 flex items-center gap-2 text-xs">
           <span className={`glass rounded-full px-3 py-1 flex items-center gap-1 ${gpsStatus==='ok'?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-amber-50 border-amber-200'}`}>
@@ -379,16 +457,16 @@ export default function AttendancePage() {
           {lastGps && <span className="text-slate-400">Real geolocation captured on each clock</span>}
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <span className="glass rounded-full px-3 py-1 flex items-center gap-1 bg-emerald-50 border-emerald-200"><Camera size={12}/> Facial liveness</span>
-          <span className="glass rounded-full px-3 py-1 flex items-center gap-1"><Fingerprint size={12}/> 98% match</span>
-          <span className="glass rounded-full px-3 py-1 flex items-center gap-1"><Activity size={12}/> Motion 0.8–12%</span>
+          {features.faceEnrollment && <span className="glass rounded-full px-3 py-1 flex items-center gap-1 bg-emerald-50 border-emerald-200"><Camera size={12}/> Facial liveness</span>}
+          {features.faceEnrollment && <span className="glass rounded-full px-3 py-1 flex items-center gap-1"><Fingerprint size={12}/> 98% match</span>}
+          {features.faceEnrollment && <span className="glass rounded-full px-3 py-1 flex items-center gap-1"><Activity size={12}/> Motion 0.8–12%</span>}
           <span className="glass rounded-full px-3 py-1 flex items-center gap-1"><ShieldCheck size={12}/> Snapshot 90d</span>
           <span className="glass rounded-full px-3 py-1 flex items-center gap-1"><Smartphone size={12}/> Device fingerprint</span>
         </div>
         <p className="text-xs text-slate-500 mt-2">Net = Gross − Breaks • Duplicate face / device sharing → flagged “Requires Review” • Snap stored as <code>faceSnapshotRef</code> base64, confidence, retention 90d</p>
       </GlassCard>
 
-      <FaceCaptureModal open={!!faceModal?.open} onClose={()=>setFaceModal(null)} action={faceModal?.action || 'clock-in'} onCapture={handleFaceCapture} />
+      {features.faceEnrollment && <FaceCaptureModal open={!!faceModal?.open} onClose={()=>setFaceModal(null)} action={faceModal?.action || 'clock-in'} onCapture={handleFaceCapture} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <GlassCard className="p-0 overflow-hidden">

@@ -209,4 +209,17 @@ export class AdminController {
   @PlatformOnly()
   @RequirePermissions('admin:manage')
   organizations() { return this.svc.listOrganizations(); }
+
+  // ===== Per-organization feature toggles (facial enrollment / clock-in / clock-out) =====
+  @Get('organizations/:orgId/features')
+  @PlatformOnly()
+  @RequirePermissions('admin:manage')
+  @ApiOperation({ summary: 'Get per-org feature toggles (super admin)' })
+  orgFeatures(@Param('orgId') orgId: string) { return this.svc.getOrgFeatures(orgId); }
+
+  @Patch('organizations/:orgId/features')
+  @PlatformOnly()
+  @RequirePermissions('admin:manage')
+  @ApiOperation({ summary: 'Enable/disable per-org features: faceEnrollment, clockIn, clockOut (super admin)' })
+  updateOrgFeatures(@Param('orgId') orgId: string, @Body() dto: any) { return this.svc.updateOrgFeatures(orgId, dto); }
 }

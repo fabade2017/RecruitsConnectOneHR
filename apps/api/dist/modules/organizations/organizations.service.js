@@ -45,6 +45,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrganizationsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
+const org_features_1 = require("../../common/org-features");
 const bcrypt = __importStar(require("bcryptjs"));
 let OrganizationsService = class OrganizationsService {
     prisma;
@@ -58,7 +59,12 @@ let OrganizationsService = class OrganizationsService {
             dto.config = JSON.stringify(dto.config);
         return this.prisma.organization.update({ where: { id }, data: dto });
     }
-    getConfig(id) { return this.prisma.organization.findUnique({ where: { id }, select: { config: true, industryTemplate: true } }); }
+    async getConfig(id) {
+        const org = await this.prisma.organization.findUnique({ where: { id }, select: { config: true, industryTemplate: true } });
+        if (!org)
+            throw new common_1.NotFoundException('Organization not found');
+        return { ...org, features: (0, org_features_1.parseOrgFeatures)(org.config) };
+    }
     healthScore(orgId, date) { return this.prisma.workforceScore.findMany({ where: { organizationId: orgId, date: new Date(date) } }); }
     async getBranding(id) {
         const org = await this.prisma.organization.findUnique({ where: { id }, select: { id: true, name: true, acronym: true, logoUrl: true, watermarkEnabled: true, watermarkText: true, watermarkOpacity: true, watermarkPosition: true, primaryColor: true, config: true } });

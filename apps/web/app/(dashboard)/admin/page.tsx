@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { GlassCard, Pill } from '../../../components/ui/GlassCard';
 import { Shield, Users, Building2, CreditCard, Plus, Trash2, Edit2, Check, X, Layers, Sparkles, Search, DollarSign, Package, Eye, EyeOff, RefreshCw, Receipt, Bell, Calendar, Clock } from 'lucide-react';
 import { getApiUrl, getAuthHeaders, parseApiList, isPlatformSuperAdmin, PLATFORM_ORG_ACRONYM } from '../../../lib/api';
+import { parseOrgFeatures } from '../../../lib/features';
 
 export default function SuperAdminPage() {
   const api = getApiUrl();
   const [platform, setPlatform] = useState<boolean | null>(null);
-  const [active, setActive] = useState<'roles'|'groups'|'plans'|'orgs'|'modules'|'renewals'>('roles');
+  const [active, setActive] = useState<'roles'|'groups'|'plans'|'orgs'|'modules'|'renewals'|'features'>('roles');
   const [roles, setRoles] = useState<any[]>([]);
   const [perms, setPerms] = useState<any[]>([]);
   const [groupedPerms, setGroupedPerms] = useState<Record<string,any[]>>({});
@@ -163,6 +164,15 @@ export default function SuperAdminPage() {
     load();
   };
 
+  const toggleOrgFeature = async (orgId: string, key: 'faceEnrollment'|'clockIn'|'clockOut', value: boolean) => {
+    const res = await fetch(`${api}/admin/organizations/${orgId}/features`, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json', ...auth()},
+      body: JSON.stringify({ [key]: value }),
+    });
+    if (res.ok) load(); else alert('Failed to update feature');
+  };
+
   const savePlanModules = async (planId: string) => {
     const priceMap = editingPrices[planId] || {};
     // Build modules array with price overrides
@@ -247,6 +257,7 @@ export default function SuperAdminPage() {
           ['plans','Subscriptions',CreditCard],
           ['renewals','Renewals',RefreshCw],
           ['groups','Company Groups',Building2],
+          ['features','Features',Sparkles],
           ['orgs','Organizations',Users],
         ].map(([k,label,Icon]: any) => (
           <button key={k} onClick={()=>setActive(k as any)} className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${active===k ? 'bg-slate-900 text-white' : 'glass'}`}>
@@ -551,6 +562,49 @@ export default function SuperAdminPage() {
               </table>
             </div>
             <div className="p-3 bg-slate-50/50 text-xs text-slate-500">Yearly renewal adds 1 year to <code>endDate</code> (e.g. 2026→2027) and generates <code>RCPT-YYYY-XXXX</code> receipt + in-app notification.</div>
+          </GlassCard>
+        </div>
+      )}
+
+      {active==='features' && (
+        <div className="space-y-4">
+          <GlassCard>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold flex items-center gap-2"><Sparkles size={16}/> Feature Controls — per Organization</h3>
+              <button onClick={load} className="text-xs glass rounded-full px-3 py-1">Refresh</button>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Enable or disable <b>Face Enrollment</b>, <b>Clock In</b> and <b>Clock Out</b> per organization. Disabled features are hidden from the org's UI and blocked at the API. Changes apply immediately.</p>
+          </GlassCard>
+          <GlassCard className="p-0 overflow-hidden">
+            <div className="p-4"><h3 className="font-semibold flex items-center gap-2"><Building2 size={16}/> Organizations ({orgs.length})</h3></div>
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs"><tr><th className="text-left p-3">Organization</th><th className="p-2">Acronym</th><th className="p-2 text-center">Face Enrollment</th><th className="p-2 text-center">Clock In</th><th className="p-2 text-center">Clock Out</th></tr></thead>
+                <tbody className="divide-y">
+                  {orgs.map((o:any)=> {
+                    const f = o.features || parseOrgFeatures(o.config);
+                    return (
+                      <tr key={o.id} className="hover:bg-slate-50/50">
+                        <td className="p-3"><div className="font-semibold">{o.name || '—'}</div><div className="text-xs text-slate-500 font-mono">{o.id ? o.id.slice(0,8) : '—'}</div></td>
+                        <td className="p-2"><span className="font-mono text-xs bg-slate-900 text-white px-2 py-1 rounded-full">{o.acronym || '—'}</span></td>
+                        {(['faceEnrollment','clockIn','clockOut'] as const).map((key)=> (
+                          <td key={key} className="p-2 text-center">
+                            <button
+                              onClick={()=>toggleOrgFeature(o.id, key, !f[key])}
+                              className={`px-3 py-1 rounded-full text-xs font-semibold ${f[key] ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}
+                            >
+                              {f[key] ? 'Enabled' : 'Disabled'}
+                            </button>
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                  {orgs.length===0 && <tr><td colSpan={5} className="p-8 text-center text-slate-500">No organizations</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-3 bg-slate-50/50 text-xs text-slate-500">Backed by <code>Organization.config.features</code>. API: <code>GET/PATCH /v1/admin/organizations/:orgId/features</code>.</div>
           </GlassCard>
         </div>
       )}

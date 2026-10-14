@@ -13,6 +13,7 @@ exports.AdminService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
+const org_features_1 = require("../../common/org-features");
 let AdminService = class AdminService {
     prisma;
     constructor(prisma) {
@@ -393,8 +394,8 @@ let AdminService = class AdminService {
             return false; // No active subscription
         return sub.plan.modules.some(m => m.moduleKey === moduleKey && m.enabled);
     }
-    listOrganizations() {
-        return this.prisma.organization.findMany({
+    async listOrganizations() {
+        const orgs = await this.prisma.organization.findMany({
             orderBy: { createdAt: 'desc' },
             include: {
                 _count: { select: { employees: true, branches: true, users: true, departments: true } },
@@ -402,6 +403,26 @@ let AdminService = class AdminService {
                 subscriptions: { include: { plan: true } },
             },
         });
+        return orgs.map((o) => ({ ...o, features: (0, org_features_1.parseOrgFeatures)(o.config) }));
+    }
+    // ===== Per-organization feature toggles (Super Admin controlled) =====
+    async getOrgFeatures(orgId) {
+        const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { id: true, config: true } });
+        if (!org)
+            throw new common_1.NotFoundException('Organization not found');
+        return { organizationId: org.id, ...(0, org_features_1.parseOrgFeatures)(org.config) };
+    }
+    async updateOrgFeatures(orgId, patch) {
+        const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { id: true, config: true } });
+        if (!org)
+            throw new common_1.NotFoundException('Organization not found');
+        const config = (0, org_features_1.mergeOrgFeatures)(org.config, {
+            faceEnrollment: patch?.faceEnrollment,
+            clockIn: patch?.clockIn,
+            clockOut: patch?.clockOut,
+        });
+        await this.prisma.organization.update({ where: { id: orgId }, data: { config } });
+        return { organizationId: orgId, ...(0, org_features_1.parseOrgFeatures)(config) };
     }
     // ===== Renewals (yearly) =====
     listRenewals(status) {

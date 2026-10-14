@@ -5,6 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 import { sendEmail, getStaffInviteTemplate } from '../../lib/email';
+import { parseOrgFeatures } from '../../common/org-features';
 
 function canAccessEmployee(user: any, employeeId: string, employee?: any): boolean {
   const role = user?.role;
@@ -460,6 +461,8 @@ export class EmployeesService {
   }
 
   async enrollFace(orgId: string, id: string, dto: any, user?: any) {
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { config: true } });
+    if (!parseOrgFeatures(org?.config).faceEnrollment) throw new ForbiddenException('Face enrollment is disabled for this organization');
     const emp = await this.prisma.employee.findFirst({ where: { id, organizationId: orgId } });
     if (!emp) throw new NotFoundException('Employee not found');
     if (user?.role === 'employee') {
@@ -473,10 +476,13 @@ export class EmployeesService {
     if (images.length > 5) throw new ConflictException('Max 5 images');
     // Basic validation: must be data:image
     for (const img of images) if (!img.startsWith('data:image')) throw new ConflictException('Invalid image format');
+    // Biometric matching requires a valid 128-d face descriptor — do not accept image-only enrollments.
+    const validDescriptors = descriptors.filter(d => Array.isArray(d) && d.length === 128);
+    if (!validDescriptors.length) throw new ConflictException('No valid face descriptor captured — ensure good lighting, a clear unobstructed face, and retry');
     // Store both images (truncated) and descriptors for intelligent matching (Euclidean <0.4)
     const toStore = JSON.stringify({
       images: images.map(s => s.slice(0, 8000)),
-      descriptors: descriptors.filter(d=> Array.isArray(d) && d.length===128).slice(0,5),
+      descriptors: validDescriptors.slice(0, 5),
       updatedAt: new Date().toISOString(),
     });
     const updated = await this.prisma.employee.update({
@@ -486,7 +492,7 @@ export class EmployeesService {
     await this.prisma.consentLog.create({
       data: { employeeId: id, type: 'face', granted: true, version: '1.0', ip: dto.ip || null } as any,
     }).catch(()=>{});
-    return { employeeId: id, enrolled: images.length, faceProfileRef: toStore, consentFace: true, descriptors: descriptors.length };
+    return { employeeId: id, enrolled: images.length, faceProfileRef: toStore, consentFace: true, descriptors: validDescriptors.length };
   }
 
   async getFaceProfile(orgId: string, id: string, user?: any) {

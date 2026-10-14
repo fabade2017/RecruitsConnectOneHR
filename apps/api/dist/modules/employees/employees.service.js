@@ -50,6 +50,7 @@ const bcrypt = __importStar(require("bcryptjs"));
 const jwt = __importStar(require("jsonwebtoken"));
 const crypto = __importStar(require("crypto"));
 const email_1 = require("../../lib/email");
+const org_features_1 = require("../../common/org-features");
 function canAccessEmployee(user, employeeId, employee) {
     const role = user?.role;
     if (['org_admin', 'super_admin', 'hr_admin', 'hr_manager', 'executive', 'auditor'].includes(role))
@@ -589,6 +590,9 @@ let EmployeesService = class EmployeesService {
         return this.prisma.employee.findFirst({ where: { id, organizationId: orgId }, select: { employeeCode: true, jobTitle: true, grade: true, skills: true, hireDate: true } });
     }
     async enrollFace(orgId, id, dto, user) {
+        const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { config: true } });
+        if (!(0, org_features_1.parseOrgFeatures)(org?.config).faceEnrollment)
+            throw new common_1.ForbiddenException('Face enrollment is disabled for this organization');
         const emp = await this.prisma.employee.findFirst({ where: { id, organizationId: orgId } });
         if (!emp)
             throw new common_1.NotFoundException('Employee not found');
@@ -608,10 +612,14 @@ let EmployeesService = class EmployeesService {
         for (const img of images)
             if (!img.startsWith('data:image'))
                 throw new common_1.ConflictException('Invalid image format');
+        // Biometric matching requires a valid 128-d face descriptor — do not accept image-only enrollments.
+        const validDescriptors = descriptors.filter(d => Array.isArray(d) && d.length === 128);
+        if (!validDescriptors.length)
+            throw new common_1.ConflictException('No valid face descriptor captured — ensure good lighting, a clear unobstructed face, and retry');
         // Store both images (truncated) and descriptors for intelligent matching (Euclidean <0.4)
         const toStore = JSON.stringify({
             images: images.map(s => s.slice(0, 8000)),
-            descriptors: descriptors.filter(d => Array.isArray(d) && d.length === 128).slice(0, 5),
+            descriptors: validDescriptors.slice(0, 5),
             updatedAt: new Date().toISOString(),
         });
         const updated = await this.prisma.employee.update({
@@ -621,7 +629,7 @@ let EmployeesService = class EmployeesService {
         await this.prisma.consentLog.create({
             data: { employeeId: id, type: 'face', granted: true, version: '1.0', ip: dto.ip || null },
         }).catch(() => { });
-        return { employeeId: id, enrolled: images.length, faceProfileRef: toStore, consentFace: true, descriptors: descriptors.length };
+        return { employeeId: id, enrolled: images.length, faceProfileRef: toStore, consentFace: true, descriptors: validDescriptors.length };
     }
     async getFaceProfile(orgId, id, user) {
         const emp = await this.prisma.employee.findFirst({ where: { id, organizationId: orgId }, select: { id: true, employeeCode: true, faceProfileRef: true, consentFace: true, photoUrl: true } });

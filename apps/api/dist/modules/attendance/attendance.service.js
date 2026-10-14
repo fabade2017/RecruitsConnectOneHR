@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AttendanceService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
+const org_features_1 = require("../../common/org-features");
 function diffMinutes(a, b) { return Math.round((b.getTime() - a.getTime()) / 60000); }
 function toRadians(deg) { return deg * Math.PI / 180; }
 function haversineMeters(lat1, lon1, lat2, lon2) {
@@ -53,10 +54,66 @@ let AttendanceService = class AttendanceService {
     constructor(prisma) {
         this.prisma = prisma;
     }
+    // Compares a live face descriptor against the employee's enrolled descriptors using
+    // Euclidean distance. No image/slice fallback — a valid 128-d descriptor is required
+    // for biometric matching. Creates review exceptions when matching is not possible.
+    async verifyFaceEnrollment(opts) {
+        const { orgId, employee, sessionId, dto, requireFace, motion, eventType } = opts;
+        const liveDescriptor = dto.faceDescriptor || dto.descriptor || dto.face_descriptor || dto.face_meta?.descriptor || null;
+        const hasLive = Array.isArray(liveDescriptor) && liveDescriptor.length === 128;
+        let enrolledDescriptors = [];
+        if (employee?.faceProfileRef) {
+            try {
+                const parsed = JSON.parse(employee.faceProfileRef);
+                if (parsed && Array.isArray(parsed.descriptors)) {
+                    enrolledDescriptors = parsed.descriptors.filter((d) => Array.isArray(d) && d.length === 128);
+                }
+            }
+            catch { }
+        }
+        const hasEnrolled = enrolledDescriptors.length > 0;
+        const suffix = eventType === 'clock_out' ? '_out' : '';
+        if (hasEnrolled && hasLive) {
+            let bestDistance = Infinity;
+            for (const refDesc of enrolledDescriptors) {
+                const d = euclidean(liveDescriptor, refDesc);
+                if (d < bestDistance)
+                    bestDistance = d;
+            }
+            const confidence = Math.max(0, Math.round((1 - Math.min(bestDistance, 1)) * 100));
+            await this.prisma.workSession.update({ where: { id: sessionId }, data: { verificationScore: confidence } }).catch(() => { });
+            if (bestDistance > 0.6) {
+                await this.prisma.attendanceException.create({
+                    data: { organizationId: orgId, employeeId: employee.id, workSessionId: sessionId, type: 'duplicate_face', severity: 'critical', details: JSON.stringify({ reason: `face_mismatch_descriptor${suffix}`, distance: Number(bestDistance.toFixed(4)), confidence, threshold: 0.6, expected: 'enrolled', liveMotion: motion }) },
+                });
+            }
+            else if (bestDistance > 0.4) {
+                await this.prisma.attendanceException.create({
+                    data: { organizationId: orgId, employeeId: employee.id, workSessionId: sessionId, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: `low_face_similarity_descriptor${suffix}`, distance: Number(bestDistance.toFixed(4)), confidence, threshold: 0.4 }) },
+                });
+            }
+            return;
+        }
+        if (hasEnrolled && !hasLive) {
+            // Employee is enrolled but the client could not produce a descriptor — cannot verify.
+            await this.prisma.attendanceException.create({
+                data: { organizationId: orgId, employeeId: employee.id, workSessionId: sessionId, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: `no_face_descriptor${suffix}`, note: 'Face snapshot sent without a valid 128-d descriptor — biometric match skipped' }) },
+            });
+            return;
+        }
+        if (!hasEnrolled && requireFace) {
+            await this.prisma.attendanceException.create({
+                data: { organizationId: orgId, employeeId: employee.id, workSessionId: sessionId, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'no_enrolled_face', hint: 'Ask HR to send face-enroll link', eventType }) },
+            });
+        }
+    }
     async clockIn(orgId, userId, dto) {
         const employee = await this.prisma.employee.findUnique({ where: { userId } });
         if (!employee)
             throw new common_1.ForbiddenException('Employee not found for user');
+        const orgFeatures = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { config: true } });
+        if (!(0, org_features_1.parseOrgFeatures)(orgFeatures?.config).clockIn)
+            throw new common_1.ForbiddenException('Clock-in is disabled for this organization');
         const today = new Date();
         const dateOnly = new Date(today.toISOString().slice(0, 10));
         const existing = await this.prisma.workSession.findUnique({ where: { organizationId_employeeId_date: { organizationId: orgId, employeeId: employee.id, date: dateOnly } } });
@@ -99,84 +156,16 @@ let AttendanceService = class AttendanceService {
         if (isFacial && dto.face_meta) {
             const m = parseFloat(dto.face_meta.motion || 0);
             const liveness = dto.face_meta.liveness;
-            if (liveness !== 'verified' || m < 0.5 || m > 12) {
+            // Liveness is now a client-side randomised challenge (blink / mouth / head-turn);
+            // motion is recorded for audit but no longer gates, since challenges cause large motion.
+            if (liveness !== 'verified') {
                 await this.prisma.attendanceException.create({
-                    data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: m < 0.5 ? 'high' : 'medium', details: JSON.stringify({ reason: 'liveness_failed', motion: m, liveness, faceDetected: dto.face_meta.faceDetected }) },
+                    data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'liveness_failed', motion: m, liveness, faceDetected: dto.face_meta.faceDetected, challenges: dto.face_meta.challenges }) },
                 });
             }
-            // Intelligent face comparison — descriptor (Euclidean) if available, fallback to slice
-            if (employee.faceProfileRef) {
-                try {
-                    const parsed = JSON.parse(employee.faceProfileRef);
-                    let enrolledImages = [];
-                    let enrolledDescriptors = [];
-                    if (Array.isArray(parsed))
-                        enrolledImages = parsed;
-                    else if (parsed && Array.isArray(parsed.images)) {
-                        enrolledImages = parsed.images;
-                        enrolledDescriptors = parsed.descriptors || [];
-                    }
-                    const liveDescriptor = dto.faceDescriptor || dto.descriptor || dto.face_descriptor || dto.face_meta?.descriptor || null;
-                    // Descriptor path — true biometric
-                    if (enrolledDescriptors.length && liveDescriptor && Array.isArray(liveDescriptor) && liveDescriptor.length === 128) {
-                        let bestDistance = Infinity;
-                        for (const refDesc of enrolledDescriptors) {
-                            if (!Array.isArray(refDesc) || refDesc.length !== 128)
-                                continue;
-                            const d = euclidean(liveDescriptor, refDesc);
-                            if (d < bestDistance)
-                                bestDistance = d;
-                        }
-                        const confidence = Math.max(0, Math.round((1 - Math.min(bestDistance, 1)) * 100));
-                        // Update verificationScore on session with descriptor confidence
-                        await this.prisma.workSession.update({ where: { id: session.id }, data: { verificationScore: confidence } }).catch(() => { });
-                        if (bestDistance > 0.6) {
-                            await this.prisma.attendanceException.create({
-                                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'duplicate_face', severity: 'critical', details: JSON.stringify({ reason: 'face_mismatch_descriptor', distance: Number(bestDistance.toFixed(4)), confidence, threshold: 0.6, expected: 'enrolled', liveMotion: m }) },
-                            });
-                        }
-                        else if (bestDistance > 0.4) {
-                            await this.prisma.attendanceException.create({
-                                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'low_face_similarity_descriptor', distance: Number(bestDistance.toFixed(4)), confidence, threshold: 0.4 }) },
-                            });
-                        }
-                    }
-                    else {
-                        // Fallback — truncated base64 slice compare (legacy)
-                        const liveSlice = (dto.face_snapshot_base64 || '').slice(22, 522);
-                        let bestScore = 0;
-                        for (const ref of enrolledImages) {
-                            const refSlice = ref.slice(22, 522);
-                            let matches = 0;
-                            const len = Math.min(liveSlice.length, refSlice.length, 500);
-                            for (let i = 0; i < len; i++)
-                                if (liveSlice[i] === refSlice[i])
-                                    matches++;
-                            const score = len ? (matches / len) * 100 : 0;
-                            if (score > bestScore)
-                                bestScore = score;
-                        }
-                        const confidence = Math.round(bestScore);
-                        if (bestScore < 60) {
-                            await this.prisma.attendanceException.create({
-                                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'duplicate_face', severity: 'critical', details: JSON.stringify({ reason: 'face_mismatch', confidence, method: 'fallback_slice', expected: 'enrolled', liveMotion: m }) },
-                            });
-                        }
-                        else if (bestScore < 80) {
-                            await this.prisma.attendanceException.create({
-                                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'low_face_similarity', confidence, method: 'fallback_slice' }) },
-                            });
-                        }
-                    }
-                }
-                catch { }
-            }
-            else if (requireFace) {
-                // No enrolled face yet — flag only when org requires face clock-in
-                await this.prisma.attendanceException.create({
-                    data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'no_enrolled_face', hint: 'Ask HR to send face-enroll link' }) },
-                });
-            }
+            // Intelligent face comparison — Euclidean descriptor against enrolled faces.
+            // No image/slice fallback; missing descriptors are flagged above/inside the helper.
+            await this.verifyFaceEnrollment({ orgId, employee, sessionId: session.id, dto, requireFace, motion: m, eventType: 'clock_in' });
             // Duplicate face check: same hash from different employee in last 10 min (proxy clock-in)
             if (faceHash) {
                 const dup = await this.prisma.attendanceEvent.findFirst({
@@ -236,6 +225,11 @@ let AttendanceService = class AttendanceService {
         const employee = await this.prisma.employee.findUnique({ where: { userId } });
         if (!employee)
             throw new common_1.ForbiddenException('Employee not found');
+        const orgFeatures = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { config: true } });
+        if (!(0, org_features_1.parseOrgFeatures)(orgFeatures?.config).clockOut)
+            throw new common_1.ForbiddenException('Clock-out is disabled for this organization');
+        const policyOut = await this.prisma.attendancePolicy.findUnique({ where: { organizationId: orgId } });
+        const requireFaceOut = !!policyOut?.requireFaceSnapshot;
         const dateOnly = new Date(new Date().toISOString().slice(0, 10));
         const session = await this.prisma.workSession.findUnique({ where: { organizationId_employeeId_date: { organizationId: orgId, employeeId: employee.id, date: dateOnly } } });
         if (!session?.clockInAt)
@@ -278,11 +272,18 @@ let AttendanceService = class AttendanceService {
         });
         if (isFacialOut && dto.face_meta) {
             const m = parseFloat(dto.face_meta.motion || 0);
-            if (dto.face_meta.liveness !== 'verified' || m < 0.5 || m > 12) {
+            if (dto.face_meta.liveness !== 'verified') {
                 await this.prisma.attendanceException.create({
-                    data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'liveness_failed_out', motion: m, liveness: dto.face_meta.liveness }) },
+                    data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'liveness_failed_out', motion: m, liveness: dto.face_meta.liveness, challenges: dto.face_meta.challenges }) },
                 });
             }
+            // Verify the clock-out face against the employee's enrolled descriptors.
+            await this.verifyFaceEnrollment({ orgId, employee, sessionId: session.id, dto, requireFace: requireFaceOut, motion: m, eventType: 'clock_out' });
+        }
+        else if (!isFacialOut && requireFaceOut) {
+            await this.prisma.attendanceException.create({
+                data: { organizationId: orgId, employeeId: employee.id, workSessionId: session.id, type: 'suspicious_attendance', severity: 'medium', details: JSON.stringify({ reason: 'no_face_snapshot_out', method: dto.method, note: 'Face clock-out required by org policy' }) },
+            });
         }
         // GPS for clock-out
         try {

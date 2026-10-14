@@ -1,5 +1,6 @@
 import { Injectable, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { parseOrgFeatures } from '../../common/org-features';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -11,7 +12,11 @@ export class OrganizationsService {
     if (dto.config && typeof dto.config === 'object') dto.config = JSON.stringify(dto.config);
     return this.prisma.organization.update({ where: { id }, data: dto });
   }
-  getConfig(id: string) { return this.prisma.organization.findUnique({ where: { id }, select: { config: true, industryTemplate: true } }); }
+  async getConfig(id: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id }, select: { config: true, industryTemplate: true } });
+    if (!org) throw new NotFoundException('Organization not found');
+    return { ...org, features: parseOrgFeatures(org.config) };
+  }
   healthScore(orgId: string, date: string) { return this.prisma.workforceScore.findMany({ where: { organizationId: orgId, date: new Date(date) } }); }
 
   async getBranding(id: string) {

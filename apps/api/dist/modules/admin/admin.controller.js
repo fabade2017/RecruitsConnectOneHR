@@ -71,6 +71,9 @@ let AdminController = class AdminController {
     rejectRenewal(id, req, dto) { return this.svc.rejectRenewal(id, req.user.sub, dto.reason); }
     renewalReceipt(id) { return this.svc.getRenewalReceipt(id); }
     organizations() { return this.svc.listOrganizations(); }
+    // ===== Per-organization feature toggles (facial enrollment / clock-in / clock-out) =====
+    orgFeatures(orgId) { return this.svc.getOrgFeatures(orgId); }
+    updateOrgFeatures(orgId, dto) { return this.svc.updateOrgFeatures(orgId, dto); }
 };
 exports.AdminController = AdminController;
 __decorate([
@@ -427,6 +430,27 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "organizations", null);
+__decorate([
+    (0, common_1.Get)('organizations/:orgId/features'),
+    (0, rbac_guard_1.PlatformOnly)(),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get per-org feature toggles (super admin)' }),
+    __param(0, (0, common_1.Param)('orgId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "orgFeatures", null);
+__decorate([
+    (0, common_1.Patch)('organizations/:orgId/features'),
+    (0, rbac_guard_1.PlatformOnly)(),
+    (0, rbac_guard_1.RequirePermissions)('admin:manage'),
+    (0, swagger_1.ApiOperation)({ summary: 'Enable/disable per-org features: faceEnrollment, clockIn, clockOut (super admin)' }),
+    __param(0, (0, common_1.Param)('orgId')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "updateOrgFeatures", null);
 exports.AdminController = AdminController = __decorate([
     (0, swagger_1.ApiTags)('admin'),
     (0, module_guard_1.RequireModule)('administration'),

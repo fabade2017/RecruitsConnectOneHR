@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { isPlatformSuperAdmin } from '../../common/guards/rbac.guard';
+import { parseOrgFeatures, mergeOrgFeatures } from '../../common/org-features';
 
 @Injectable()
 export class AdminService {
@@ -397,8 +398,8 @@ export class AdminService {
     return sub.plan.modules.some(m => m.moduleKey === moduleKey && m.enabled);
   }
 
-  listOrganizations() {
-    return this.prisma.organization.findMany({
+  async listOrganizations() {
+    const orgs = await this.prisma.organization.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         _count: { select: { employees: true, branches: true, users: true, departments: true } },
@@ -406,6 +407,26 @@ export class AdminService {
         subscriptions: { include: { plan: true } },
       },
     });
+    return orgs.map((o: any) => ({ ...o, features: parseOrgFeatures(o.config) }));
+  }
+
+  // ===== Per-organization feature toggles (Super Admin controlled) =====
+  async getOrgFeatures(orgId: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { id: true, config: true } });
+    if (!org) throw new NotFoundException('Organization not found');
+    return { organizationId: org.id, ...parseOrgFeatures(org.config) };
+  }
+
+  async updateOrgFeatures(orgId: string, patch: any) {
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { id: true, config: true } });
+    if (!org) throw new NotFoundException('Organization not found');
+    const config = mergeOrgFeatures(org.config, {
+      faceEnrollment: patch?.faceEnrollment,
+      clockIn: patch?.clockIn,
+      clockOut: patch?.clockOut,
+    });
+    await this.prisma.organization.update({ where: { id: orgId }, data: { config } });
+    return { organizationId: orgId, ...parseOrgFeatures(config) };
   }
 
   // ===== Renewals (yearly) =====

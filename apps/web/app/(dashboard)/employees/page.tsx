@@ -3,11 +3,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { GlassCard, Pill } from '../../../components/ui/GlassCard';
 import { Users, QrCode, Search, Plus, Filter, Download, Eye, Edit2, X, Save, Building2, Camera, AlertTriangle, Check } from 'lucide-react';
 import { getApiUrl, getAuthHeaders, parseApiList } from '../../../lib/api';
+import { useOrgFeatures } from '../../../lib/features';
 
 type DropdownState = { loading: boolean; error: string };
 
 export default function PeoplePage() {
   const api = getApiUrl();
+  const { features } = useOrgFeatures();
   const [employees, setEmployees] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -500,31 +502,37 @@ export default function PeoplePage() {
                   <td className="p-3"><Pill tone={e.status==='active'?'emerald':e.status==='probation'?'amber':'slate'}>{e.status}</Pill></td>
                   <td className="p-3 text-right">
                     <div className="flex justify-end gap-1">
-                      <button
-                        onClick={()=>{
-                          const link = `${window.location.origin}/face-enroll/?id=${e.id}`;
-                          navigator.clipboard.writeText(link);
-                          alert(`Face enroll link copied for ${e.employeeCode}:\n${link}\n\nSend this link to the employee to capture 3 face images. Clock-in will compare live snap with enrolled faces for fraud detection.`);
-                        }}
-                        title="Copy face enroll link"
-                        className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center hover:bg-emerald-600"
-                      >
-                        <Camera size={14}/>
-                      </button>
-                      <a href={`/face-enroll/?id=${e.id}`} className="w-8 h-8 rounded-full glass flex items-center justify-center hover:bg-white" title="Open face enroll"><Eye size={14}/></a>
+                      {features.faceEnrollment && (
+                        <>
+                          <button
+                            onClick={()=>{
+                              const link = `${window.location.origin}/face-enroll/?id=${e.id}`;
+                              navigator.clipboard.writeText(link);
+                              alert(`Face enroll link copied for ${e.employeeCode}:\n${link}\n\nSend this link to the employee to capture 3 face images. Clock-in will compare live snap with enrolled faces for fraud detection.`);
+                            }}
+                            title="Copy face enroll link"
+                            className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center hover:bg-emerald-600"
+                          >
+                            <Camera size={14}/>
+                          </button>
+                          <a href={`/face-enroll/?id=${e.id}`} className="w-8 h-8 rounded-full glass flex items-center justify-center hover:bg-white" title="Open face enroll"><Eye size={14}/></a>
+                        </>
+                      )}
                       <a href={`/employee`} className="w-8 h-8 rounded-full glass flex items-center justify-center hover:bg-white"><Eye size={14}/></a>
                       <button onClick={()=>openEdit(e)} className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-800"><Edit2 size={14}/></button>
                     </div>
-                    <div className="text-[11px] text-center mt-1">
-                      {(()=>{ try{
-                        const parsed = e.faceProfileRef ? JSON.parse(e.faceProfileRef) : null;
-                        let count = 0; let hasDesc = false;
-                        if (Array.isArray(parsed)) { count = parsed.length; }
-                        else if (parsed && Array.isArray(parsed.images)) { count = parsed.images.length; hasDesc = Array.isArray(parsed.descriptors) && parsed.descriptors.length>0; }
-                        if (count) return <span className="text-emerald-600">● Face {count}/3 {hasDesc ? '✓' : ''}</span>;
-                        return <span className="text-amber-600">○ No face</span>;
-                      } catch{ return <span className="text-slate-400">—</span> }})()}
-                    </div>
+                    {features.faceEnrollment && (
+                      <div className="text-[11px] text-center mt-1">
+                        {(()=>{ try{
+                          const parsed = e.faceProfileRef ? JSON.parse(e.faceProfileRef) : null;
+                          let count = 0; let hasDesc = false;
+                          if (Array.isArray(parsed)) { count = parsed.length; }
+                          else if (parsed && Array.isArray(parsed.images)) { count = parsed.images.length; hasDesc = Array.isArray(parsed.descriptors) && parsed.descriptors.length>0; }
+                          if (count) return <span className="text-emerald-600">● Face {count}/3 {hasDesc ? '✓' : ''}</span>;
+                          return <span className="text-amber-600">○ No face</span>;
+                        } catch{ return <span className="text-slate-400">—</span> }})()}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
