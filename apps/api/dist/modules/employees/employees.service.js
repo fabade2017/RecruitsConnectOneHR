@@ -993,7 +993,7 @@ let EmployeesService = class EmployeesService {
         const built = await this.buildInvite(orgId, invite);
         const html = (0, email_1.getStaffInviteTemplate)(org.name, built.inviteUrl, invite.role, expiresAt.toISOString().slice(0, 10));
         const sent = await (0, email_1.sendEmail)({ to: email, subject: `You're invited to join ${org.name} on OneHR`, html }).catch((e) => ({ success: false, error: e }));
-        return { invite: built, emailSent: sent.success === true, emailError: sent.success === true ? undefined : (sent.notConfigured ? 'Email not configured on the server (SMTP_USER/SMTP_PASS missing) — share the invite link manually.' : String(sent.error?.message || sent.error || 'Email failed to send')), inviteUrl: built.inviteUrl };
+        return { invite: built, emailSent: sent.success === true, emailError: sent.success === true ? undefined : (sent.notConfigured ? 'Email not configured on the server (set RESEND_API_KEY or SENDGRID_API_KEY) — share the invite link manually.' : String(sent.error?.message || sent.error || 'Email failed to send')), inviteUrl: built.inviteUrl };
     }
     async listInvites(orgId, query) {
         const where = { organizationId: orgId };
@@ -1025,7 +1025,7 @@ let EmployeesService = class EmployeesService {
         const built = await this.buildInvite(orgId, updated);
         const html = (0, email_1.getStaffInviteTemplate)(org?.name || 'OneHR', built.inviteUrl, updated.role, expiresAt.toISOString().slice(0, 10));
         const sent = await (0, email_1.sendEmail)({ to: updated.email, subject: `You're invited to join ${org?.name || 'OneHR'} on OneHR`, html }).catch((e) => ({ success: false, error: e }));
-        return { invite: built, emailSent: sent.success === true, emailError: sent.success === true ? undefined : (sent.notConfigured ? 'Email not configured on the server (SMTP_USER/SMTP_PASS missing) — share the invite link manually.' : String(sent.error?.message || sent.error || 'Email failed to send')), inviteUrl: built.inviteUrl };
+        return { invite: built, emailSent: sent.success === true, emailError: sent.success === true ? undefined : (sent.notConfigured ? 'Email not configured on the server (set RESEND_API_KEY or SENDGRID_API_KEY) — share the invite link manually.' : String(sent.error?.message || sent.error || 'Email failed to send')), inviteUrl: built.inviteUrl };
     }
     // Public (no auth) — used by the /onboard page to validate the token before showing the form
     async getInviteByToken(token) {
