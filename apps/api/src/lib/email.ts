@@ -2,20 +2,26 @@
 import * as nodemailer from 'nodemailer';
 
 // Email delivery. Render (and many PaaS) block outbound SMTP ports 25/465/587,
-// so in production we send over HTTPS via a provider API (Resend or SendGrid).
+// so in production we send over HTTPS: either a provider API (Resend/SendGrid)
+// or a small relay PHP script on your own cPanel host (MAIL_RELAY_URL).
 // SMTP is kept as a fallback for local/dev environments that can reach an SMTP host.
 function emailConfig() {
   const port = parseInt(process.env.SMTP_PORT || '587');
   const requested = (process.env.EMAIL_PROVIDER || '').toLowerCase();
   const resendKey = process.env.RESEND_API_KEY || '';
   const sendgridKey = process.env.SENDGRID_API_KEY || '';
-  let provider: 'resend' | 'sendgrid' | 'smtp' = 'smtp';
+  const relayUrl = process.env.MAIL_RELAY_URL || '';
+  const relaySecret = process.env.MAIL_RELAY_SECRET || '';
+  let provider: 'resend' | 'sendgrid' | 'relay' | 'smtp' = 'smtp';
   if (requested === 'resend' || (!requested && resendKey)) provider = 'resend';
   else if (requested === 'sendgrid' || (!requested && sendgridKey)) provider = 'sendgrid';
+  else if (requested === 'relay' || (!requested && relayUrl)) provider = 'relay';
   return {
     provider,
     resendKey,
     sendgridKey,
+    relayUrl,
+    relaySecret,
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port,
     secure: port === 465,
@@ -89,6 +95,29 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
     }
   }
 
+  // HTTPS relay on your own cPanel host (works on Render free tier).
+  // The app POSTs to a small PHP script that sends via the local mailer.
+  if (cfg.provider === 'relay') {
+    if (!cfg.relayUrl) return notConfigured(to, subject);
+    try {
+      const res = await http()(cfg.relayUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Relay-Secret': cfg.relaySecret },
+        body: JSON.stringify({ to, subject, html, text: plain, from: cfg.fromEmail, fromName: cfg.fromName }),
+      });
+      const data: any = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.error || `Relay HTTP ${res.status}`);
+      }
+      const messageId = data?.messageId || `relay-${Date.now()}`;
+      console.log('Email sent via relay:', messageId);
+      return { messageId, success: true };
+    } catch (error) {
+      console.error('Relay send error:', error);
+      return { messageId: null, success: false, error };
+    }
+  }
+
   // SMTP fallback (local/dev only — blocked on Render)
   if (!cfg.user || !cfg.pass) return notConfigured(to, subject);
   try {
@@ -111,8 +140,8 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
 }
 
 function notConfigured(to: string, subject: string): SendResult {
-  console.error('[EMAIL NOT SENT] No email provider configured — set RESEND_API_KEY (recommended on Render) or SENDGRID_API_KEY, or SMTP_USER/SMTP_PASS. To:', to, 'Subject:', subject);
-  return { messageId: null, success: false, notConfigured: true, error: new Error('Email not configured (set RESEND_API_KEY or SENDGRID_API_KEY; SMTP is blocked on Render)') };
+  console.error('[EMAIL NOT SENT] No email provider configured — set MAIL_RELAY_URL (free, keeps your own mail server), or RESEND_API_KEY / SENDGRID_API_KEY, or SMTP_USER/SMTP_PASS. To:', to, 'Subject:', subject);
+  return { messageId: null, success: false, notConfigured: true, error: new Error('Email not configured (set MAIL_RELAY_URL, or RESEND_API_KEY / SENDGRID_API_KEY; SMTP is blocked on Render)') };
 }
 
 export function getLeaveStatusTemplate(employeeName: string, leaveType: string, status: string, startDate: string, endDate: string) {

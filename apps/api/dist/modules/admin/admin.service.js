@@ -27,15 +27,19 @@ let AdminService = class AdminService {
             ? !!process.env.RESEND_API_KEY
             : provider === 'sendgrid'
                 ? !!process.env.SENDGRID_API_KEY
-                : !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+                : provider === 'relay'
+                    ? !!process.env.MAIL_RELAY_URL
+                    : !!(process.env.SMTP_USER && process.env.SMTP_PASS);
         return {
             provider,
             configured,
             fromEmail: process.env.FROM_EMAIL || 'supports@rconehr.com',
             fromName: process.env.FROM_NAME || 'RecruitConnect OneHR',
             note: provider === 'smtp'
-                ? 'SMTP is used — this is BLOCKED on Render free tier. Set RESEND_API_KEY or SENDGRID_API_KEY instead.'
-                : 'HTTPS provider — works on Render free tier.',
+                ? 'SMTP is used — this is BLOCKED on Render free tier. Set MAIL_RELAY_URL, or RESEND_API_KEY / SENDGRID_API_KEY instead.'
+                : provider === 'relay'
+                    ? 'HTTPS relay to your own cPanel mail server — works on Render free tier.'
+                    : 'HTTPS provider — works on Render free tier.',
         };
     }
     async sendTestEmail(to) {
