@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { getJwtSecret, getJwtRefreshSecret } from '../../common/config/secrets';
 import * as bcrypt from 'bcryptjs';
@@ -62,8 +62,15 @@ export class AuthService {
 
     const mustChangePassword = (user as any).mustChangePassword || false;
     const payload = { sub: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, org_acronym: org?.acronym, employeeId: employee?.id || null, permissions, mustChangePassword };
-    const access_token = jwt.sign(payload, getJwtSecret(), { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any } as any);
-    const refresh_token = jwt.sign({ sub: user.id, type: 'refresh' }, getJwtRefreshSecret(), { expiresIn: '7d' } as any);
+    let access_token: string;
+    let refresh_token: string;
+    try {
+      access_token = jwt.sign(payload, getJwtSecret(), { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any } as any);
+      refresh_token = jwt.sign({ sub: user.id, type: 'refresh' }, getJwtRefreshSecret(), { expiresIn: '7d' } as any);
+    } catch (e: any) {
+      // Surface misconfiguration (missing/placeholder secrets) instead of opaque 500
+      throw new ServiceUnavailableException(e?.message || 'Auth configuration error');
+    }
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     return { access_token, refresh_token, user: { id: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, org_acronym: org?.acronym, permissions, mustChangePassword } };
   }
@@ -79,9 +86,15 @@ export class AuthService {
 
   async refresh(refreshToken: string) {
     if (!refreshToken || typeof refreshToken !== 'string') throw new UnauthorizedException('Invalid refresh token');
+    let refreshSecret: string;
+    try {
+      refreshSecret = getJwtRefreshSecret();
+    } catch (e: any) {
+      throw new ServiceUnavailableException(e?.message || 'Auth configuration error');
+    }
     let decoded: any;
     try {
-      decoded = jwt.verify(refreshToken, getJwtRefreshSecret());
+      decoded = jwt.verify(refreshToken, refreshSecret);
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }

@@ -115,8 +115,16 @@ let AuthService = class AuthService {
         const permissions = await this.resolvePermissions(user);
         const mustChangePassword = user.mustChangePassword || false;
         const payload = { sub: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, org_acronym: org?.acronym, employeeId: employee?.id || null, permissions, mustChangePassword };
-        const access_token = jwt.sign(payload, (0, secrets_1.getJwtSecret)(), { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') });
-        const refresh_token = jwt.sign({ sub: user.id, type: 'refresh' }, (0, secrets_1.getJwtRefreshSecret)(), { expiresIn: '7d' });
+        let access_token;
+        let refresh_token;
+        try {
+            access_token = jwt.sign(payload, (0, secrets_1.getJwtSecret)(), { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') });
+            refresh_token = jwt.sign({ sub: user.id, type: 'refresh' }, (0, secrets_1.getJwtRefreshSecret)(), { expiresIn: '7d' });
+        }
+        catch (e) {
+            // Surface misconfiguration (missing/placeholder secrets) instead of opaque 500
+            throw new common_1.ServiceUnavailableException(e?.message || 'Auth configuration error');
+        }
         await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
         return { access_token, refresh_token, user: { id: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, org_acronym: org?.acronym, permissions, mustChangePassword } };
     }
@@ -132,9 +140,16 @@ let AuthService = class AuthService {
     async refresh(refreshToken) {
         if (!refreshToken || typeof refreshToken !== 'string')
             throw new common_1.UnauthorizedException('Invalid refresh token');
+        let refreshSecret;
+        try {
+            refreshSecret = (0, secrets_1.getJwtRefreshSecret)();
+        }
+        catch (e) {
+            throw new common_1.ServiceUnavailableException(e?.message || 'Auth configuration error');
+        }
         let decoded;
         try {
-            decoded = jwt.verify(refreshToken, (0, secrets_1.getJwtRefreshSecret)());
+            decoded = jwt.verify(refreshToken, refreshSecret);
         }
         catch {
             throw new common_1.UnauthorizedException('Invalid refresh token');
