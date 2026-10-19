@@ -105,8 +105,18 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
         headers: { 'Content-Type': 'application/json', 'X-Relay-Secret': cfg.relaySecret },
         body: JSON.stringify({ to, subject, html, text: plain, from: cfg.fromEmail, fromName: cfg.fromName }),
       });
-      const data: any = await res.json().catch(() => ({}));
+      const raw = await res.text();
+      let data: any = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { /* non-JSON response (e.g. HTML error page) */ }
       if (!res.ok || data?.success === false) {
+        if (res.status === 404 || !raw.trim().startsWith('{')) {
+          throw new Error(
+            `Mail relay not reachable at ${cfg.relayUrl} (HTTP ${res.status}) — ` +
+            'upload apps/web/public/mail-relay.php with the site build (it ships in out/), ' +
+            'create a .relay-secret file next to it, and set MAIL_RELAY_URL + MAIL_RELAY_SECRET on Render. ' +
+            'Or set RESEND_API_KEY / SENDGRID_API_KEY instead.'
+          );
+        }
         throw new Error(data?.error || `Relay HTTP ${res.status}`);
       }
       const messageId = data?.messageId || `relay-${Date.now()}`;

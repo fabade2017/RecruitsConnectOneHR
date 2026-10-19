@@ -2,21 +2,29 @@
 /**
  * RecruitConnect OneHR — mail relay
  * ----------------------------------------------------------------------------
- * Upload this file to your cPanel web root, e.g. as:
+ * Deployed automatically with the static site (apps/web/public/mail-relay.php
+ * is copied into out/ at build time), i.e. live at:
  *     https://www.rconehr.com/mail-relay.php
  *
- * It lets the API (hosted on Render, where outbound SMTP is blocked) send email
- * over HTTPS using your own cPanel mail server. No third-party service needed.
+ * It lets the API (hosted on Render, where the app's SMTP is unavailable) send
+ * email over HTTPS using your own cPanel mail server. No third-party service.
  *
- * SETUP
- *   1. Change RELAY_SECRET below to a long random string.
- *   2. Set the SAME value on Render as MAIL_RELAY_SECRET, and set
- *        MAIL_RELAY_URL = https://www.rconehr.com/mail-relay.php
- *      (optionally EMAIL_PROVIDER = relay)
- *   3. Redeploy the API, then test with POST /v1/admin/email/test {"to":"..."}
- */
+ * SETUP (do this once)
+ *   1. Create the secret (from your laptop):
+ *        openssl rand -hex 32
+ *   2. On Render (API service → Environment) set BOTH:
+ *        MAIL_RELAY_URL    = https://www.rconehr.com/mail-relay.php
+ *        MAIL_RELAY_SECRET = <the value from step 1>
+ *      Redeploy the API.
+ *   3. On cPanel → File Manager, next to this file create `.relay-secret`
+ *      (a plain text file whose ONLY content is the same secret), chmod 640.
+ *      If you prefer, paste the secret into RELAY_SECRET below instead —
+ *      but then re-apply it after every site re-upload.
+ *   4. Test: POST /v1/admin/email/test {"to":"you@yourdomain.com"}
+ *
+ * Secret resolution order: .relay-secret file → RELAY_SECRET constant.
+ * ---------------------------------------------------------------------------- */
 
-// ---- Configuration ---------------------------------------------------------
 const RELAY_SECRET = 'CHANGE_ME_TO_A_LONG_RANDOM_STRING';
 const FROM_EMAIL   = 'supports@rconehr.com';
 const FROM_NAME    = 'RecruitConnect OneHR';
@@ -28,6 +36,15 @@ function fail($code, $msg) {
   http_response_code($code);
   echo json_encode(['success' => false, 'error' => $msg]);
   exit;
+}
+
+function relay_secret(): string {
+  $file = __DIR__ . '/.relay-secret';
+  if (is_readable($file)) {
+    $v = trim((string)file_get_contents($file));
+    if ($v !== '') return $v;
+  }
+  return RELAY_SECRET;
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -43,7 +60,11 @@ $secret = $_SERVER['HTTP_X_RELAY_SECRET'] ?? '';
 if ($secret === '' && !empty($_SERVER['HTTP_AUTHORIZATION'])) {
   if (preg_match('/Bearer\s+(.+)/i', $_SERVER['HTTP_AUTHORIZATION'], $m)) $secret = trim($m[1]);
 }
-if (!hash_equals(RELAY_SECRET, (string)$secret)) {
+$expected = relay_secret();
+if ($expected === 'CHANGE_ME_TO_A_LONG_RANDOM_STRING') {
+  fail(500, 'relay secret not configured — create .relay-secret next to this file (see header comment)');
+}
+if (!hash_equals($expected, (string)$secret)) {
   fail(401, 'unauthorized');
 }
 
