@@ -71,6 +71,24 @@ let EmployeesService = class EmployeesService {
     constructor(prisma) {
         this.prisma = prisma;
     }
+    // Allocate the next free employee code from the highest existing sequence
+    // (count()+1 breaks after deletions/terminations leave gaps → unique clash).
+    async nextEmployeeCode(orgAcronym, orgId, db = this.prisma) {
+        const existing = await db.employee.findMany({
+            where: { organizationId: orgId, employeeCode: { startsWith: `${orgAcronym}-` } },
+            select: { employeeCode: true },
+        });
+        let max = 0;
+        for (const e of existing) {
+            const m = /-(\d+)$/.exec(e.employeeCode || '');
+            if (m) {
+                const n = parseInt(m[1], 10);
+                if (n > max)
+                    max = n;
+            }
+        }
+        return `${orgAcronym}-${String(max + 1).padStart(6, '0')}`;
+    }
     async resolveEmployeeIdFromUser(user) {
         if (user.employeeId)
             return user.employeeId;
@@ -254,9 +272,7 @@ let EmployeesService = class EmployeesService {
         const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
         if (!org)
             throw new common_1.ConflictException('Org not found');
-        const count = await this.prisma.employee.count({ where: { organizationId: orgId } });
-        const seq = String(count + 1).padStart(6, '0');
-        const employeeCode = `${org.acronym}-${seq}`;
+        const employeeCode = await this.nextEmployeeCode(org.acronym, orgId);
         const qrCode = await QRCode.toDataURL(employeeCode);
         // handle DOB
         let dob = undefined;
@@ -1086,8 +1102,7 @@ let EmployeesService = class EmployeesService {
             const newUser = await tx.user.create({
                 data: { organizationId: orgId, email, phone, passwordHash: hash, role: invite.role || 'employee', mustChangePassword: false },
             });
-            const count = await tx.employee.count({ where: { organizationId: orgId } });
-            const employeeCode = `${org.acronym}-${String(count + 1).padStart(6, '0')}`;
+            const employeeCode = await this.nextEmployeeCode(org.acronym, orgId, tx);
             const qrCode = await QRCode.toDataURL(employeeCode).catch(() => null);
             const employee = await tx.employee.create({
                 data: {
