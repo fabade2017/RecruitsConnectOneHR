@@ -95,14 +95,19 @@ function mime_encode_header(string $s): string {
 if (!preg_match('/@rconehr\.com$/i', $from)) $from = FROM_EMAIL;
 
 try {
-  if (!function_exists('mail')) {
-    fail(503, 'PHP mail() is not available on this hosting account');
-  }
+  // Strip CR/LF from header fields to prevent header injection.
+  $subject  = str_replace(["\r", "\n"], '', $subject);
+  $fromName = str_replace(["\r", "\n"], '', $fromName);
+
   $boundary = '=_relay_' . bin2hex(random_bytes(10));
   $headers = [
+    'Date: ' . date('r'),
+    'From: ' . (mime_encode_header($fromName) !== '' ? mime_encode_header($fromName) . ' ' : '') . '<' . $from . '>',
+    'To: <' . $to . '>',
+    'Subject: ' . mime_encode_header($subject),
+    'Message-ID: <relay-' . bin2hex(random_bytes(8)) . '@' . (preg_match('/@([\w.-]+)$/', $from, $m) ? $m[1] : 'rconehr.com') . '>',
     'MIME-Version: 1.0',
     'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
-    'From: ' . mime_encode_header($fromName) . ' <' . $from . '>',
     'Reply-To: ' . $from,
     'X-Mailer: OneHR-MailRelay',
   ];
@@ -113,11 +118,60 @@ try {
   $body .= "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n$html\r\n";
   $body .= "--$boundary--";
 
-  // Envelope sender helps SPF alignment on the cPanel mail server.
-  $ok = @mail($to, $subject, $body, implode("\r\n", $headers), '-f' . $from);
+  // Dot-stuffing per RFC 5321 (body lines starting with '.').
+  $mime = implode("\r\n", $headers) . "\r\n\r\n" . preg_replace('/^\./m', '..', $body);
+  $sent = false;
+  $errors = [];
 
-  if (!$ok) {
-    fail(502, 'local mailer rejected the message');
+  // 1) Local SMTP (cPanel Exim on this same host). Works even when mail() is
+  //    disabled by the host, and keeps delivery on your own mail server.
+  foreach ([['127.0.0.1', 25], ['localhost', 25]] as [$host, $port]) {
+    $errno = 0; $errstr = '';
+    $fp = @fsockopen($host, $port, $errno, $errstr, 10);
+    if (!$fp) { $errors[] = "connect $host:$port failed ($errstr)"; continue; }
+    stream_set_timeout($fp, 20);
+    $read = function () use ($fp) {
+      $out = '';
+      while (($line = fgets($fp, 2048)) !== false) {
+        $out .= $line;
+        if (strlen($line) < 4 || $line[3] === ' ') break;
+      }
+      return $out;
+    };
+    $cmd = function (string $c) use ($fp, $read) {
+      fwrite($fp, $c . "\r\n");
+      return $read();
+    };
+
+    $banner = $read();
+    if (strpos($banner, '220') !== 0) { $errors[] = 'bad SMTP banner: ' . trim($banner); fclose($fp); continue; }
+    $cmd('EHLO localhost');
+    $r = $cmd('MAIL FROM:<' . $from . '>');
+    if (strpos($r, '250') !== 0) { $errors[] = 'MAIL FROM: ' . trim($r); $cmd('QUIT'); fclose($fp); continue; }
+    $r = $cmd('RCPT TO:<' . $to . '>');
+    if (strpos($r, '250') !== 0 && strpos($r, '251') !== 0) { $errors[] = 'RCPT TO: ' . trim($r); $cmd('QUIT'); fclose($fp); continue; }
+    $r = $cmd('DATA');
+    if (strpos($r, '354') !== 0) { $errors[] = 'DATA: ' . trim($r); $cmd('QUIT'); fclose($fp); continue; }
+    fwrite($fp, $mime . "\r\n.\r\n");
+    $r = $read();
+    $cmd('QUIT');
+    fclose($fp);
+    if (strpos($r, '250') === 0) { $sent = true; break; }
+    $errors[] = 'message rejected: ' . trim($r);
+  }
+
+  // 2) Fallback: PHP mail() when the host allows it.
+  if (!$sent && function_exists('mail')) {
+    $ok = @mail($to, $subject, $body, implode("\r\n", $headers), '-f' . $from);
+    if ($ok) {
+      $sent = true;
+    } else {
+      $errors[] = 'PHP mail() rejected the message';
+    }
+  }
+
+  if (!$sent) {
+    fail(502, 'mail delivery failed: ' . implode(' | ', $errors));
   }
 
   echo json_encode(['success' => true, 'messageId' => 'relay-' . uniqid()]);
