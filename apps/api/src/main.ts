@@ -65,12 +65,21 @@ async function bootstrap() {
 
   app.setGlobalPrefix('v1');
   const corsOrigins = process.env.CORS_ORIGIN?.split(',').map(s => s.trim()).filter(Boolean);
-  app.enableCors({
-    origin: corsOrigins && corsOrigins.length ? corsOrigins : true,
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Idempotency-Key'],
-  });
+  if (corsOrigins && corsOrigins.length) {
+    app.enableCors({
+      origin: corsOrigins,
+      credentials: true,
+      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Idempotency-Key'],
+    });
+  } else if (process.env.NODE_ENV === 'production') {
+    // Fail closed in production: no CORS_ORIGIN → same-origin / server-side clients only
+    app.enableCors({ origin: false, credentials: false });
+    console.warn('[cors] CORS_ORIGIN not set — refusing cross-origin browser access in production');
+  } else {
+    // Dev only: allow any origin for local Next.js
+    app.enableCors({ origin: true, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Idempotency-Key'] });
+  }
 
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
@@ -79,20 +88,23 @@ async function bootstrap() {
     transformOptions: { enableImplicitConversion: true },
   }));
 
-  // Swagger — always enabled (was gated by NODE_ENV/ENABLE_SWAGGER, now on for /v1/api/docs)
-  try {
-    const config = new DocumentBuilder()
-      .setTitle('OneHR API')
-      .setDescription('RecruitConnect OneHR™ - Workforce Operating System (RBAC hardened)')
-      .setVersion('1.0')
-      .addBearerAuth()
-      .addApiKey({ type: 'apiKey', in: 'header', name: 'X-Organization-Id' }, 'tenant')
-      .build();
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document);
-    console.log('Swagger enabled at /v1/api/docs (also /api/docs)');
-  } catch (e) {
-    console.warn('Swagger setup failed (non-blocking):', (e as Error).message);
+  // Swagger — off by default in production; enable with ENABLE_SWAGGER=true
+  const swaggerEnabled = process.env.ENABLE_SWAGGER === 'true' || (process.env.ENABLE_SWAGGER !== 'false' && process.env.NODE_ENV !== 'production');
+  if (swaggerEnabled) {
+    try {
+      const config = new DocumentBuilder()
+        .setTitle('OneHR API')
+        .setDescription('RecruitConnect OneHR™ - Workforce Operating System (RBAC hardened)')
+        .setVersion('1.0')
+        .addBearerAuth()
+        .addApiKey({ type: 'apiKey', in: 'header', name: 'X-Organization-Id' }, 'tenant')
+        .build();
+      const document = SwaggerModule.createDocument(app, config);
+      SwaggerModule.setup('api/docs', app, document);
+      console.log(`Swagger enabled at /v1/api/docs (also /api/docs)`);
+    } catch (e) {
+      console.warn('Swagger setup failed (non-blocking):', (e as Error).message);
+    }
   }
 
   //const port = process.env.PORT_API ? parseInt(process.env.PORT_API, 10) : 3001;

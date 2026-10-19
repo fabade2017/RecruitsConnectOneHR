@@ -15,7 +15,8 @@
     "db:generate": "npx prisma generate --schema=./prisma/schema.prisma",
     "db:seed": "tsx apps/api/src/prisma/seed.ts",
     "lint": "eslint .",
-    "test": "jest"
+    "test": "npm run test --workspace=apps/api",
+    "test:unit": "npm run test:unit --workspace=apps/api"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

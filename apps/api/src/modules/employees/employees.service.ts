@@ -1,5 +1,6 @@
 import { Injectable, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { getJwtSecret } from '../../common/config/secrets';
 import * as QRCode from 'qrcode';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
@@ -44,7 +45,7 @@ export class EmployeesService {
       branchId: employee.branchId,
       iat: Math.floor(Date.now() / 1000),
     };
-    const token = jwt.sign(payload, (process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev') as string, { expiresIn: '10y' } as any);
+    const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '10y' } as any);
     // QR contains secure token (can be verified via /employees/qr/verify)
     const qrSecure = await QRCode.toDataURL(token);
     return { token, qrSecure };
@@ -52,7 +53,7 @@ export class EmployeesService {
 
   async verifySecureQr(token: string): Promise<any> {
     try {
-      const decoded: any = jwt.verify(token, (process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev') as string);
+      const decoded: any = jwt.verify(token, getJwtSecret());
       const emp = await this.prisma.employee.findUnique({ where: { id: decoded.employeeId }, include: { department: true, branch: true, organization: true, user: { select: { email: true, role: true } } } });
       if (!emp || emp.employeeCode !== decoded.employeeCode) throw new NotFoundException('Employee not found for QR');
       return { valid: true, decoded, employee: { id: emp.id, employeeCode: emp.employeeCode, jobTitle: emp.jobTitle, grade: emp.grade, department: emp.department?.name, branch: emp.branch?.name, organization: emp.organization.name, photoUrl: emp.photoUrl } };

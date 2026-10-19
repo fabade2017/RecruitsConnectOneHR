@@ -45,6 +45,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.EmployeesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
+const secrets_1 = require("../../common/config/secrets");
 const QRCode = __importStar(require("qrcode"));
 const bcrypt = __importStar(require("bcryptjs"));
 const jwt = __importStar(require("jsonwebtoken"));
@@ -89,14 +90,14 @@ let EmployeesService = class EmployeesService {
             branchId: employee.branchId,
             iat: Math.floor(Date.now() / 1000),
         };
-        const token = jwt.sign(payload, (process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev'), { expiresIn: '10y' });
+        const token = jwt.sign(payload, (0, secrets_1.getJwtSecret)(), { expiresIn: '10y' });
         // QR contains secure token (can be verified via /employees/qr/verify)
         const qrSecure = await QRCode.toDataURL(token);
         return { token, qrSecure };
     }
     async verifySecureQr(token) {
         try {
-            const decoded = jwt.verify(token, (process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev'));
+            const decoded = jwt.verify(token, (0, secrets_1.getJwtSecret)());
             const emp = await this.prisma.employee.findUnique({ where: { id: decoded.employeeId }, include: { department: true, branch: true, organization: true, user: { select: { email: true, role: true } } } });
             if (!emp || emp.employeeCode !== decoded.employeeCode)
                 throw new common_1.NotFoundException('Employee not found for QR');

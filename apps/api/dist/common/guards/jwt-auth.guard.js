@@ -43,12 +43,27 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.JwtAuthGuard = exports.Public = exports.IS_PUBLIC_KEY = void 0;
+exports.extractToken = extractToken;
 const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 const jwt = __importStar(require("jsonwebtoken"));
+const secrets_1 = require("../config/secrets");
 exports.IS_PUBLIC_KEY = 'isPublic';
 const Public = () => (0, common_1.SetMetadata)(exports.IS_PUBLIC_KEY, true);
 exports.Public = Public;
+/** Extract bearer token from Authorization header or (optional) cookies set by login. */
+function extractToken(req) {
+    const auth = req.headers?.authorization;
+    if (auth?.startsWith('Bearer '))
+        return auth.slice(7);
+    const cookieHeader = req.headers?.cookie || '';
+    if (cookieHeader) {
+        const match = cookieHeader.match(/(?:^|;\s*)onehr_access=([^;]+)/);
+        if (match?.[1])
+            return decodeURIComponent(match[1]);
+    }
+    return null;
+}
 let JwtAuthGuard = class JwtAuthGuard {
     reflector;
     constructor(reflector) {
@@ -69,16 +84,20 @@ let JwtAuthGuard = class JwtAuthGuard {
         ]);
         if (isPublic)
             return true;
-        const auth = req.headers.authorization;
-        if (!auth?.startsWith('Bearer '))
+        const token = extractToken(req);
+        if (!token)
             throw new common_1.UnauthorizedException('Missing token');
-        const token = auth.slice(7);
         try {
-            const payload = jwt.verify(token, process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev');
+            const payload = jwt.verify(token, (0, secrets_1.getJwtSecret)());
             req.user = payload;
-            // Tenant resolution: prefer JWT org_id, fallback to header
-            req.orgId = payload.org_id || payload.orgId || req.headers['x-organization-id'];
-            // super_admin is global — allow missing org context (admin endpoints are org-agnostic)
+            // Tenant resolution: JWT org_id only for normal users.
+            // super_admin may target an org via X-Organization-Id (platform admin ops).
+            req.orgId = payload.org_id || payload.orgId;
+            if (!req.orgId && payload.role === 'super_admin') {
+                const headerOrg = req.headers['x-organization-id'];
+                if (headerOrg && /^[0-9a-f-]{36}$/i.test(headerOrg))
+                    req.orgId = headerOrg;
+            }
             if (!req.orgId && payload.role !== 'super_admin')
                 throw new common_1.UnauthorizedException('Missing organization context');
             return true;

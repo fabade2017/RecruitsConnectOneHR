@@ -49,7 +49,16 @@ exports.ChatGateway = void 0;
 const websockets_1 = require("@nestjs/websockets");
 const socket_io_1 = require("socket.io");
 const jwt = __importStar(require("jsonwebtoken"));
+const secrets_1 = require("../../common/config/secrets");
 const prisma_service_1 = require("../../prisma/prisma.service");
+function wsCorsOrigin() {
+    const env = process.env.CORS_ORIGIN?.split(',').map(s => s.trim()).filter(Boolean);
+    if (env && env.length)
+        return { origin: env, credentials: true };
+    if (process.env.NODE_ENV === 'production')
+        return { origin: false, credentials: false };
+    return { origin: true, credentials: true };
+}
 let ChatGateway = class ChatGateway {
     prisma;
     server;
@@ -65,7 +74,7 @@ let ChatGateway = class ChatGateway {
                 client.disconnect();
                 return;
             }
-            const payload = jwt.verify(token, process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev');
+            const payload = jwt.verify(token, (0, secrets_1.getJwtSecret)());
             const userId = payload.sub;
             const orgId = payload.org_id || payload.orgId;
             if (!userId || !orgId) {
@@ -271,7 +280,7 @@ __decorate([
 ], ChatGateway.prototype, "handleRead", null);
 exports.ChatGateway = ChatGateway = __decorate([
     (0, websockets_1.WebSocketGateway)({
-        cors: { origin: '*', credentials: true },
+        cors: wsCorsOrigin(),
         namespace: '/chat',
     }),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])

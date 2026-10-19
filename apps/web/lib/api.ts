@@ -1,11 +1,15 @@
 'use client';
 
 export const getApiUrl = () => process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
+
+/**
+ * Auth: primary is Bearer JWT in localStorage (static export on QServers has no
+ * server routes). API also sets HttpOnly cookies (onehr_access/onehr_refresh)
+ * when CORS credentials are enabled — send both so cookie auth works when present.
+ */
 export const getAuthHeaders = (): Record<string,string> => {
   if (typeof window === 'undefined') return {};
-  // Point 2: token now HttpOnly — JS cannot read. Use cookie auth via fetch credentials:include.
-  // Keep Bearer fallback only if token still in localStorage (legacy transition)
-  const t = typeof localStorage !== 'undefined' ? localStorage.getItem('onehr_token') : null;
+  const t = localStorage.getItem('onehr_token');
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
@@ -25,7 +29,7 @@ export async function fetchJson(endpoint: string, opts: RequestInit = {}) {
   const headers: Record<string,string> = { ...getAuthHeaders(), ...(opts.headers as any || {}) };
   if (!headers['Content-Type'] && opts.body) headers['Content-Type'] = 'application/json';
   const url = endpoint.startsWith('http') ? endpoint : `${api}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-  const res = await fetch(url, { ...opts, headers });
+  const res = await fetch(url, { ...opts, headers, credentials: 'include' });
   const text = await res.text();
   let json: any = null;
   try { json = text ? JSON.parse(text) : null; } catch { json = text; }
@@ -41,13 +45,6 @@ export function getOrgAcronym(): string {
   try {
     const u = JSON.parse(localStorage.getItem('onehr_user') || 'null');
     if (u?.org_acronym) return String(u.org_acronym).trim().toUpperCase();
-    const t = localStorage.getItem('onehr_token');
-    if (t) {
-      const part = t.split('.')[1] || '';
-      const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
-      const payload = JSON.parse(atob(b64));
-      if (payload?.org_acronym) return String(payload.org_acronym).trim().toUpperCase();
-    }
   } catch {}
   return '';
 }

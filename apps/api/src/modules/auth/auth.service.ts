@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { getJwtSecret, getJwtRefreshSecret } from '../../common/config/secrets';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 
@@ -61,8 +62,8 @@ export class AuthService {
 
     const mustChangePassword = (user as any).mustChangePassword || false;
     const payload = { sub: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, org_acronym: org?.acronym, employeeId: employee?.id || null, permissions, mustChangePassword };
-    const access_token = jwt.sign(payload, (process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev') as string, { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any } as any);
-    const refresh_token = jwt.sign({ sub: user.id, type: 'refresh' }, (process.env.JWT_REFRESH_SECRET || 'change-me-refresh-32-chars-minimum') as string, { expiresIn: '7d' } as any);
+    const access_token = jwt.sign(payload, getJwtSecret(), { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any } as any);
+    const refresh_token = jwt.sign({ sub: user.id, type: 'refresh' }, getJwtRefreshSecret(), { expiresIn: '7d' } as any);
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     return { access_token, refresh_token, user: { id: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, org_acronym: org?.acronym, permissions, mustChangePassword } };
   }
@@ -77,17 +78,22 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
+    if (!refreshToken || typeof refreshToken !== 'string') throw new UnauthorizedException('Invalid refresh token');
+    let decoded: any;
     try {
-      const decoded: any = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'change-me-refresh-32-chars');
-      const user = await this.prisma.user.findUnique({ where: { id: decoded.sub } });
-      if (!user) throw new UnauthorizedException('Invalid refresh');
+      decoded = jwt.verify(refreshToken, getJwtRefreshSecret());
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    if (decoded?.type !== 'refresh') throw new UnauthorizedException('Invalid refresh token');
+    const user = await this.prisma.user.findUnique({ where: { id: decoded.sub } });
+    if (!user) throw new UnauthorizedException('Invalid refresh');
     const employee = await this.prisma.employee.findUnique({ where: { userId: user.id }, select: { id: true } });
     const permissions = await this.resolvePermissions(user);
     const org = await this.prisma.organization.findUnique({ where: { id: user.organizationId }, select: { acronym: true } }).catch(() => null);
     const payload = { sub: user.id, email: user.email, role: user.role, customRoleId: user.customRoleId, org_id: user.organizationId, org_acronym: org?.acronym, employeeId: employee?.id || null, permissions };
-      const access_token = jwt.sign(payload, (process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev') as string, { expiresIn: '15m' } as any);
-      return { access_token };
-    } catch { throw new UnauthorizedException('Invalid refresh token'); }
+    const access_token = jwt.sign(payload, getJwtSecret(), { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any } as any);
+    return { access_token };
   }
 
   async registerDevice(userId: string, dto: { device_fingerprint: string; device_type: string; device_name?: string }) {

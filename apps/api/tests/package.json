@@ -1,0 +1,8 @@
+{
+  "name": "onehr-api-tests",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test:unit": "node --import tsx --test tests/*.test.ts"
+  }
+}

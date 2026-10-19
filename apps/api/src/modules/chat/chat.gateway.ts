@@ -9,10 +9,18 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import * as jwt from 'jsonwebtoken';
+import { getJwtSecret } from '../../common/config/secrets';
 import { PrismaService } from '../../prisma/prisma.service';
 
+function wsCorsOrigin(): { origin: string | string[] | boolean; credentials: boolean } {
+  const env = process.env.CORS_ORIGIN?.split(',').map(s => s.trim()).filter(Boolean);
+  if (env && env.length) return { origin: env, credentials: true };
+  if (process.env.NODE_ENV === 'production') return { origin: false, credentials: false };
+  return { origin: true, credentials: true };
+}
+
 @WebSocketGateway({
-  cors: { origin: '*', credentials: true },
+  cors: wsCorsOrigin(),
   namespace: '/chat',
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -29,7 +37,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.disconnect();
         return;
       }
-      const payload: any = jwt.verify(token, process.env.JWT_SECRET || 'change-me-32-chars-minimum-secret-for-dev');
+      const payload: any = jwt.verify(token, getJwtSecret());
       const userId = payload.sub;
       const orgId = payload.org_id || payload.orgId;
       if (!userId || !orgId) {

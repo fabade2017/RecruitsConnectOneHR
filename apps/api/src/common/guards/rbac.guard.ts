@@ -34,14 +34,16 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
 };
 
 export function hasPermission(perms: string[], required: string): boolean {
+  if (!Array.isArray(perms) || !perms.length) return false;
   if (perms.includes('*')) return true;
+  if (typeof required !== 'string' || !required) return false;
   return perms.some((p) => {
+    if (typeof p !== 'string') return false;
     if (p === required) return true;
-    if (p.endsWith(':*')) return required.startsWith(p.replace(':*', ':'));
-    if (required.endsWith(':*')) return p.startsWith(required.replace(':*', ':'));
-    const pBase = p.split(':').slice(0, 2).join(':');
-    const rBase = required.split(':').slice(0, 2).join(':');
-    if (pBase === rBase) return true;
+    // User wildcard: 'employee:*' grants 'employee:read', 'employee:update', etc.
+    if (p.endsWith(':*')) return required.startsWith(p.slice(0, -1)); // 'employee:' prefix
+    // Required wildcard: endpoint requires 'shift:*' → any 'shift:...' user perm satisfies it
+    if (required.endsWith(':*')) return p.startsWith(required.slice(0, -1));
     return false;
   });
 }
@@ -90,11 +92,10 @@ export class RbacGuard {
       if (!ok) throw new ForbiddenException(`Platform Super Admin only — managed by organisation ${getPlatformOrgAcronym()}`);
     }
 
-    // Resolve dynamic permissions: if user has customRole, use DB, else system map, else JWT perms
+    // Resolve dynamic permissions from DB (never trust stale JWT perms).
+    // Order: customRoleId → role slug in custom roles → system matrix → JWT fallback.
     let userPerms: string[] = [];
-    if (user.permissions && Array.isArray(user.permissions)) {
-      userPerms = user.permissions;
-    } else if (user.customRoleId) {
+    if (user.customRoleId) {
       try {
         const cr = await this.prisma.roleDefinition.findUnique({ where: { id: user.customRoleId } });
         if (cr) {
@@ -113,6 +114,8 @@ export class RbacGuard {
       } catch {}
     }
     if (!userPerms.length) userPerms = getSystemPermissions(role);
+    // Last-resort: JWT-cached perms only if system matrix is empty for unknown roles
+    if (!userPerms.length && Array.isArray(user.permissions)) userPerms = user.permissions;
 
     // Role check — allow if user has one of required roles OR has wildcard
     if (requiredRoles && !requiredRoles.includes(role) && !userPerms.includes('*') && role !== 'org_admin' && role !== 'super_admin') {
