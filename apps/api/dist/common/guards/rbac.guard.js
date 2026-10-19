@@ -48,6 +48,13 @@ exports.ROLE_PERMISSIONS = {
     executive: ['report:read', 'analytics:read', 'employee:read', 'attendance:read', 'audit:read'],
     auditor: ['audit:read', 'report:read', 'compliance:read', 'employee:read'],
 };
+function permBase(p) {
+    return p.split(':').slice(0, 2).join(':');
+}
+function permScope(p) {
+    const parts = p.split(':');
+    return parts.length > 2 ? parts.slice(2).join(':') : null;
+}
 function hasPermission(perms, required) {
     if (!Array.isArray(perms) || !perms.length)
         return false;
@@ -66,6 +73,18 @@ function hasPermission(perms, required) {
         // Required wildcard: endpoint requires 'shift:*' → any 'shift:...' user perm satisfies it
         if (required.endsWith(':*'))
             return p.startsWith(required.slice(0, -1));
+        // Same module:action — unscoped user perm covers any scope (leave:request → leave:request:self),
+        // scoped user perm covers unscoped required (employee:read:self → employee:read),
+        // but differing explicit scopes never cross (leave:read:self must NOT grant leave:read:team).
+        if (permBase(p) === permBase(required)) {
+            const sp = permScope(p);
+            const sr = permScope(required);
+            if (sp === sr)
+                return true;
+            if (sp === null || sr === null)
+                return true;
+            return false;
+        }
         return false;
     });
 }
@@ -155,10 +174,16 @@ let RbacGuard = class RbacGuard {
         // Last-resort: JWT-cached perms only if system matrix is empty for unknown roles
         if (!userPerms.length && Array.isArray(user.permissions))
             userPerms = user.permissions;
-        // Role check — allow if user has one of required roles OR has wildcard
+        // Role check — allow if user has one of required roles OR fully covers one
+        // required role's permission set (custom roles that duplicate a system role).
+        // Never "any single overlap" — that let employees pass @Roles('hr_admin') gates.
         if (requiredRoles && !requiredRoles.includes(role) && !userPerms.includes('*') && role !== 'org_admin' && role !== 'super_admin') {
-            // Also check if any required role's perms are subset of user perms — for custom roles that map to system roles
-            const hasRolePerm = requiredRoles.some(r => getSystemPermissions(r).some(p => userPerms.some(up => hasPermission([up], p))));
+            const hasRolePerm = requiredRoles.some((r) => {
+                const rolePerms = getSystemPermissions(r);
+                if (!rolePerms.length)
+                    return false;
+                return rolePerms.every((rp) => hasPermission(userPerms, rp));
+            });
             if (!hasRolePerm)
                 throw new common_1.ForbiddenException(`Requires role: ${requiredRoles.join(', ')}`);
         }
