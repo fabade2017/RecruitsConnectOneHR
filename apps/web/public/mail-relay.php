@@ -85,29 +85,42 @@ $fromName = trim($data['fromName'] ?? FROM_NAME);
 if (!filter_var($to, FILTER_VALIDATE_EMAIL)) fail(400, 'invalid recipient');
 if ($subject === '' || $html === '') fail(400, 'subject and html are required');
 
+// ASCII-safe RFC 2047 encoded-word (no mbstring dependency).
+function mime_encode_header(string $s): string {
+  if ($s !== '' && preg_match('/^[\x20-\x7E]*$/', $s)) return $s;
+  return '=?UTF-8?B?' . base64_encode($s) . '?=';
+}
+
 // Never let the relay send from someone else's domain.
 if (!preg_match('/@rconehr\.com$/i', $from)) $from = FROM_EMAIL;
 
-$boundary = '=_relay_' . bin2hex(random_bytes(10));
-$headers = [
-  'MIME-Version: 1.0',
-  'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
-  'From: ' . mb_encode_mimeheader($fromName, 'UTF-8') . ' <' . $from . '>',
-  'Reply-To: ' . $from,
-  'X-Mailer: OneHR-MailRelay',
-];
+try {
+  if (!function_exists('mail')) {
+    fail(503, 'PHP mail() is not available on this hosting account');
+  }
+  $boundary = '=_relay_' . bin2hex(random_bytes(10));
+  $headers = [
+    'MIME-Version: 1.0',
+    'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
+    'From: ' . mime_encode_header($fromName) . ' <' . $from . '>',
+    'Reply-To: ' . $from,
+    'X-Mailer: OneHR-MailRelay',
+  ];
 
-$body  = "--$boundary\r\n";
-$body .= "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n$text\r\n";
-$body .= "--$boundary\r\n";
-$body .= "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n$html\r\n";
-$body .= "--$boundary--";
+  $body  = "--$boundary\r\n";
+  $body .= "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n$text\r\n";
+  $body .= "--$boundary\r\n";
+  $body .= "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n$html\r\n";
+  $body .= "--$boundary--";
 
-// Envelope sender helps SPF alignment on the cPanel mail server.
-$ok = @mail($to, $subject, $body, implode("\r\n", $headers), '-f' . $from);
+  // Envelope sender helps SPF alignment on the cPanel mail server.
+  $ok = @mail($to, $subject, $body, implode("\r\n", $headers), '-f' . $from);
 
-if (!$ok) {
-  fail(502, 'local mailer rejected the message');
+  if (!$ok) {
+    fail(502, 'local mailer rejected the message');
+  }
+
+  echo json_encode(['success' => true, 'messageId' => 'relay-' . uniqid()]);
+} catch (Throwable $e) {
+  fail(500, 'relay internal error: ' . $e->getMessage());
 }
-
-echo json_encode(['success' => true, 'messageId' => 'relay-' . uniqid()]);
