@@ -114,8 +114,19 @@ async function bootstrap() {
                 rateMap.delete(k);
     }, 5 * 60 * 1000).unref();
     app.setGlobalPrefix('v1');
-    const corsOrigins = process.env.CORS_ORIGIN?.split(',').map(s => s.trim()).filter(Boolean);
-    if (corsOrigins && corsOrigins.length) {
+    const parseOrigins = (v) => (v || '').split(',').map(s => s.trim().replace(/\/$/, '')).filter(Boolean);
+    let corsOrigins = parseOrigins(process.env.CORS_ORIGIN);
+    if (!corsOrigins.length) {
+        // Convenience: WEB_APP_URL often set for invite links
+        corsOrigins = parseOrigins(process.env.WEB_APP_URL);
+    }
+    if (!corsOrigins.length && process.env.NODE_ENV === 'production') {
+        // Known product frontends — still an explicit allowlist, never origin:true
+        corsOrigins = ['https://www.rconehr.com', 'https://rconehr.com'];
+        console.error('[cors] CORS_ORIGIN not set — falling back to known product origins: ' + corsOrigins.join(', ') + '. Set CORS_ORIGIN explicitly on Render.');
+    }
+    if (corsOrigins.length) {
+        console.log('[cors] allowed origins: ' + corsOrigins.join(', '));
         app.enableCors({
             origin: corsOrigins,
             credentials: true,
@@ -123,13 +134,8 @@ async function bootstrap() {
             allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Idempotency-Key'],
         });
     }
-    else if (process.env.NODE_ENV === 'production') {
-        // Fail closed in production: no CORS_ORIGIN → same-origin / server-side clients only
-        app.enableCors({ origin: false, credentials: false });
-        console.warn('[cors] CORS_ORIGIN not set — refusing cross-origin browser access in production');
-    }
     else {
-        // Dev only: allow any origin for local Next.js
+        // Dev only (no origins resolved): allow any origin for local Next.js
         app.enableCors({ origin: true, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Idempotency-Key'] });
     }
     app.useGlobalPipes(new common_1.ValidationPipe({
