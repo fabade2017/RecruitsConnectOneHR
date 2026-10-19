@@ -16,8 +16,10 @@
  *        MAIL_RELAY_URL    = https://www.rconehr.com/mail-relay.php
  *        MAIL_RELAY_SECRET = <the value from step 1>
  *      Redeploy the API.
- *   3. On cPanel → File Manager, next to this file create `.relay-secret`
- *      (a plain text file whose ONLY content is the same secret), chmod 640.
+ *   3. Create the secret file OUTSIDE the web root (preferred), i.e. one level
+ *      above public_html (File Manager → Home, Show Dotfiles → New File
+ *      `.relay-secret`). Next to this file also works — .htaccess blocks it —
+ *      but outside the web root is safer. chmod 640.
  *      If you prefer, paste the secret into RELAY_SECRET below instead —
  *      but then re-apply it after every site re-upload.
  *   4. Test: POST /v1/admin/email/test {"to":"you@yourdomain.com"}
@@ -39,10 +41,15 @@ function fail($code, $msg) {
 }
 
 function relay_secret(): string {
-  $file = __DIR__ . '/.relay-secret';
-  if (is_readable($file)) {
-    $v = trim((string)file_get_contents($file));
-    if ($v !== '') return $v;
+  $candidates = [
+    dirname(__DIR__) . '/.relay-secret', // outside the web root (preferred)
+    __DIR__ . '/.relay-secret',          // next to this file (blocked by .htaccess)
+  ];
+  foreach ($candidates as $file) {
+    if (is_readable($file)) {
+      $v = trim((string)file_get_contents($file));
+      if ($v !== '') return $v;
+    }
   }
   return RELAY_SECRET;
 }

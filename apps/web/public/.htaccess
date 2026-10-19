@@ -4,25 +4,45 @@
 Options -Indexes
 DirectoryIndex index.html
 
-# Use the Next.js static 404 page (out/404.html) instead of Apache's default error page.
+# Branded pages for missing resources / forbidden dirs (e.g. folders without index).
+ErrorDocument 403 /404.html
 ErrorDocument 404 /404.html
 
 RewriteEngine On
 
-# /face-enroll/<any id> -> static placeholder page (client reads the real id from the URL)
-RewriteRule ^face-enroll/([^/]+)/?$ /face-enroll/placeholder/ [L]
+# /face-enroll/<any id> -> static placeholder page (client reads the real id from the URL).
+# MUST exclude the placeholder route itself, otherwise it rewrites to itself and
+# Apache dies with a rewrite loop (500) — the DirectoryIndex subrequest for
+# face-enroll/index.html also flows through this rule.
+RewriteRule ^face-enroll/(?!placeholder(?:/|$))([^/]+)/?$ /face-enroll/placeholder/ [L]
 
 # Static export uses trailing-slash URLs (out/<route>/index.html).
 # Redirect any existing route without a trailing slash to the directory form.
+# Skip server error documents (missing .shtml etc.) so ErrorDocument isn't mangled.
 RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_URI} !\.(shtml|html)$
 RewriteRule ^(.*[^/])$ /$1/ [L,R=301]
+
+# Never serve dotfiles over HTTP (.relay-secret, .DS_Store, .env, ...).
+# .well-known (ACME/Let's Encrypt renewals) must stay reachable.
+<IfModule mod_authz_core.c>
+  <FilesMatch "^\.((?!well-known).)*$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+<IfModule !mod_authz_core.c>
+  <FilesMatch "^\.((?!well-known).)*$">
+    Order allow,deny
+    Deny from all
+  </FilesMatch>
+</IfModule>
 
 # Security headers (same intent as the old next.config headers()).
 <IfModule mod_headers.c>
   Header set X-Content-Type-Options "nosniff"
   Header set X-Frame-Options "DENY"
   Header set Referrer-Policy "strict-origin-when-cross-origin"
-  Header set Permissions-Policy "camera=(self), microphone=(), geolocation=(self)"
+  Header set Permissions-Policy "camera=(self), microphone=(self), geolocation=(self)"
   # HSTS only applies when the site is served over HTTPS (cPanel Let's Encrypt)
   Header set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
 </IfModule>
