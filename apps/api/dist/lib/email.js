@@ -154,9 +154,10 @@ async function sendEmail({ to, subject, html, text }) {
             catch { /* non-JSON response (e.g. HTML error page) */ }
             if (!res.ok || data?.success === false) {
                 if (res.status === 404 || !raw.trim().startsWith('{')) {
-                    throw new Error(`Mail relay not reachable at ${cfg.relayUrl} (HTTP ${res.status}) — ` +
-                        'upload apps/web/public/mail-relay.php with the site build (it ships in out/), ' +
-                        'create a .relay-secret file next to it, and set MAIL_RELAY_URL + MAIL_RELAY_SECRET on Render. ' +
+                    const snippet = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+                    throw new Error(`Mail relay error at ${cfg.relayUrl} (HTTP ${res.status})${snippet ? `: ${snippet}` : ' (empty response)'} — ` +
+                        'if 404, upload apps/web/public/mail-relay.php with the site build; ' +
+                        'if 500, the relay script returned a PHP error (check its message above). ' +
                         'Or set RESEND_API_KEY / SENDGRID_API_KEY instead.');
                 }
                 throw new Error(data?.error || `Relay HTTP ${res.status}`);
