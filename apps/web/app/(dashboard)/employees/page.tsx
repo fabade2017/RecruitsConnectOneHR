@@ -309,13 +309,12 @@ export default function PeoplePage() {
     try {
       const res = await fetch(`${api}/employees/bulk/template`, { headers: authHeader() });
       const data = await res.json();
-      const csv = data.csv || 'job_title,grade,department,branch,employment_type,work_arrangement,hire_date,skills,phone,email\nSoftware Engineer,L2,Engineering,Lagos Head Office,permanent,office,2024-01-15,"React,Node",08012345678,eng1@company.com';
+      const csv = data.csv || 'job_title,grade,department,branch,employment_type,work_arrangement,hire_date,dob,skills,phone,email\nSoftware Engineer,L2,Engineering,Lagos Head Office,permanent,office,2024-01-15,1995-06-15,"React,Node",08012345678,eng1@company.com';
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'employees_template.csv'; a.click(); URL.revokeObjectURL(url);
     } catch {
-      const csv = 'job_title,grade,department,branch,employment_type,work_arrangement,hire_date,skills,phone,email\nSoftware Engineer,L2,Engineering,Lagos Head Office,permanent,office,2024-01-15,"React,Node",08012345678,eng1@company.com';
-      const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='employees_template.csv'; a.click(); URL.revokeObjectURL(url);
+      const csv = 'job_title,grade,department,branch,employment_type,work_arrangement,hire_date,dob,skills,phone,email\nSoftware Engineer,L2,Engineering,Lagos Head Office,permanent,office,2024-01-15,1995-06-15,"React,Node",08012345678,eng1@company.com';      const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='employees_template.csv'; a.click(); URL.revokeObjectURL(url);
     }
   };
 
