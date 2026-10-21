@@ -12,9 +12,10 @@ export default function AboutPage() {
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
             <Link href="/#features" className="hover:text-slate-900">Features</Link>
-            <Link href="/#solutions" className="hover:text-slate-900">Solutions</Link>
+            <Link href="/industries" className="hover:text-slate-900">Industries</Link>
+            <Link href="/#pricing" className="hover:text-slate-900">Pricing</Link>
             <Link href="/about" className="text-slate-900 font-semibold">About</Link>
-            <Link href="/contact" className="hover:text-slate-900">Contact</Link>
+            <Link href="/#contact" className="hover:text-slate-900">Contact</Link>
           </nav>
           <div className="flex items-center gap-3">
             <Link href="/login" className="text-sm font-medium">Login</Link>
@@ -28,8 +29,8 @@ export default function AboutPage() {
         <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-16">
           <div className="max-w-3xl">
             <div className="inline-flex bg-violet-50 text-violet-700 rounded-full px-3 py-1 text-xs font-semibold">OUR STORY</div>
-            <h1 className="text-4xl font-black leading-tight mt-3">We’re building the <span className="bg-gradient-to-r from-violet-600 to-sky-600 bg-clip-text text-transparent">Workforce Operating System</span> for Africa.</h1>
-            <p className="text-slate-600 mt-4 leading-7">RecruitConnect started as a recruitment agency in Lagos. We saw the same pain everywhere: spreadsheets for people, WhatsApp for leave, Excel for payroll, and no single truth for “what is happening right now?”. OneHR is our answer — an Intelligent Workforce OS that merges people, work, time and prediction, secure and audit-ready by design.</p>
+            <h1 className="text-4xl font-black leading-tight mt-3">We’re building <span className="bg-gradient-to-r from-violet-600 to-sky-600 bg-clip-text text-transparent">payroll, attendance and HR</span> that African businesses can trust.</h1>
+            <p className="text-slate-600 mt-4 leading-7">RecruitConnect started as a recruitment agency in Lagos. We saw the same pain everywhere: spreadsheets for people, WhatsApp for leave, Excel for payroll, and no single truth for “what is happening right now?”. OneHR is our answer — one place where payroll, attendance, people records and reporting finally agree with each other, secure and audit-ready by design.</p>
             <div className="mt-6 flex gap-3">
               <Link href="/register" className="bg-slate-900 text-white rounded-full px-6 py-3 font-semibold inline-flex items-center gap-2">Join 120+ teams <ArrowRight size={16}/></Link>
               <Link href="/contact" className="bg-white border rounded-full px-6 py-3 font-semibold">Talk to founders</Link>
@@ -40,7 +41,7 @@ export default function AboutPage() {
 
       <section className="max-w-7xl mx-auto px-6 lg:px-8 py-12 grid md:grid-cols-3 gap-6">
         {[
-          { icon: Target, title: 'Mission', desc: 'Make workforce intelligence as accessible as payroll — for every team from 50 to 10,000.' },
+          { icon: Target, title: 'Mission', desc: 'Make reliable payroll and attendance as accessible as a spreadsheet — for every team from 50 to 10,000.' },
           { icon: HeartHandshake, title: 'Values', desc: 'Privacy-first, consent-based, no auto-accusations. Flag for review, not punish.' },
           { icon: Globe, title: 'Vision', desc: 'From Lagos to global: industry templates, group-of-companies, NGN + multi-currency.' },
         ].map(c=> <div key={c.title} className="bg-white rounded-2xl border p-6"><div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center"><c.icon size={18}/></div><h3 className="font-bold mt-3">{c.title}</h3><p className="text-sm text-slate-600 mt-1 leading-6">{c.desc}</p></div>)}
@@ -53,7 +54,7 @@ export default function AboutPage() {
             {[
               {k:'Teams', v:'120+', sub:'Across 6 industries'},
               {k:'Employees', v:'12k+', sub:'Under management'},
-              {k:'Modules', v:'20+', sub:'From hire to alumni'},
+              {k:'Migration', v:'48 hrs', sub:'Typical go-live'},
               {k:'Uptime', v:'99.9%', sub:'Enterprise-grade'},
             ].map(s=> <div key={s.k} className="bg-white rounded-2xl border p-6 text-center"><div className="text-3xl font-black">{s.v}</div><div className="font-semibold">{s.k}</div><div className="text-xs text-slate-500">{s.sub}</div></div>)}
           </div>

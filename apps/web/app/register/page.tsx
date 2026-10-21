@@ -61,14 +61,14 @@ export default function RegisterPage() {
           </Link>
           <div className="mt-14">
             <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-3 py-1 text-xs"><Sparkles size={14}/> 14-day free trial • No card</div>
-            <h1 className="text-4xl font-black leading-tight mt-4">Start your<br/>workforce<br/><span className="text-violet-300">intelligence</span> today.</h1>
-            <p className="text-white/60 mt-3 leading-6">Join 120+ teams running payroll, attendance and analytics — secure, compliant and audit-ready.</p>
+            <h1 className="text-4xl font-black leading-tight mt-4">Stop payroll errors<br/><span className="text-violet-300">before your next payday.</span></h1>
+            <p className="text-white/60 mt-3 leading-6">Join 120+ teams running payroll, attendance and HR in one place — secure, compliant and audit-ready.</p>
             <ul className="mt-8 space-y-3 text-sm">
               {[
-                'Modular — enable only what you need',
+                'Payroll that reconciles itself',
                 '7 clocking methods, facial 98%, GPS opt-in',
-                'HR Health 89/100 — 6 indicators, early warnings',
-                'Group of companies + subscriptions (NGN)',
+                'One HR Health score, 6 indicators, early warnings',
+                'Migrate from Excel in 48 hours — no downtime',
               ].map(t=> <li key={t} className="flex items-center gap-2"><Check size={16} className="text-emerald-400"/>{t}</li>)}
             </ul>
           </div>
