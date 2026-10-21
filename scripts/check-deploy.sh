@@ -65,7 +65,7 @@ elif [ -n "$CPANEL_IP" ]; then
   warn "skipped (testing against $CPANEL_IP directly)"
 else
   for d in "$APEX" "$HOST" "$MAIL_HOST"; do
-    ip=$(dig +short "$d" A @1.1.1.1 2>/dev/null | tail -1)
+    ip=$(dig +short "$d" A @1.1.1.1 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | tail -1)
     if [ -z "$ip" ]; then
       bad "$d does not resolve"
     elif [ "$ip" = "127.0.0.1" ]; then
