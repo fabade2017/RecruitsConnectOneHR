@@ -35,6 +35,7 @@ export default function PeoplePage() {
   const [bulkPreview, setBulkPreview] = useState<any[]>([]);
   const [bulkResult, setBulkResult] = useState<any>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkSendInvites, setBulkSendInvites] = useState(false);
 
   const authHeader = () => getAuthHeaders() as any;
 
@@ -356,13 +357,14 @@ export default function PeoplePage() {
       if (isExcel) {
         const fd = new FormData();
         fd.append('file', bulkFile);
+        fd.append('sendInvites', String(bulkSendInvites));
         res = await fetch(`${api}/employees/bulk/excel`, { method: 'POST', headers: { ...authHeader() }, body: fd });
       } else {
         const text = await bulkFile.text();
         res = await fetch(`${api}/employees/bulk`, {
           method: 'POST',
           headers: { 'Content-Type':'application/json', ...authHeader() },
-          body: JSON.stringify({ csv: text })
+          body: JSON.stringify({ csv: text, sendInvites: bulkSendInvites })
         });
       }
       const data = await res.json();
@@ -699,6 +701,13 @@ export default function PeoplePage() {
                 </label>
                 {bulkFile && <span className="text-xs bg-emerald-50 text-emerald-700 rounded-full px-3 py-1 self-center">{bulkFile.name} • {(bulkFile.size/1024).toFixed(1)} KB • {bulkFile.name.endsWith('.xlsx') ? 'Excel with dropdowns' : 'CSV'}</span>}
               </div>
+              <label className="flex items-start gap-3 rounded-xl border p-3 cursor-pointer hover:bg-slate-50">
+                <input type="checkbox" checked={bulkSendInvites} onChange={e=>setBulkSendInvites(e.target.checked)} className="mt-1 w-4 h-4 accent-emerald-600"/>
+                <span className="text-sm">
+                  <span className="font-semibold">Send invite emails to employees</span>
+                  <span className="block text-xs text-slate-500">Each row with an email is created and receives a self-onboarding invite to set their own password. No default password is generated. Leave off to create logins with the default Acronym+MMYYYY+DD password shown after upload.</span>
+                </span>
+              </label>
               {bulkPreview.length > 0 && (
                 <div className="border rounded-xl overflow-hidden">
                   <div className="bg-slate-50 p-3 flex items-center justify-between">
@@ -717,13 +726,24 @@ export default function PeoplePage() {
                 <div className={`rounded-xl p-4 ${bulkResult.failed ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'}`}>
                   <div className="font-bold flex items-center gap-2">{bulkResult.failed ? <AlertTriangle size={16} className="text-amber-600"/> : <Check size={16} className="text-emerald-600"/>} Bulk Result — {bulkResult.success}/{bulkResult.total} succeeded</div>
                   <div className="text-sm mt-1">Success: {bulkResult.success} • Failed: {bulkResult.failed} • See Super Admin → Organizations for updated count</div>
-                  {bulkResult.errors?.length > 0 && <div className="mt-2 max-h-[120px] overflow-auto bg-white rounded border p-2 text-xs">{bulkResult.errors.slice(0,5).map((e:any)=> <div key={e.index} className="text-red-600">Row {e.index+1}: {e.error}</div>)}{bulkResult.errors.length>5 && <div className="text-slate-500">+{bulkResult.errors.length-5} more</div>}</div>}
+                  {bulkResult.errors?.length > 0 && <div className="mt-2 max-h-[120px] overflow-auto bg-white rounded border p-2 text-xs">{bulkResult.errors.slice(0,5).map((e:any)=> <div key={e.index} className="text-red-600">Row {e.rowNumber ?? e.index+1}: {e.error}</div>)}{bulkResult.errors.length>5 && <div className="text-slate-500">+{bulkResult.errors.length-5} more</div>}</div>}
+                  {bulkResult.sendInvites !== undefined && bulkResult.message && <div className="text-xs mt-2">{bulkResult.message}</div>}
+                  {bulkResult.invites?.length > 0 && (
+                    <div className="mt-2 max-h-[120px] overflow-auto bg-white rounded border p-2 text-xs space-y-1">
+                      {bulkResult.invites.slice(0,8).map((iv:any)=> (
+                        <div key={iv.index} className={iv.emailSent ? 'text-emerald-700' : 'text-amber-700'}>
+                          {iv.email} — {iv.emailSent ? 'invite sent' : `not sent (${iv.emailError || 'email failed'})`}
+                        </div>
+                      ))}
+                      {bulkResult.invites.length>8 && <div className="text-slate-500">+{bulkResult.invites.length-8} more</div>}
+                    </div>
+                  )}
                   <div className="mt-2 text-xs">{bulkResult.results?.slice(0,3).map((r:any)=> <span key={r.id} className="bg-white border rounded-full px-2 py-1 mr-1">{r.employeeCode}</span>)}</div>
                 </div>
               )}
               <div className="flex gap-3">
                 <button onClick={()=>setShowBulk(false)} className="flex-1 glass rounded-xl py-2.5 font-semibold">Close</button>
-                <button onClick={uploadBulk} disabled={!bulkFile || bulkLoading} className="flex-1 bg-emerald-600 text-white rounded-xl py-2.5 font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">{bulkLoading ? 'Uploading…' : `Upload ${bulkFile ? 'CSV' : ''} → Create`}</button>
+                <button onClick={uploadBulk} disabled={!bulkFile || bulkLoading} className="flex-1 bg-emerald-600 text-white rounded-xl py-2.5 font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">{bulkLoading ? 'Uploading…' : (bulkSendInvites ? 'Upload → Create + Send Invites' : `Upload ${bulkFile ? 'CSV' : ''} → Create`)}</button>
               </div>
               <p className="text-xs text-slate-500">Department/branch by name auto-creates if not found • Skills in quotes "React,Node" • Phone/email optional creates login (Employee@123) • Generic slicing: filter by work_arrangement/grade in People grid</p>
             </div>

@@ -52,6 +52,56 @@ const jwt = __importStar(require("jsonwebtoken"));
 const crypto = __importStar(require("crypto"));
 const email_1 = require("../../lib/email");
 const org_features_1 = require("../../common/org-features");
+// Canonical bulk-upload columns, in display order — the single source of truth
+// shared by BOTH the Excel template and the CSV template.
+const BULK_COLUMNS = [
+    { key: 'job_title', label: 'job_title*', width: 22, required: true },
+    { key: 'grade', label: 'grade', width: 10 },
+    { key: 'department', label: 'department', width: 18 },
+    { key: 'branch', label: 'branch', width: 20 },
+    { key: 'employment_type', label: 'employment_type', width: 16 },
+    { key: 'work_arrangement', label: 'work_arrangement', width: 16 },
+    { key: 'hire_date', label: 'hire_date', width: 14 },
+    { key: 'dob', label: 'dob', width: 14 },
+    { key: 'skills', label: 'skills', width: 22 },
+    { key: 'phone', label: 'phone', width: 16 },
+    { key: 'email', label: 'email', width: 24 },
+];
+// Header aliases → canonical key. Lowercased, non-alphanumerics stripped so
+// "Job Title", "job_title", "JobTitle*", "Department *" all normalize.
+const BULK_ALIASES = {
+    jobtitle: 'job_title', title: 'job_title', role: 'job_title', position: 'job_title', designation: 'job_title',
+    grade: 'grade', level: 'grade', jobgrade: 'grade',
+    department: 'department', dept: 'department', departmentname: 'department',
+    branch: 'branch', branchname: 'branch', location: 'branch', office: 'branch',
+    employmenttype: 'employment_type', employment: 'employment_type', employeetype: 'employment_type',
+    workarrangement: 'work_arrangement', arrangement: 'work_arrangement', mode: 'work_arrangement', workmode: 'work_arrangement',
+    hiredate: 'hire_date', dateofhire: 'hire_date', startdate: 'hire_date', resumptiondate: 'hire_date',
+    dob: 'dob', dateofbirth: 'dob', birthdate: 'dob', birthday: 'dob',
+    skills: 'skills', skill: 'skills', competencies: 'skills',
+    phone: 'phone', phonenumber: 'phone', mobile: 'phone', telephone: 'phone', gsm: 'phone',
+    email: 'email', emailaddress: 'email', workemail: 'email',
+    firstname: 'first_name', lastname: 'last_name', surname: 'last_name', middlename: 'middle_name',
+    departmentid: 'department_id', branchid: 'branch_id', adminemail: 'admin_email',
+};
+function normHeaderKey(h) {
+    const bare = String(h || '').toLowerCase().replace(/\*/g, '').replace(/[^a-z0-9]/g, '');
+    return BULK_ALIASES[bare] || bare;
+}
+const BULK_EMPLOYMENT_TYPES = ['permanent', 'contract', 'intern', 'volunteer', 'consultant', 'seasonal', 'part_time', 'full_time'];
+const BULK_WORK_ARRANGEMENTS = ['office', 'remote', 'hybrid', 'field', 'mobile', 'shift', 'flexible', 'project_based'];
+const BULK_GRADES = ['L1', 'L2', 'L3', 'M1', 'M2', 'M3', 'H1', 'H2', 'H3', 'Executive'];
+function isValidDate(v) {
+    if (v == null || v === '')
+        return false;
+    const d = new Date(v);
+    return !isNaN(d.getTime());
+}
+function toISODate(v) {
+    if (!isValidDate(v))
+        return undefined;
+    return new Date(v).toISOString().slice(0, 10);
+}
 function canAccessEmployee(user, employeeId, employee) {
     const role = user?.role;
     if (['org_admin', 'super_admin', 'hr_admin', 'hr_manager', 'executive', 'auditor'].includes(role))
@@ -268,7 +318,7 @@ let EmployeesService = class EmployeesService {
         }));
         return { total: cards.length, cards };
     }
-    async create(orgId, dto, user) {
+    async create(orgId, dto, user, opts) {
         const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
         if (!org)
             throw new common_1.ConflictException('Org not found');
@@ -303,7 +353,7 @@ let EmployeesService = class EmployeesService {
             throw e;
         }
         // Auto-create user if email provided — default password Acronym+MMYYYY+DD
-        if (dto.email || dto.adminEmail) {
+        if (!opts?.suppressUserCreation && (dto.email || dto.adminEmail)) {
             const email = dto.email || dto.adminEmail;
             const exists = await this.prisma.user.findFirst({ where: { email, organizationId: orgId } });
             if (!exists) {
@@ -674,14 +724,14 @@ let EmployeesService = class EmployeesService {
         return { employeeId: emp.id, employeeCode: emp.employeeCode, enrolled: count > 0, count, hasDescriptor, consentFace: emp.consentFace, hasPhoto: !!emp.photoUrl };
     }
     bulkTemplate(orgId) {
-        const header = 'job_title,grade,department,branch,employment_type,work_arrangement,hire_date,dob,skills,phone,email';
+        const header = BULK_COLUMNS.map(c => c.label).join(',');
         const example = [
             'Software Engineer,L2,Engineering,Lagos Head Office,permanent,office,2024-01-15,1995-06-15,"React,Node",08012345678,eng1@company.com',
             'HR Officer,H2,Human Resources,Lagos Head Office,permanent,hybrid,2024-02-01,1990-12-02,"HRIS,Payroll",08087654321,hr@company.com',
         ].join('\n');
-        return { header, example, csv: `${header}\n${example}\n`, count: 300, note: 'Upload CSV with header above. department/branch by name (will auto-create if not found). skills comma-separated in quotes. Max 500 rows per bulk.' };
+        return { header, example, csv: `${header}\n${example}\n`, count: 300, note: 'Upload CSV with the header above. department/branch by name (auto-created if not found). skills comma-separated in quotes. dob drives the default password (Acronym+MMYYYY+DD). Max 500 rows per bulk.' };
     }
-    async createBulkExcel(orgId, file, user) {
+    async createBulkExcel(orgId, file, user, opts) {
         if (!file || !file.buffer)
             throw new common_1.ConflictException('No file uploaded. Use field name \"file\" with .xlsx');
         const ExcelJS = require('exceljs');
@@ -692,12 +742,12 @@ let EmployeesService = class EmployeesService {
             throw new common_1.ConflictException('No worksheet found');
         const headerRow = ws.getRow(1);
         const headers = [];
-        headerRow.eachCell((cell, colNumber) => { headers[colNumber - 1] = String(cell.value || '').trim().toLowerCase(); });
+        headerRow.eachCell((cell, colNumber) => { headers[colNumber - 1] = normHeaderKey(String(cell.value || '')); });
         const list = [];
         ws.eachRow((row, rowNumber) => {
             if (rowNumber <= 1)
                 return;
-            // Skip empty rows and example rows that are highlighted? Include all with job_title
+            // Collect each mapped cell; example rows are skipped by requiring a non-empty job_title.
             const obj = {};
             let hasData = false;
             row.eachCell((cell, colNumber) => {
@@ -709,18 +759,20 @@ let EmployeesService = class EmployeesService {
                     v = v.text;
                 if (v && typeof v === 'object' && v.result)
                     v = v.result;
+                if (v instanceof Date)
+                    v = v.toISOString().slice(0, 10);
                 v = v == null ? '' : String(v).trim();
                 if (v)
                     hasData = true;
                 obj[h] = v;
             });
-            // Only push if has job_title
+            // Only push rows that carry a job_title (skips blank/example rows)
             if (hasData && obj['job_title'])
                 list.push(obj);
         });
         if (!list.length)
             throw new common_1.ConflictException('No data rows found in Excel. Fill rows 4+ with employee data.');
-        return this.createBulk(orgId, { employees: list }, user);
+        return this.createBulk(orgId, { employees: list, sendInvites: opts?.sendInvites === true }, user);
     }
     async bulkTemplateExcel(orgId) {
         const ExcelJS = require('exceljs');
@@ -740,9 +792,9 @@ let EmployeesService = class EmployeesService {
         const branchNames = branches.map(b => b.name);
         if (!branchNames.length)
             branchNames.push('Lagos Head Office', 'Abuja Branch', 'Port Harcourt');
-        const employmentTypes = ['permanent', 'contract', 'intern', 'volunteer', 'consultant', 'seasonal', 'part_time', 'full_time'];
-        const workArrangements = ['office', 'remote', 'hybrid', 'field', 'mobile', 'shift', 'flexible', 'project_based', 'contract', 'seasonal', 'part_time', 'full_time', 'volunteer', 'intern', 'consultant'];
-        const grades = ['L1', 'L2', 'L3', 'M1', 'M2', 'M3', 'H1', 'H2', 'H3', 'Executive'];
+        const employmentTypes = [...BULK_EMPLOYMENT_TYPES];
+        const workArrangements = [...BULK_WORK_ARRANGEMENTS];
+        const grades = [...BULK_GRADES];
         const statuses = ['active', 'probation', 'suspended', 'exited', 'alumni'];
         // Hidden sheet for dropdown sources
         const ref = wb.addWorksheet('Dropdowns');
@@ -758,8 +810,8 @@ let EmployeesService = class EmployeesService {
         setList(4, workArrangements);
         setList(5, grades);
         setList(6, statuses);
-        // Header — dob added for password generation (Acronym+MMYYYY+DD)
-        const headers = ['job_title*', 'grade', 'department', 'branch', 'employment_type', 'work_arrangement', 'hire_date', 'dob', 'skills', 'phone', 'email'];
+        // Header — driven by BULK_COLUMNS so it always matches the importer & CSV
+        const headers = BULK_COLUMNS.map(c => c.label);
         const headerRow = ws.addRow(headers);
         headerRow.eachCell((cell) => {
             cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -767,23 +819,12 @@ let EmployeesService = class EmployeesService {
             cell.alignment = { horizontal: 'center', vertical: 'middle' };
             cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
         });
-        ws.columns = [
-            { header: 'job_title*', key: 'job_title', width: 22 },
-            { header: 'grade', key: 'grade', width: 10 },
-            { header: 'department', key: 'department', width: 18 },
-            { header: 'branch', key: 'branch', width: 20 },
-            { header: 'employment_type', key: 'employment_type', width: 16 },
-            { header: 'work_arrangement', key: 'work_arrangement', width: 16 },
-            { header: 'hire_date', key: 'hire_date', width: 14 },
-            { header: 'dob', key: 'dob', width: 14 },
-            { header: 'skills', key: 'skills', width: 22 },
-            { header: 'phone', key: 'phone', width: 16 },
-            { header: 'email', key: 'email', width: 24 },
-        ];
-        // Example rows — dob used for default password e.g., JSO12202602 (Acronym+MMYYYY+DD)
+        ws.columns = BULK_COLUMNS.map(c => ({ header: c.label, key: c.key, width: c.width }));
+        // Example rows — 11 values each, in BULK_COLUMNS order. dob drives the
+        // default password e.g., JSO + MMYYYY + DD.
         const examples = [
             ['Software Engineer', 'L2', 'Engineering', 'Lagos Head Office', 'permanent', 'office', '2024-01-15', '1995-06-15', 'React, Node', '08012345678', 'eng1@company.com'],
-            ['HR Officer', 'H2', 'Human Resources', 'Lagos Head Office', 'permanent', 'hybrid', '2024-02-01', 'HRIS, Payroll', '08087654321', 'hr@company.com'],
+            ['HR Officer', 'H2', 'Human Resources', 'Lagos Head Office', 'permanent', 'hybrid', '2024-02-01', '1990-12-02', 'HRIS, Payroll', '08087654321', 'hr@company.com'],
         ];
         examples.forEach(r => {
             const row = ws.addRow(r);
@@ -812,8 +853,9 @@ let EmployeesService = class EmployeesService {
         // Note: status not in template but available for edit
         // Freeze header, autoFilter, notes
         ws.views = [{ state: 'frozen', ySplit: 1 }];
-        ws.autoFilter = { from: 'A1', to: 'J1' };
+        ws.autoFilter = { from: 'A1', to: 'K1' };
         // Add comments/notes for dropdowns
+        ws.getCell('B1').note = grades.join(', ');
         ws.getCell('C1').note = 'Select from existing departments or type new — will auto-create';
         ws.getCell('D1').note = 'Select branch — linked to departments';
         ws.getCell('E1').note = employmentTypes.join(', ');
@@ -822,23 +864,26 @@ let EmployeesService = class EmployeesService {
         const inst = wb.addWorksheet('Instructions');
         inst.getCell('A1').value = 'OneHR Bulk Upload — Instructions';
         inst.getCell('A1').font = { bold: true, size: 14 };
-        inst.getCell('A2').value = '1. Fill rows 4-305 with employee data. Columns with * are required.';
-        inst.getCell('A3').value = '2. Use dropdowns for employment_type, work_arrangement, grade, department, branch.';
-        inst.getCell('A4').value = '3. Department dropdown is filtered by branch — select branch first then department.';
+        inst.getCell('A2').value = '1. Fill rows 4-305 with employee data. job_title is required; other blank columns use sensible defaults.';
+        inst.getCell('A3').value = '2. Use dropdowns for grade, department, branch, employment_type, work_arrangement.';
+        inst.getCell('A4').value = '3. Department/branch are matched by name (case-insensitive); unknown names are auto-created.';
         inst.getCell('A5').value = '4. Skills: comma-separated in one cell, e.g., "React, Node"';
-        inst.getCell('A6').value = '5. Upload this file at People → Bulk Upload → Choose Excel (.xlsx) — max 500 rows, 10mb';
-        inst.getCell('A7').value = '6. New departments/branches typed will be auto-created.';
+        inst.getCell('A6').value = '5. dob (YYYY-MM-DD) drives the default login password: Acronym+MMYYYY+DD.';
+        inst.getCell('A7').value = '6. Dates must be YYYY-MM-DD. Rows with invalid dates or unknown dropdown values are rejected with a row number.';
+        inst.getCell('A8').value = '7. Upload this file at People → Bulk Upload → Choose Excel (.xlsx) — max 500 rows, 10mb';
+        inst.getCell('A9').value = '8. If a row has an email that already exists, that employee is updated instead of duplicated.';
         inst.columns = [{ width: 100 }];
         const buf = await wb.xlsx.writeBuffer();
         return { buffer: buf, filename: `OneHR_Employees_Template_${new Date().toISOString().slice(0, 10)}.xlsx` };
     }
     async createBulk(orgId, dto, user) {
         const raw = Array.isArray(dto) ? dto : Array.isArray(dto.employees) ? dto.employees : Array.isArray(dto.data) ? dto.data : [];
+        const sendInvites = dto?.sendInvites === true || dto?.send_invites === true || dto?.sendInvites === 'true';
         // Also support CSV string in dto.csv
         let list = raw;
         if (!list.length && typeof dto.csv === 'string' && dto.csv.trim()) {
-            const lines = dto.csv.trim().split('\n');
-            const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
+            const lines = dto.csv.replace(/\r/g, '').trim().split('\n');
+            const header = lines[0].split(',').map((h) => normHeaderKey(h));
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i];
                 if (!line.trim())
@@ -880,36 +925,65 @@ let EmployeesService = class EmployeesService {
         const results = [];
         const errors = [];
         const credentials = []; // for superadmin email template
+        const sentInvites = [];
         for (let idx = 0; idx < list.length; idx++) {
-            const row = list[idx];
+            const rowNumber = idx + 2; // +1 header, +1 for 1-based
+            const rawRow = list[idx] || {};
+            // Normalize any header spellings carried from JSON/callers into canonical keys.
+            const row = {};
+            for (const k of Object.keys(rawRow)) {
+                const canon = normHeaderKey(k);
+                if (row[canon] === undefined || row[canon] === '')
+                    row[canon] = rawRow[k];
+            }
             try {
-                // Map CSV header variants to service DTO
-                const dobRaw = row.dob || row.date_of_birth || row.dateOfBirth || row.birth_date || row.birthDate || row.DOB;
+                if (!row.job_title || !String(row.job_title).trim()) {
+                    throw new Error('job_title is required');
+                }
+                // Validate dropdown values instead of silently accepting typos
+                const employmentType = String(row.employment_type || 'permanent').trim().toLowerCase();
+                if (!BULK_EMPLOYMENT_TYPES.includes(employmentType)) {
+                    throw new Error(`invalid employment_type "${row.employment_type}" (allowed: ${BULK_EMPLOYMENT_TYPES.join(', ')})`);
+                }
+                const workArrangement = String(row.work_arrangement || 'office').trim().toLowerCase();
+                if (!BULK_WORK_ARRANGEMENTS.includes(workArrangement)) {
+                    throw new Error(`invalid work_arrangement "${row.work_arrangement}" (allowed: ${BULK_WORK_ARRANGEMENTS.join(', ')})`);
+                }
+                const gradeIn = row.grade != null && String(row.grade).trim() !== '' ? String(row.grade).trim() : '';
+                if (gradeIn && !BULK_GRADES.map(g => g.toLowerCase()).includes(gradeIn.toLowerCase())) {
+                    throw new Error(`invalid grade "${row.grade}" (allowed: ${BULK_GRADES.join(', ')})`);
+                }
+                const dobRaw = row.dob || row.date_of_birth;
+                if (dobRaw && !isValidDate(dobRaw))
+                    throw new Error(`invalid dob "${dobRaw}" (use YYYY-MM-DD)`);
+                const hireRaw = row.hire_date;
+                if (hireRaw && !isValidDate(hireRaw))
+                    throw new Error(`invalid hire_date "${hireRaw}" (use YYYY-MM-DD)`);
                 const payload = {
-                    job_title: row.job_title || row.jobTitle || row.title || `Employee ${idx + 1}`,
-                    grade: row.grade || 'L1',
-                    department_id: row.department_id || row.departmentId || (row.department ? deptByName.get(String(row.department).toLowerCase()) : undefined),
-                    branch_id: row.branch_id || row.branchId || (row.branch ? branchByName.get(String(row.branch).toLowerCase()) : undefined),
-                    employment_type: row.employment_type || row.employmentType || 'permanent',
-                    work_arrangement: row.work_arrangement || row.workArrangement || 'office',
-                    hire_date: row.hire_date || row.hireDate || new Date().toISOString().slice(0, 10),
-                    date_of_birth: dobRaw || undefined,
-                    dob: dobRaw || undefined,
+                    job_title: String(row.job_title).trim(),
+                    grade: gradeIn || 'L1',
+                    department_id: row.department_id || (row.department ? deptByName.get(String(row.department).trim().toLowerCase()) : undefined),
+                    branch_id: row.branch_id || (row.branch ? branchByName.get(String(row.branch).trim().toLowerCase()) : undefined),
+                    employment_type: employmentType,
+                    work_arrangement: workArrangement,
+                    hire_date: toISODate(hireRaw) || new Date().toISOString().slice(0, 10),
+                    date_of_birth: toISODate(dobRaw),
+                    dob: toISODate(dobRaw),
                     skills: row.skills ? (typeof row.skills === 'string' ? row.skills.split(',').map((s) => s.trim()).filter(Boolean) : row.skills) : [],
                     // Optional: create user if email provided
-                    email: row.email || row.adminEmail || undefined,
+                    email: row.email || row.admin_email || undefined,
                     phone: row.phone || undefined,
                 };
-                // Auto-create department/branch if name not found and name provided
-                if (row.department && !payload.department_id) {
-                    const created = await this.prisma.department.create({ data: { organizationId: orgId, name: String(row.department), branchId: payload.branch_id || branches[0]?.id } });
-                    deptByName.set(String(row.department).toLowerCase(), created.id);
-                    payload.department_id = created.id;
-                }
+                // Auto-create branch first so a new department can be linked to it correctly.
                 if (row.branch && !payload.branch_id) {
-                    const createdB = await this.prisma.branch.create({ data: { organizationId: orgId, name: String(row.branch), isHeadOffice: false } });
-                    branchByName.set(String(row.branch).toLowerCase(), createdB.id);
+                    const createdB = await this.prisma.branch.create({ data: { organizationId: orgId, name: String(row.branch).trim(), isHeadOffice: false } });
+                    branchByName.set(String(row.branch).trim().toLowerCase(), createdB.id);
                     payload.branch_id = createdB.id;
+                }
+                if (row.department && !payload.department_id) {
+                    const created = await this.prisma.department.create({ data: { organizationId: orgId, name: String(row.department).trim(), branchId: payload.branch_id || branches[0]?.id } });
+                    deptByName.set(String(row.department).trim().toLowerCase(), created.id);
+                    payload.department_id = created.id;
                 }
                 // Upsert: if employee with same email already exists, update it (so edited Excel updates DB)
                 let created;
@@ -921,42 +995,80 @@ let EmployeesService = class EmployeesService {
                         if (existingEmp) {
                             // Update existing employee with new data
                             created = await this.update(orgId, existingEmp.id, payload, user);
-                            // Also ensure user password is regenerated if DOB provided (for upsert)
-                            // Note: update handles email/phone/DOB, but we need to return generatedPassword for template
-                            // Generate pwd as per spec for display
-                            const dobRawForPwd = payload.date_of_birth || payload.dob;
-                            let dobDayForPwd = '00';
-                            if (dobRawForPwd) {
-                                const d = new Date(dobRawForPwd);
-                                if (!isNaN(d.getTime()))
-                                    dobDayForPwd = String(d.getDate()).padStart(2, '0');
-                            }
-                            const pwdForUpdate = `${acronymForPwd}${mmForPwd}${yyyyForPwd}${dobDayForPwd}`;
-                            created.generatedPassword = pwdForUpdate;
-                            created.loginEmail = payload.email;
                             isUpdate = true;
+                            // Default password is only relevant when not using the invite flow
+                            if (!sendInvites) {
+                                const dobRawForPwd = payload.date_of_birth || payload.dob;
+                                let dobDayForPwd = '00';
+                                if (dobRawForPwd) {
+                                    const d = new Date(dobRawForPwd);
+                                    if (!isNaN(d.getTime()))
+                                        dobDayForPwd = String(d.getDate()).padStart(2, '0');
+                                }
+                                const pwdForUpdate = `${acronymForPwd}${mmForPwd}${yyyyForPwd}${dobDayForPwd}`;
+                                created.generatedPassword = pwdForUpdate;
+                                created.loginEmail = payload.email;
+                            }
                         }
                     }
                 }
                 if (!isUpdate) {
-                    created = await this.create(orgId, payload, user);
+                    created = await this.create(orgId, payload, user, { suppressUserCreation: sendInvites });
+                }
+                // Optionally send a self-onboarding invite email for this row (skip if a login already exists)
+                let inviteSent = false;
+                let inviteError;
+                let inviteUrl;
+                if (sendInvites && payload.email) {
+                    try {
+                        const inv = await this.sendStaffInvite(orgId, {
+                            email: payload.email,
+                            jobTitle: payload.job_title,
+                            departmentId: payload.department_id,
+                            branchId: payload.branch_id,
+                            phone: payload.phone,
+                            employeeId: created.id,
+                            invitedBy: user?.sub,
+                        });
+                        inviteSent = inv.emailSent;
+                        inviteError = inv.emailError;
+                        inviteUrl = inv.inviteUrl;
+                        sentInvites.push({ index: idx, rowNumber, email: payload.email, employeeCode: created.employeeCode, emailSent: inviteSent, inviteUrl, emailError: inviteError });
+                    }
+                    catch (invErr) {
+                        inviteError = invErr.message;
+                        sentInvites.push({ index: idx, rowNumber, email: payload.email, employeeCode: created.employeeCode, emailSent: false, emailError: inviteError });
+                    }
                 }
                 const pwd = created.generatedPassword;
                 const emailForCred = created.loginEmail || payload.email;
-                results.push({ index: idx, employeeCode: created.employeeCode, id: created.id, email: emailForCred || null, hasLogin: !!emailForCred, updated: isUpdate });
-                if (emailForCred && pwd) {
-                    credentials.push({ index: idx, employeeCode: created.employeeCode, email: emailForCred, password: pwd, dob: payload.date_of_birth || payload.dob, phone: payload.phone, updated: isUpdate });
-                }
-                else if (emailForCred) {
-                    // For updates where pwd not generated (existing user), still provide email for template but note password unchanged
-                    credentials.push({ index: idx, employeeCode: created.employeeCode, email: emailForCred, password: '(unchanged - see previous bulk)', dob: payload.date_of_birth || payload.dob, phone: payload.phone, updated: isUpdate });
+                results.push({ index: idx, rowNumber, employeeCode: created.employeeCode, id: created.id, email: emailForCred || null, hasLogin: !!emailForCred, updated: isUpdate, inviteSent, inviteEmail: payload.email || null, inviteUrl });
+                if (!sendInvites) {
+                    if (emailForCred && pwd) {
+                        credentials.push({ index: idx, rowNumber, employeeCode: created.employeeCode, email: emailForCred, password: pwd, dob: payload.date_of_birth || payload.dob, phone: payload.phone, updated: isUpdate });
+                    }
+                    else if (emailForCred) {
+                        // For updates where pwd not generated (existing user), still provide email for template but note password unchanged
+                        credentials.push({ index: idx, rowNumber, employeeCode: created.employeeCode, email: emailForCred, password: '(unchanged - see previous bulk)', dob: payload.date_of_birth || payload.dob, phone: payload.phone, updated: isUpdate });
+                    }
                 }
             }
             catch (e) {
-                errors.push({ index: idx, error: e.message, row });
+                errors.push({ index: idx, rowNumber, error: e.message, row: rawRow });
             }
         }
-        return { total: list.length, success: results.length, failed: errors.length, results, errors, credentials, message: credentials.length ? `Created ${results.length} employees. ${credentials.length} logins generated with default password Acronym+MMYYYY+DD (must change on first login).` : `Created ${results.length} employees.` };
+        const invitesSent = sentInvites.filter(s => s.emailSent).length;
+        let message;
+        if (sendInvites) {
+            message = `Created ${results.length} employees. Invite emails: ${invitesSent} sent${sentInvites.length - invitesSent > 0 ? `, ${sentInvites.length - invitesSent} failed` : ''}. Employees set their own password via the invite link.`;
+        }
+        else if (credentials.length) {
+            message = `Created ${results.length} employees. ${credentials.length} logins generated with default password Acronym+MMYYYY+DD (must change on first login).`;
+        }
+        else {
+            message = `Created ${results.length} employees.`;
+        }
+        return { total: list.length, success: results.length, failed: errors.length, results, errors, credentials, invites: sentInvites, invitesSent, sendInvites, message };
     }
     // ---------------------------------------------------------------------------
     // Staff invite / self-onboarding
@@ -972,13 +1084,15 @@ let EmployeesService = class EmployeesService {
         const inviteUrl = `${this.webBaseUrl()}/onboard/?token=${invite.token}`;
         return { ...invite, inviteUrl, organization: org ? { name: org.name, acronym: org.acronym } : null };
     }
-    async createInvite(orgId, dto, user) {
-        const email = String(dto.email || '').trim().toLowerCase();
-        if (!email)
-            throw new common_1.ConflictException('Email is required');
+    // Creates a staffInvite row + sends the invite email. Shared by manual invites
+    // and bulk upload (createInvite/createBulk). Optionally links a pre-created employee.
+    async sendStaffInvite(orgId, params) {
         const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
         if (!org)
             throw new common_1.ConflictException('Org not found');
+        const email = String(params.email || '').trim().toLowerCase();
+        if (!email)
+            throw new common_1.ConflictException('Email is required');
         // Block if a user with this email already exists in the org
         const existingUser = await this.prisma.user.findFirst({ where: { email, organizationId: orgId } });
         if (existingUser)
@@ -994,16 +1108,17 @@ let EmployeesService = class EmployeesService {
             data: {
                 organizationId: orgId,
                 email,
-                role: dto.role || 'employee',
-                jobTitle: dto.job_title || dto.jobTitle || null,
-                departmentId: dto.department_id || dto.departmentId || null,
-                branchId: dto.branch_id || dto.branchId || null,
-                firstName: dto.first_name || dto.firstName || null,
-                lastName: dto.last_name || dto.lastName || null,
-                phone: dto.phone || null,
+                role: params.role || 'employee',
+                jobTitle: params.jobTitle || null,
+                departmentId: params.departmentId || null,
+                branchId: params.branchId || null,
+                firstName: params.firstName || null,
+                lastName: params.lastName || null,
+                phone: params.phone || null,
                 token,
                 status: 'pending',
-                invitedBy: user?.sub || null,
+                invitedBy: params.invitedBy || null,
+                employeeId: params.employeeId || null,
                 expiresAt,
             },
         });
@@ -1011,6 +1126,20 @@ let EmployeesService = class EmployeesService {
         const html = (0, email_1.getStaffInviteTemplate)(org.name, built.inviteUrl, invite.role, expiresAt.toISOString().slice(0, 10));
         const sent = await (0, email_1.sendEmail)({ to: email, subject: `You're invited to join ${org.name} on OneHR`, html }).catch((e) => ({ success: false, error: e }));
         return { invite: built, emailSent: sent.success === true, emailError: sent.success === true ? undefined : (sent.notConfigured ? 'Email not configured on the server (set MAIL_RELAY_URL, or RESEND_API_KEY / SENDGRID_API_KEY) — share the invite link manually.' : String(sent.error?.message || sent.error || 'Email failed to send')), inviteUrl: built.inviteUrl };
+    }
+    async createInvite(orgId, dto, user) {
+        return this.sendStaffInvite(orgId, {
+            email: dto.email,
+            role: dto.role,
+            jobTitle: dto.job_title || dto.jobTitle,
+            departmentId: dto.department_id || dto.departmentId,
+            branchId: dto.branch_id || dto.branchId,
+            firstName: dto.first_name || dto.firstName,
+            lastName: dto.last_name || dto.lastName,
+            phone: dto.phone,
+            employeeId: dto.employee_id || dto.employeeId,
+            invitedBy: user?.sub,
+        });
     }
     async listInvites(orgId, query) {
         const where = { organizationId: orgId };
@@ -1102,22 +1231,40 @@ let EmployeesService = class EmployeesService {
             const newUser = await tx.user.create({
                 data: { organizationId: orgId, email, phone, passwordHash: hash, role: invite.role || 'employee', mustChangePassword: false },
             });
-            const employeeCode = await this.nextEmployeeCode(org.acronym, orgId, tx);
-            const qrCode = await QRCode.toDataURL(employeeCode).catch(() => null);
-            const employee = await tx.employee.create({
-                data: {
-                    organizationId: orgId,
-                    employeeCode,
-                    firstName,
-                    lastName,
-                    qrCode,
-                    jobTitle: invite.jobTitle || null,
-                    departmentId: invite.departmentId || null,
-                    branchId: invite.branchId || null,
-                    userId: newUser.id,
-                    hireDate: new Date(),
-                },
-            });
+            // If the invite is linked to a pre-created employee (bulk upload), link the
+            // new user to it instead of creating a duplicate employee record.
+            const preExisting = invite.employeeId
+                ? await tx.employee.findFirst({ where: { id: invite.employeeId, organizationId: orgId } })
+                : null;
+            let employee;
+            if (preExisting) {
+                employee = await tx.employee.update({
+                    where: { id: preExisting.id },
+                    data: {
+                        userId: newUser.id,
+                        firstName: firstName || preExisting.firstName,
+                        lastName: lastName || preExisting.lastName,
+                    },
+                });
+            }
+            else {
+                const employeeCode = await this.nextEmployeeCode(org.acronym, orgId, tx);
+                const qrCode = await QRCode.toDataURL(employeeCode).catch(() => null);
+                employee = await tx.employee.create({
+                    data: {
+                        organizationId: orgId,
+                        employeeCode,
+                        firstName,
+                        lastName,
+                        qrCode,
+                        jobTitle: invite.jobTitle || null,
+                        departmentId: invite.departmentId || null,
+                        branchId: invite.branchId || null,
+                        userId: newUser.id,
+                        hireDate: new Date(),
+                    },
+                });
+            }
             await tx.staffInvite.update({ where: { id: invite.id }, data: { status: 'accepted', acceptedAt: new Date(), employeeId: employee.id, userId: newUser.id } });
             return { employee, user: newUser };
         });

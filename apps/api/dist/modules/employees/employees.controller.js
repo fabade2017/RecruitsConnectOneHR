@@ -26,7 +26,7 @@ let EmployeesController = class EmployeesController {
     }
     create(req, dto) { return this.svc.create(req.orgId, dto, req.user); }
     bulk(req, dto) { return this.svc.createBulk(req.orgId, dto, req.user); }
-    async bulkExcel(req, file) { return this.svc.createBulkExcel(req.orgId, file, req.user); }
+    async bulkExcel(req, file, body) { const sendInvites = body?.sendInvites === true || body?.sendInvites === 'true' || req.query?.sendInvites === 'true'; return this.svc.createBulkExcel(req.orgId, file, req.user, { sendInvites }); }
     template(req) { return this.svc.bulkTemplate(req.orgId); }
     async templateXlsx(req, res) {
         const { buffer, filename } = await this.svc.bulkTemplateExcel(req.orgId);
@@ -84,6 +84,7 @@ __decorate([
     (0, swagger_1.ApiBody)({ schema: { type: 'object', properties: {
                 employees: { type: 'array', items: { type: 'object', properties: { job_title: { type: 'string', example: 'Sample Engineer' }, grade: { type: 'string', example: 'L1' }, department: { type: 'string', example: 'Sample Dept' }, branch: { type: 'string', example: 'Sample Branch' }, employment_type: { type: 'string', example: 'permanent' }, work_arrangement: { type: 'string', example: 'office' }, hire_date: { type: 'string', example: '2024-01-15' }, dob: { type: 'string', example: '1990-05-15' }, skills: { type: 'string', example: 'SampleSkill1, SampleSkill2' }, phone: { type: 'string', example: '08000000000' }, email: { type: 'string', example: 'sample.bulk@example.com' } } } },
                 csv: { type: 'string', example: 'job_title,grade,department,branch,employment_type,work_arrangement,hire_date,dob,skills,phone,email\nSample Engineer,L1,Sample Dept,Sample Branch,permanent,office,2024-01-15,1990-05-15,\"SampleSkill1,SampleSkill2\",08000000000,sample.bulk@example.com' },
+                sendInvites: { type: 'boolean', example: false, description: 'true to email self-onboarding invites to each row with an email (no default password generated)' },
             } } }),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
@@ -98,11 +99,12 @@ __decorate([
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
     (0, swagger_1.ApiOperation)({ summary: 'Bulk create via Excel .xlsx with dropdowns' }),
     (0, swagger_1.ApiConsumes)('multipart/form-data'),
-    (0, swagger_1.ApiBody)({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary', description: 'Excel .xlsx file with job_title, grade, department, branch, employment_type, work_arrangement, hire_date, dob, skills, phone, email' } } } }),
+    (0, swagger_1.ApiBody)({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary', description: 'Excel .xlsx file with job_title, grade, department, branch, employment_type, work_arrangement, hire_date, dob, skills, phone, email' }, sendInvites: { type: 'string', description: 'true to email self-onboarding invites to each row with an email' } } } }),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.UploadedFile)()),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:paramtypes", [Object, Object, Object]),
     __metadata("design:returntype", Promise)
 ], EmployeesController.prototype, "bulkExcel", null);
 __decorate([

@@ -130,13 +130,13 @@ async function bootstrap() {
         app.enableCors({
             origin: corsOrigins,
             credentials: true,
-            methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+            methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
             allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Idempotency-Key'],
         });
     }
     else {
         // Dev only (no origins resolved): allow any origin for local Next.js
-        app.enableCors({ origin: true, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Idempotency-Key'] });
+        app.enableCors({ origin: true, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Idempotency-Key'] });
     }
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,

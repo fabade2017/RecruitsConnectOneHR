@@ -255,7 +255,7 @@ export class EmployeesService {
     return { total: cards.length, cards };
   }
 
-  async create(orgId: string, dto: any, user?: any) {
+  async create(orgId: string, dto: any, user?: any, opts?: { suppressUserCreation?: boolean }) {
     const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
     if (!org) throw new ConflictException('Org not found');
     const employeeCode = await this.nextEmployeeCode(org.acronym, orgId);
@@ -286,7 +286,7 @@ export class EmployeesService {
       throw e;
     }
     // Auto-create user if email provided — default password Acronym+MMYYYY+DD
-    if (dto.email || dto.adminEmail) {
+    if (!opts?.suppressUserCreation && (dto.email || dto.adminEmail)) {
       const email = dto.email || dto.adminEmail;
       const exists = await this.prisma.user.findFirst({ where: { email, organizationId: orgId } });
       if (!exists) {
@@ -588,7 +588,7 @@ export class EmployeesService {
     return { header, example, csv: `${header}\n${example}\n`, count: 300, note: 'Upload CSV with the header above. department/branch by name (auto-created if not found). skills comma-separated in quotes. dob drives the default password (Acronym+MMYYYY+DD). Max 500 rows per bulk.' };
   }
 
-  async createBulkExcel(orgId: string, file: any, user?: any) {
+  async createBulkExcel(orgId: string, file: any, user?: any, opts?: { sendInvites?: boolean }) {
     if (!file || !file.buffer) throw new ConflictException('No file uploaded. Use field name \"file\" with .xlsx');
     const ExcelJS = require('exceljs');
     const wb = new ExcelJS.Workbook();
@@ -619,7 +619,7 @@ export class EmployeesService {
       if (hasData && obj['job_title']) list.push(obj);
     });
     if (!list.length) throw new ConflictException('No data rows found in Excel. Fill rows 4+ with employee data.');
-    return this.createBulk(orgId, { employees: list }, user);
+    return this.createBulk(orgId, { employees: list, sendInvites: opts?.sendInvites === true }, user);
   }
 
   async bulkTemplateExcel(orgId: string) {
@@ -732,6 +732,7 @@ export class EmployeesService {
 
   async createBulk(orgId: string, dto: any, user?: any) {
     const raw: any[] = Array.isArray(dto) ? dto : Array.isArray(dto.employees) ? dto.employees : Array.isArray(dto.data) ? dto.data : [];
+    const sendInvites = dto?.sendInvites === true || dto?.send_invites === true || dto?.sendInvites === 'true';
     // Also support CSV string in dto.csv
     let list: any[] = raw;
     if (!list.length && typeof dto.csv === 'string' && dto.csv.trim()) {
@@ -773,6 +774,7 @@ export class EmployeesService {
     const results: any[] = [];
     const errors: any[] = [];
     const credentials: any[] = []; // for superadmin email template
+    const sentInvites: any[] = [];
     for (let idx=0; idx<list.length; idx++) {
       const rowNumber = idx + 2; // +1 header, +1 for 1-based
       const rawRow = list[idx] || {};
@@ -840,33 +842,71 @@ export class EmployeesService {
             if (existingEmp) {
               // Update existing employee with new data
               created = await this.update(orgId, existingEmp.id, payload, user);
-              const dobRawForPwd = payload.date_of_birth || payload.dob;
-              let dobDayForPwd = '00';
-              if (dobRawForPwd) { const d=new Date(dobRawForPwd); if(!isNaN(d.getTime())) dobDayForPwd=String(d.getDate()).padStart(2,'0'); }
-              const pwdForUpdate = `${acronymForPwd}${mmForPwd}${yyyyForPwd}${dobDayForPwd}`;
-              (created as any).generatedPassword = pwdForUpdate;
-              (created as any).loginEmail = payload.email;
               isUpdate = true;
+              // Default password is only relevant when not using the invite flow
+              if (!sendInvites) {
+                const dobRawForPwd = payload.date_of_birth || payload.dob;
+                let dobDayForPwd = '00';
+                if (dobRawForPwd) { const d=new Date(dobRawForPwd); if(!isNaN(d.getTime())) dobDayForPwd=String(d.getDate()).padStart(2,'0'); }
+                const pwdForUpdate = `${acronymForPwd}${mmForPwd}${yyyyForPwd}${dobDayForPwd}`;
+                (created as any).generatedPassword = pwdForUpdate;
+                (created as any).loginEmail = payload.email;
+              }
             }
           }
         }
         if (!isUpdate) {
-          created = await this.create(orgId, payload, user);
+          created = await this.create(orgId, payload, user, { suppressUserCreation: sendInvites });
+        }
+        // Optionally send a self-onboarding invite email for this row (skip if a login already exists)
+        let inviteSent = false;
+        let inviteError: string | undefined;
+        let inviteUrl: string | undefined;
+        if (sendInvites && payload.email) {
+          try {
+            const inv = await this.sendStaffInvite(orgId, {
+              email: payload.email,
+              jobTitle: payload.job_title,
+              departmentId: payload.department_id,
+              branchId: payload.branch_id,
+              phone: payload.phone,
+              employeeId: created.id,
+              invitedBy: user?.sub,
+            });
+            inviteSent = inv.emailSent;
+            inviteError = inv.emailError;
+            inviteUrl = inv.inviteUrl;
+            sentInvites.push({ index: idx, rowNumber, email: payload.email, employeeCode: created.employeeCode, emailSent: inviteSent, inviteUrl, emailError: inviteError });
+          } catch (invErr: any) {
+            inviteError = invErr.message;
+            sentInvites.push({ index: idx, rowNumber, email: payload.email, employeeCode: created.employeeCode, emailSent: false, emailError: inviteError });
+          }
         }
         const pwd = (created as any).generatedPassword;
         const emailForCred = (created as any).loginEmail || payload.email;
-        results.push({ index: idx, rowNumber, employeeCode: created.employeeCode, id: created.id, email: emailForCred || null, hasLogin: !!emailForCred, updated: isUpdate });
-        if (emailForCred && pwd) {
-          credentials.push({ index: idx, rowNumber, employeeCode: created.employeeCode, email: emailForCred, password: pwd, dob: payload.date_of_birth || payload.dob, phone: payload.phone, updated: isUpdate });
-        } else if (emailForCred) {
-          // For updates where pwd not generated (existing user), still provide email for template but note password unchanged
-          credentials.push({ index: idx, rowNumber, employeeCode: created.employeeCode, email: emailForCred, password: '(unchanged - see previous bulk)', dob: payload.date_of_birth || payload.dob, phone: payload.phone, updated: isUpdate });
+        results.push({ index: idx, rowNumber, employeeCode: created.employeeCode, id: created.id, email: emailForCred || null, hasLogin: !!emailForCred, updated: isUpdate, inviteSent, inviteEmail: payload.email || null, inviteUrl });
+        if (!sendInvites) {
+          if (emailForCred && pwd) {
+            credentials.push({ index: idx, rowNumber, employeeCode: created.employeeCode, email: emailForCred, password: pwd, dob: payload.date_of_birth || payload.dob, phone: payload.phone, updated: isUpdate });
+          } else if (emailForCred) {
+            // For updates where pwd not generated (existing user), still provide email for template but note password unchanged
+            credentials.push({ index: idx, rowNumber, employeeCode: created.employeeCode, email: emailForCred, password: '(unchanged - see previous bulk)', dob: payload.date_of_birth || payload.dob, phone: payload.phone, updated: isUpdate });
+          }
         }
       } catch (e:any) {
         errors.push({ index: idx, rowNumber, error: e.message, row: rawRow });
       }
     }
-    return { total: list.length, success: results.length, failed: errors.length, results, errors, credentials, message: credentials.length ? `Created ${results.length} employees. ${credentials.length} logins generated with default password Acronym+MMYYYY+DD (must change on first login).` : `Created ${results.length} employees.` };
+    const invitesSent = sentInvites.filter(s => s.emailSent).length;
+    let message: string;
+    if (sendInvites) {
+      message = `Created ${results.length} employees. Invite emails: ${invitesSent} sent${sentInvites.length - invitesSent > 0 ? `, ${sentInvites.length - invitesSent} failed` : ''}. Employees set their own password via the invite link.`;
+    } else if (credentials.length) {
+      message = `Created ${results.length} employees. ${credentials.length} logins generated with default password Acronym+MMYYYY+DD (must change on first login).`;
+    } else {
+      message = `Created ${results.length} employees.`;
+    }
+    return { total: list.length, success: results.length, failed: errors.length, results, errors, credentials, invites: sentInvites, invitesSent, sendInvites, message };
   }
 
   // ---------------------------------------------------------------------------
@@ -887,11 +927,13 @@ export class EmployeesService {
     return { ...invite, inviteUrl, organization: org ? { name: org.name, acronym: org.acronym } : null };
   }
 
-  async createInvite(orgId: string, dto: any, user?: any) {
-    const email = String(dto.email || '').trim().toLowerCase();
-    if (!email) throw new ConflictException('Email is required');
+  // Creates a staffInvite row + sends the invite email. Shared by manual invites
+  // and bulk upload (createInvite/createBulk). Optionally links a pre-created employee.
+  private async sendStaffInvite(orgId: string, params: { email: string; role?: string; jobTitle?: string; departmentId?: string; branchId?: string; firstName?: string; lastName?: string; phone?: string; employeeId?: string; invitedBy?: string }) {
     const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
     if (!org) throw new ConflictException('Org not found');
+    const email = String(params.email || '').trim().toLowerCase();
+    if (!email) throw new ConflictException('Email is required');
     // Block if a user with this email already exists in the org
     const existingUser = await this.prisma.user.findFirst({ where: { email, organizationId: orgId } });
     if (existingUser) throw new ConflictException('A user with this email already exists in your organization');
@@ -906,16 +948,17 @@ export class EmployeesService {
       data: {
         organizationId: orgId,
         email,
-        role: dto.role || 'employee',
-        jobTitle: dto.job_title || dto.jobTitle || null,
-        departmentId: dto.department_id || dto.departmentId || null,
-        branchId: dto.branch_id || dto.branchId || null,
-        firstName: dto.first_name || dto.firstName || null,
-        lastName: dto.last_name || dto.lastName || null,
-        phone: dto.phone || null,
+        role: params.role || 'employee',
+        jobTitle: params.jobTitle || null,
+        departmentId: params.departmentId || null,
+        branchId: params.branchId || null,
+        firstName: params.firstName || null,
+        lastName: params.lastName || null,
+        phone: params.phone || null,
         token,
         status: 'pending',
-        invitedBy: user?.sub || null,
+        invitedBy: params.invitedBy || null,
+        employeeId: params.employeeId || null,
         expiresAt,
       },
     });
@@ -923,6 +966,21 @@ export class EmployeesService {
     const html = getStaffInviteTemplate(org.name, built.inviteUrl, invite.role, expiresAt.toISOString().slice(0, 10));
     const sent: any = await sendEmail({ to: email, subject: `You're invited to join ${org.name} on OneHR`, html }).catch((e: any) => ({ success: false, error: e }));
     return { invite: built, emailSent: sent.success === true, emailError: sent.success === true ? undefined : (sent.notConfigured ? 'Email not configured on the server (set MAIL_RELAY_URL, or RESEND_API_KEY / SENDGRID_API_KEY) — share the invite link manually.' : String(sent.error?.message || sent.error || 'Email failed to send')), inviteUrl: built.inviteUrl };
+  }
+
+  async createInvite(orgId: string, dto: any, user?: any) {
+    return this.sendStaffInvite(orgId, {
+      email: dto.email,
+      role: dto.role,
+      jobTitle: dto.job_title || dto.jobTitle,
+      departmentId: dto.department_id || dto.departmentId,
+      branchId: dto.branch_id || dto.branchId,
+      firstName: dto.first_name || dto.firstName,
+      lastName: dto.last_name || dto.lastName,
+      phone: dto.phone,
+      employeeId: dto.employee_id || dto.employeeId,
+      invitedBy: user?.sub,
+    });
   }
 
   async listInvites(orgId: string, query: any) {
@@ -1005,22 +1063,39 @@ export class EmployeesService {
       const newUser = await tx.user.create({
         data: { organizationId: orgId, email, phone, passwordHash: hash, role: invite.role || 'employee', mustChangePassword: false },
       });
-      const employeeCode = await this.nextEmployeeCode(org.acronym, orgId, tx);
-      const qrCode = await QRCode.toDataURL(employeeCode).catch(() => null);
-      const employee = await tx.employee.create({
-        data: {
-          organizationId: orgId,
-          employeeCode,
-          firstName,
-          lastName,
-          qrCode,
-          jobTitle: invite.jobTitle || null,
-          departmentId: invite.departmentId || null,
-          branchId: invite.branchId || null,
-          userId: newUser.id,
-          hireDate: new Date(),
-        },
-      });
+      // If the invite is linked to a pre-created employee (bulk upload), link the
+      // new user to it instead of creating a duplicate employee record.
+      const preExisting = invite.employeeId
+        ? await tx.employee.findFirst({ where: { id: invite.employeeId, organizationId: orgId } })
+        : null;
+      let employee: any;
+      if (preExisting) {
+        employee = await tx.employee.update({
+          where: { id: preExisting.id },
+          data: {
+            userId: newUser.id,
+            firstName: firstName || preExisting.firstName,
+            lastName: lastName || preExisting.lastName,
+          },
+        });
+      } else {
+        const employeeCode = await this.nextEmployeeCode(org.acronym, orgId, tx);
+        const qrCode = await QRCode.toDataURL(employeeCode).catch(() => null);
+        employee = await tx.employee.create({
+          data: {
+            organizationId: orgId,
+            employeeCode,
+            firstName,
+            lastName,
+            qrCode,
+            jobTitle: invite.jobTitle || null,
+            departmentId: invite.departmentId || null,
+            branchId: invite.branchId || null,
+            userId: newUser.id,
+            hireDate: new Date(),
+          },
+        });
+      }
       await tx.staffInvite.update({ where: { id: invite.id }, data: { status: 'accepted', acceptedAt: new Date(), employeeId: employee.id, userId: newUser.id } });
       return { employee, user: newUser };
     });
