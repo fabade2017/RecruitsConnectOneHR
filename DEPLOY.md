@@ -92,24 +92,34 @@ See `docs/RBAC.md`, `docs/ARCHITECTURE.md`, `docs/PRD.md:8` for open decisions (
 
 ## 7. Production Topology (rconehr.com)
 
-Three hosts, three jobs:
+Two hosts, two jobs:
 
 | Host | Serves | Deployed by |
 | --- | --- | --- |
-| **Vercel** (`recruits-connect-one-hr-web`) | the web app at `www.rconehr.com` / `rconehr.com` | auto-deploy on push to `main` |
+| **Qservers.net / cPanel** | the whole web app (static export) **and** `mail-relay.php` (Apache runs the PHP) | upload `site-upload.zip` to `public_html` |
 | **Render** (`recruits-connect-one-hr-api`) | the API at `https://recruits-connect-one-hr-api.onrender.com/v1` | Render Git integration (manual/autodeploy) |
-| **cPanel / qservers.net** | `mail-relay.php` (PHP — the only host that executes it) | upload `site-upload.zip` |
 
-The API calls the app at `NEXT_PUBLIC_API_URL` and the app calls the API at the
-same URL, so the two are independent of which host serves the frontend.
+The app talks to the API at `NEXT_PUBLIC_API_URL` and the API builds invite
+links from `WEB_APP_URL`, so the two only have to agree on the domain.
 
 ### DNS records
 
+All three live in the **qservers** DNS zone (`ns47/ns48.qservers.net`) and
+point at the same cPanel server:
+
 | Host | Type | Value | Notes |
 | --- | --- | --- | --- |
-| `rconehr.com` | A | `76.76.21.21` | Vercel (anycast) — set at the qservers DNS zone |
-| `www.rconehr.com` | CNAME | `cname.vercel-dns.com` | Vercel |
+| `rconehr.com` | A | `<cPanel server IP>` | the site itself |
+| `www.rconehr.com` | A | `<cPanel server IP>` | or a CNAME to the apex |
 | `mail.rconehr.com` | A | `<cPanel server IP>` | required by `SMTP_HOST=mail.rconehr.com` |
+
+The server IP is shown in cPanel → *Domains* → the shared-IP address.
+
+### TLS
+
+cPanel → *Security* → **AutoSSL** (or Let's Encrypt) for both `rconehr.com` and
+`www.rconehr.com`. The `.htaccess` sets HSTS only over HTTPS and blocks every
+dotfile except `.well-known` (which AutoSSL needs for renewal).
 
 ### Registrar hold (why the site shows a cert error)
 
@@ -121,50 +131,40 @@ port 443, which produces `ERR_CERT_COMMON_NAME_INVALID` locally and
 "connection refused" everywhere else. No TLS or deploy change can fix this.
 
 **Fix:** verify the registrant email in the Gransy panel (it restores
-`ns47/ns48.qservers.net`), then add the records above. Vercel issues the
-certificate for the apex and `www` automatically once the A record resolves.
+`ns47/ns48.qservers.net`), then add the records above and run AutoSSL.
 
 Check with:
 
 ```bash
-dig +short www.rconehr.com          # expect 76.76.21.21, never 127.0.0.1
-vercel domains inspect rconehr.com   # expect the nameservers to be ✓
+dig +short www.rconehr.com   # expect the cPanel server IP, never 127.0.0.1
 ```
 
-### Building for cPanel
+### Building and uploading
 
 ```bash
-npm run build:cpanel --workspace=apps/web   # adds out/mail-relay.php
+npm run build --workspace=apps/web          # static export -> apps/web/out
 cd apps/web && zip -rX ../../site-upload.zip out/ -x "*.DS_Store"
 ```
 
-`apps/web/cpanel/` holds the two files that only make sense on Apache:
+`apps/web/public/` ships with the build, so `out/` contains everything the
+server needs:
 
-- `mail-relay.php` — the PHP mail endpoint (the only host that executes PHP)
-- `.htaccess` — the Apache rewrite rules (trailing-slash redirects, the
+- `out/mail-relay.php` — the PHP mail endpoint (Apache runs it, the API posts
+  to it over HTTPS)
+- `out/.htaccess` — the Apache rewrite rules (trailing-slash redirects, the
   `/face-enroll/<id>` rewrite, dotfile blocking, security headers)
 
-They are **not** in `apps/web/public/`, because Vercel collects `public/` into
-its static output and would serve the PHP as plain text. The default build
-(`npm run build`, used by Vercel) copies only `.htaccess`; `build:cpanel` copies
-both. `apps/web/scripts/relay-guard.mjs` enforces this and drops `.DS_Store`.
+Unzip `site-upload.zip` and move the **contents** of `out/` into
+`public_html` (not the `out/` folder itself).
 
-### Two build flavours
+### Mail relay setup
 
-`apps/web/next.config.js` switches on `NEXT_OUTPUT`:
-
-| `NEXT_OUTPUT` | Build | Used by |
-| --- | --- | --- |
-| unset (default) | `output: 'export'` — static files, no server | cPanel / qservers.net |
-| `server` | serverless Next.js | Vercel (`vercel.json`), the web Dockerfile |
-
-The Vercel build must be the server one: a static export can only ship the
-params listed in `generateStaticParams`, so `/face-enroll/<employee-id>` — whose
-id only exists at runtime — would 500. The cPanel build rewrites that path to
-`/face-enroll/placeholder` with `.htaccess` instead.
-
-Vercel does not read `.htaccess`, so `vercel.json` mirrors the two parts that
-matter there: the `/face-enroll/:id` rewrite and the security headers the
-Apache config sets (nosniff, DENY framing, referrer and permissions policy,
-HSTS).
+1. Create the secret locally: `openssl rand -hex 32`
+2. On Render (API → Environment) set `MAIL_RELAY_URL=https://www.rconehr.com/mail-relay.php`
+   and `MAIL_RELAY_SECRET=<that value>`, then redeploy the API.
+3. On the server, create `.relay-secret` one level **above** `public_html`
+   (File Manager → Home → Show Dotfiles → New File) containing the same value,
+   `chmod 640`. The PHP reads that file first, so the secret never sits in the
+   web root.
+4. Test: `POST /v1/admin/email/test {"to":"you@yourdomain.com"}`
 

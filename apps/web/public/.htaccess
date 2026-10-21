@@ -1,7 +1,5 @@
 # Apache config for the OneHR static export (qservers.net / cPanel).
-# This file is copied into out/ at build time (apps/web/cpanel/.htaccess -> out).
-# It is not in apps/web/public/ — Vercel serves that directory as static
-# assets and Apache would never read it there.
+# This file is copied into out/ at build time (apps/web/public -> out).
 
 Options -Indexes
 DirectoryIndex index.html

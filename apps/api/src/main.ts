@@ -65,37 +65,28 @@ async function bootstrap() {
 
   app.setGlobalPrefix('v1');
   const parseOrigins = (v?: string) => (v || '').split(',').map(s => s.trim().replace(/\/$/, '')).filter(Boolean);
-  // Known product frontends — always allowed, in addition to CORS_ORIGIN.
-  // Still an explicit allowlist, never origin:true.
-  const productOrigins = [
-    'https://www.rconehr.com',
-    'https://rconehr.com',
-    'https://recruits-connect-one-hr-web.vercel.app',
-  ];
-  // Local dev (npm run dev -> web :3000, api :3001)
-  const devOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001',
-  ];
-  const corsOrigins = Array.from(new Set([
-    ...parseOrigins(process.env.CORS_ORIGIN),
-    ...productOrigins,
-    ...devOrigins,
-  ]));
-  if (!parseOrigins(process.env.CORS_ORIGIN).length) {
+  let corsOrigins = parseOrigins(process.env.CORS_ORIGIN);
+  if (!corsOrigins.length) {
     // Convenience: WEB_APP_URL often set for invite links
-    corsOrigins.push(...parseOrigins(process.env.WEB_APP_URL));
-    console.error('[cors] CORS_ORIGIN not set — allowed origins: ' + corsOrigins.join(', ') + '. Set CORS_ORIGIN explicitly on Render.');
+    corsOrigins = parseOrigins(process.env.WEB_APP_URL);
   }
-  console.log('[cors] allowed origins: ' + corsOrigins.join(', '));
-  app.enableCors({
-    origin: corsOrigins,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Idempotency-Key'],
-  });
+  if (!corsOrigins.length && process.env.NODE_ENV === 'production') {
+    // Known product frontends — still an explicit allowlist, never origin:true
+    corsOrigins = ['https://www.rconehr.com', 'https://rconehr.com'];
+    console.error('[cors] CORS_ORIGIN not set — falling back to known product origins: ' + corsOrigins.join(', ') + '. Set CORS_ORIGIN explicitly on Render.');
+  }
+  if (corsOrigins.length) {
+    console.log('[cors] allowed origins: ' + corsOrigins.join(', '));
+    app.enableCors({
+      origin: corsOrigins,
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Idempotency-Key'],
+    });
+  } else {
+    // Dev only (no origins resolved): allow any origin for local Next.js
+    app.enableCors({ origin: true, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Idempotency-Key'] });
+  }
 
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
