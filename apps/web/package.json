@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build",
+    "build": "next build && node scripts/relay-guard.mjs",
+    "build:cpanel": "next build && CPANEL_DEPLOY=1 node scripts/relay-guard.mjs",
     "start": "next start -p 3000",
     "serve:static": "node scripts/serve-static.mjs",
     "lint": "next lint"

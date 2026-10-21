@@ -2,9 +2,12 @@
 /**
  * RecruitConnect OneHR — mail relay
  * ----------------------------------------------------------------------------
- * Deployed automatically with the static site (apps/web/public/mail-relay.php
- * is copied into out/ at build time), i.e. live at:
+ * Deployed with the cPanel build (apps/web/public/mail-relay.php is copied
+ * into out/ by `npm run build:cpanel`), i.e. live at:
  *     https://www.rconehr.com/mail-relay.php
+ *
+ * It is NOT part of the Vercel build: PHP is not executed there, so the file
+ * would only be served as plain text and expose this source to the public.
  *
  * It lets the API (hosted on Render, where the app's SMTP is unavailable) send
  * email over HTTPS using your own cPanel mail server. No third-party service.
