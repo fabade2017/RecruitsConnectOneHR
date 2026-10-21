@@ -102,6 +102,23 @@ Two hosts, two jobs:
 The app talks to the API at `NEXT_PUBLIC_API_URL` and the API builds invite
 links from `WEB_APP_URL`, so the two only have to agree on the domain.
 
+### API configuration on Render
+
+| Variable | Value |
+| --- | --- |
+| `CORS_ORIGIN` | `https://www.rconehr.com,https://rconehr.com` |
+| `WEB_APP_URL` | `https://www.rconehr.com` (invite links) |
+| `MAIL_RELAY_URL` | `https://www.rconehr.com/mail-relay.php` |
+| `MAIL_RELAY_SECRET` | the same value as the `.relay-secret` file on the server |
+
+The known product origins (`www.rconehr.com`, `rconehr.com`, the Vercel
+deployment) and the local dev origins are **always** allowed on top of
+`CORS_ORIGIN` — it stays an explicit allowlist, never `origin: true`.
+
+**Render does not auto-deploy from this repository.** After changing the API
+code or any of the variables above, redeploy it by hand (Render → the service
+→ *Manual Deploy*), otherwise the live API keeps running the old build.
+
 ### DNS records
 
 All three live in the **qservers** DNS zone (`ns47/ns48.qservers.net`) and
