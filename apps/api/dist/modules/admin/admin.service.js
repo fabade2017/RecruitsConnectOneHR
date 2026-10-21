@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
 const org_features_1 = require("../../common/org-features");
+const role_payload_1 = require("./role-payload");
 const email_1 = require("../../lib/email");
 let AdminService = class AdminService {
     prisma;
@@ -98,9 +99,27 @@ let AdminService = class AdminService {
         if (actor && !(0, rbac_guard_1.isPlatformSuperAdmin)(actor) && role.organizationId !== (actor.org_id || actor.orgId)) {
             throw new common_1.ForbiddenException('Can only modify roles in your own organisation');
         }
-        if (dto.permissions && Array.isArray(dto.permissions))
-            dto.permissions = JSON.stringify(dto.permissions);
-        return this.prisma.roleDefinition.update({ where: { id }, data: dto });
+        // Never pass the raw body to Prisma: it carries the permissionLinks relation
+        // array (and immutable columns) which Prisma rejects with a validation error.
+        const { data, permissionIds } = (0, role_payload_1.buildRoleUpdate)(dto);
+        if (data.slug && data.slug !== role.slug) {
+            const dup = await this.prisma.roleDefinition.findFirst({ where: { slug: data.slug, organizationId: role.organizationId } });
+            if (dup)
+                throw new common_1.ConflictException('Role slug already exists');
+        }
+        if (permissionIds) {
+            const current = await this.prisma.permission.findMany({ where: { roles: { some: { id } } }, select: { id: true } });
+            const currentIds = current.map((p) => p.id);
+            const connect = permissionIds.filter((pid) => !currentIds.includes(pid));
+            const disconnect = currentIds.filter((pid) => !permissionIds.includes(pid));
+            if (connect.length || disconnect.length) {
+                data.permissionLinks = {
+                    ...(connect.length ? { connect: connect.map((pid) => ({ id: pid })) } : {}),
+                    ...(disconnect.length ? { disconnect: disconnect.map((pid) => ({ id: pid })) } : {}),
+                };
+            }
+        }
+        return this.prisma.roleDefinition.update({ where: { id }, data, include: { permissionLinks: true } });
     }
     async deleteRole(id, actor) {
         const role = await this.prisma.roleDefinition.findUnique({ where: { id } });

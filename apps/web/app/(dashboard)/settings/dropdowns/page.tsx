@@ -183,7 +183,17 @@ export default function DropdownsPage() {
     setNewRole({ name:'', slug:'', description:'', permissions:[] }); fetchRoles();
   };
   const updateRole = async()=> {
-    const res = await fetch(`${api}/admin/roles/${editingRole.id}`, { method:'PATCH', headers:{'Content-Type':'application/json', ...auth()}, body: JSON.stringify(editingRole)});
+    // send only the editable columns — the role object also carries permissionLinks
+    // and immutable fields that the API must never receive
+    const payload = {
+      name: editingRole.name,
+      slug: editingRole.slug,
+      description: editingRole.description,
+      isActive: editingRole.isActive,
+      permissions: parsePerms(editingRole.permissions),
+      ...(Array.isArray(editingRole.permissionLinks) ? { permissionLinks: editingRole.permissionLinks.map((p:any)=> typeof p === 'string' ? p : p?.id).filter(Boolean) } : {}),
+    };
+    const res = await fetch(`${api}/admin/roles/${editingRole.id}`, { method:'PATCH', headers:{'Content-Type':'application/json', ...auth()}, body: JSON.stringify(payload)});
     if (!res.ok) return alert('Update failed: '+(await res.text()).slice(0,200));
     setEditingRole(null); fetchRoles();
   };
