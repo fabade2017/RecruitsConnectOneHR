@@ -1,7 +1,17 @@
 /** @type {import('next').NextConfig} */
+
+// Two build flavours:
+//   default            — static export (output: 'export') for Apache/cPanel
+//                        (qservers.net): no Node server, plain files.
+//   NEXT_OUTPUT=server — serverless Next.js, used by the Vercel build.
+//                        A static export can only ship the params listed in
+//                        generateStaticParams, so runtime routes such as
+//                        /face-enroll/<employee-id> would 500 there.
+const staticExport = process.env.NEXT_OUTPUT !== 'server';
+
 const nextConfig = {
   // Static export for Apache/cPanel hosting (qservers.net) — no Node server.
-  output: 'export',
+  ...(staticExport ? { output: 'export' } : {}),
   trailingSlash: true,
   images: { unoptimized: true },
 

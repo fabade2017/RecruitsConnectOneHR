@@ -21,6 +21,12 @@ const OUT = path.join(ROOT, 'out');
 const CPANEL = path.join(ROOT, 'cpanel');
 const forCpanel = process.env.CPANEL_DEPLOY === '1';
 
+if (!fs.existsSync(OUT)) {
+  // Server build (NEXT_OUTPUT=server) produces no out/ directory.
+  console.warn('[relay-guard] out/ not found — server build, nothing to do.');
+  process.exit(0);
+}
+
 const copy = (name) => {
   const src = path.join(CPANEL, name);
   if (!fs.existsSync(src)) {

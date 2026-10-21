@@ -149,8 +149,22 @@ its static output and would serve the PHP as plain text. The default build
 (`npm run build`, used by Vercel) copies only `.htaccess`; `build:cpanel` copies
 both. `apps/web/scripts/relay-guard.mjs` enforces this and drops `.DS_Store`.
 
-Vercel serves the app as a serverless Next.js deployment, so the Apache rules
-do not apply there. `vercel.json` mirrors the two that matter: the
-`/face-enroll/:id` → `/face-enroll/placeholder` rewrite and the security
-headers.
+### Two build flavours
+
+`apps/web/next.config.js` switches on `NEXT_OUTPUT`:
+
+| `NEXT_OUTPUT` | Build | Used by |
+| --- | --- | --- |
+| unset (default) | `output: 'export'` — static files, no server | cPanel / qservers.net |
+| `server` | serverless Next.js | Vercel (`vercel.json`), the web Dockerfile |
+
+The Vercel build must be the server one: a static export can only ship the
+params listed in `generateStaticParams`, so `/face-enroll/<employee-id>` — whose
+id only exists at runtime — would 500. The cPanel build rewrites that path to
+`/face-enroll/placeholder` with `.htaccess` instead.
+
+Vercel does not read `.htaccess`, so `vercel.json` mirrors the two parts that
+matter there: the `/face-enroll/:id` rewrite and the security headers the
+Apache config sets (nosniff, DENY framing, referrer and permissions policy,
+HSTS).
 

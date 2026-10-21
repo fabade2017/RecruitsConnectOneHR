@@ -1,9 +1,9 @@
 {
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm --filter onehr-web build",
+  "buildCommand": "NEXT_OUTPUT=server pnpm --filter onehr-web build",
   "outputDirectory": "apps/web/.next",
   "rewrites": [
-    { "source": "/face-enroll/:id((?!placeholder)[^/]+)", "destination": "/face-enroll/placeholder" },
+    { "source": "/face-enroll/:id((?!placeholder)[^/]+/?)", "destination": "/face-enroll/placeholder" },
     { "source": "/v1/:path*", "destination": "https://recruits-connect-one-hr-api.onrender.com/v1/:path*" },
     { "source": "/cs/:path*", "destination": "https://customer-service-agent-sr5j.onrender.com/:path*" }
   ],
