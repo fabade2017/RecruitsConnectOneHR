@@ -89,3 +89,68 @@ curl -X POST http://localhost:3001/v1/payroll -H "Authorization: Bearer $EMP_TOK
 - Secrets: never commit `.env.production`, rotate `JWT_SECRET` via `pnpm --filter onehr-api exec tsx apps/api/src/scripts/rotate-jwt.ts` (to be added)
 
 See `docs/RBAC.md`, `docs/ARCHITECTURE.md`, `docs/PRD.md:8` for open decisions (payroll native vs SeamlessHR, biometric vendor).
+
+## 7. Production Topology (rconehr.com)
+
+Three hosts, three jobs:
+
+| Host | Serves | Deployed by |
+| --- | --- | --- |
+| **Vercel** (`recruits-connect-one-hr-web`) | the web app at `www.rconehr.com` / `rconehr.com` | auto-deploy on push to `main` |
+| **Render** (`recruits-connect-one-hr-api`) | the API at `https://recruits-connect-one-hr-api.onrender.com/v1` | Render Git integration (manual/autodeploy) |
+| **cPanel / qservers.net** | `mail-relay.php` (PHP — the only host that executes it) | upload `site-upload.zip` |
+
+The API calls the app at `NEXT_PUBLIC_API_URL` and the app calls the API at the
+same URL, so the two are independent of which host serves the frontend.
+
+### DNS records
+
+| Host | Type | Value | Notes |
+| --- | --- | --- | --- |
+| `rconehr.com` | A | `76.76.21.21` | Vercel (anycast) — set at the qservers DNS zone |
+| `www.rconehr.com` | CNAME | `cname.vercel-dns.com` | Vercel |
+| `mail.rconehr.com` | A | `<cPanel server IP>` | required by `SMTP_HOST=mail.rconehr.com` |
+
+### Registrar hold (why the site shows a cert error)
+
+`rconehr.com` is registered at **Gransy, s.r.o.** While the registrant email is
+unverified, Gransy replaces the nameservers with
+`ns1/ns2.verification-hold.suspended-domain.com` and the domain resolves to
+`127.0.0.1` — the browser then talks to whatever listens on the visitor's own
+port 443, which produces `ERR_CERT_COMMON_NAME_INVALID` locally and
+"connection refused" everywhere else. No TLS or deploy change can fix this.
+
+**Fix:** verify the registrant email in the Gransy panel (it restores
+`ns47/ns48.qservers.net`), then add the records above. Vercel issues the
+certificate for the apex and `www` automatically once the A record resolves.
+
+Check with:
+
+```bash
+dig +short www.rconehr.com          # expect 76.76.21.21, never 127.0.0.1
+vercel domains inspect rconehr.com   # expect the nameservers to be ✓
+```
+
+### Building for cPanel
+
+```bash
+npm run build:cpanel --workspace=apps/web   # adds out/mail-relay.php
+cd apps/web && zip -rX ../../site-upload.zip out/ -x "*.DS_Store"
+```
+
+`apps/web/cpanel/` holds the two files that only make sense on Apache:
+
+- `mail-relay.php` — the PHP mail endpoint (the only host that executes PHP)
+- `.htaccess` — the Apache rewrite rules (trailing-slash redirects, the
+  `/face-enroll/<id>` rewrite, dotfile blocking, security headers)
+
+They are **not** in `apps/web/public/`, because Vercel collects `public/` into
+its static output and would serve the PHP as plain text. The default build
+(`npm run build`, used by Vercel) copies only `.htaccess`; `build:cpanel` copies
+both. `apps/web/scripts/relay-guard.mjs` enforces this and drops `.DS_Store`.
+
+Vercel serves the app as a serverless Next.js deployment, so the Apache rules
+do not apply there. `vercel.json` mirrors the two that matter: the
+`/face-enroll/:id` → `/face-enroll/placeholder` rewrite and the security
+headers.
+

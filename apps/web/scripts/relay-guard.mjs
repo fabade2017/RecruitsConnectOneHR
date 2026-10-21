@@ -1,29 +1,49 @@
 #!/usr/bin/env node
-// Keeps host-specific files out of the static export.
+// Copies the cPanel-only assets into the static export.
 //
-// apps/web/public/mail-relay.php is a PHP endpoint that has to run on the
-// qservers.net/cPanel host (Apache + PHP). Every other host (Vercel) serves
-// the export as plain files, so a deployed copy is never executed — it is
-// handed back to any visitor as source text, exposing the relay config.
+// apps/web/cpanel/mail-relay.php is a PHP endpoint that has to run on the
+// qservers.net/cPanel host (Apache + PHP), and apps/web/cpanel/.htaccess
+// holds the Apache rewrite rules. Neither lives in apps/web/public/:
+// Vercel collects public/ into its static output, so a PHP file there is
+// served as plain text and exposes its source to the public.
 //
-// Default (every Vercel build): drop out/mail-relay.php.
-// CPANEL_DEPLOY=1 (npm run build:cpanel): keep it for the cPanel upload.
+// CPANEL_DEPLOY=1 (npm run build:cpanel): both files land in out/.
+// Default (every Vercel build): only .htaccess is copied, the PHP is not.
 //
-// .DS_Store is dropped in both cases — it is macOS noise, never web content.
+// .DS_Store is dropped in both cases — macOS noise, never web content.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.resolve(dir, '..', 'out');
-const RELAY = path.join(OUT, 'mail-relay.php');
+const ROOT = path.resolve(dir, '..');
+const OUT = path.join(ROOT, 'out');
+const CPANEL = path.join(ROOT, 'cpanel');
 const forCpanel = process.env.CPANEL_DEPLOY === '1';
 
+const copy = (name) => {
+  const src = path.join(CPANEL, name);
+  if (!fs.existsSync(src)) {
+    console.warn(`[relay-guard] missing cpanel/${name}`);
+    return;
+  }
+  fs.copyFileSync(src, path.join(OUT, name));
+  console.log(`[relay-guard] copied cpanel/${name} -> out/${name}`);
+};
+
+// .htaccess: Apache needs it in the web root on every cPanel build.
+copy('.htaccess');
+
+// mail-relay.php: only the cPanel host executes PHP. Keep it out of every
+// other build so it is never readable as source.
 if (forCpanel) {
-  console.log('[relay-guard] CPANEL_DEPLOY=1 — keeping out/mail-relay.php for the cPanel upload.');
-} else if (fs.existsSync(RELAY)) {
-  fs.rmSync(RELAY);
-  console.log('[relay-guard] removed out/mail-relay.php (PHP is not executed on this host).');
+  copy('mail-relay.php');
+} else {
+  const relay = path.join(OUT, 'mail-relay.php');
+  if (fs.existsSync(relay)) {
+    fs.rmSync(relay);
+    console.log('[relay-guard] removed out/mail-relay.php (PHP is not executed on this host).');
+  }
 }
 
 let removed = 0;

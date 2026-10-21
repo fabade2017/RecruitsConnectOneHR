@@ -2,7 +2,7 @@
 /**
  * RecruitConnect OneHR — mail relay
  * ----------------------------------------------------------------------------
- * Deployed with the cPanel build (apps/web/public/mail-relay.php is copied
+ * Deployed with the cPanel build (apps/web/cpanel/mail-relay.php is copied
  * into out/ by `npm run build:cpanel`), i.e. live at:
  *     https://www.rconehr.com/mail-relay.php
  *
