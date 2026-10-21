@@ -157,6 +157,20 @@ server needs:
 Unzip `site-upload.zip` and move the **contents** of `out/` into
 `public_html` (not the `out/` folder itself).
 
+### Checking a deployment
+
+```bash
+./scripts/check-deploy.sh                     # through public DNS
+./scripts/check-deploy.sh --ip 198.51.100.10  # straight at the cPanel server
+```
+
+It verifies DNS (and flags `127.0.0.1`, i.e. the registrar hold), the
+certificate, the key pages, the `/face-enroll/<id>` rewrite, the 404 page, that
+`mail-relay.php` executes instead of being served as source, that
+`/.htaccess` and `/.relay-secret` are not downloadable, and that the Render API
+is healthy. The `--ip` mode bypasses DNS, so you can confirm the upload while
+the hold is still on.
+
 ### Mail relay setup
 
 1. Create the secret locally: `openssl rand -hex 32`
