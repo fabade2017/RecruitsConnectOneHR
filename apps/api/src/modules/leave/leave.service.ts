@@ -22,7 +22,8 @@ import { PrismaService } from '../../prisma/prisma.service';
     const emp = await this.prisma.employee.findUnique({ where:{ userId }});
     if (!emp) throw new ForbiddenException('Employee not found');
     const days = (new Date(dto.end_date).getTime() - new Date(dto.start_date).getTime())/86400000+1;
-    return this.prisma.leaveRequest.create({ data:{ organizationId: orgId, employeeId: emp!.id, leaveTypeId: dto.leave_type_id || dto.leaveTypeId, startDate: new Date(dto.start_date), endDate: new Date(dto.end_date), days, reason: dto.reason }});
+    const relieverId = dto.reliever_employee_id || dto.relieverId || dto.reliever_employeeId || null;
+    return this.prisma.leaveRequest.create({ data:{ organizationId: orgId, employeeId: emp!.id, leaveTypeId: dto.leave_type_id || dto.leaveTypeId, startDate: new Date(dto.start_date), endDate: new Date(dto.end_date), days, reason: dto.reason, relieverEmployeeId: relieverId, relieverStatus: relieverId ? 'pending' : 'none' }});
   }
   async list(orgId:string, q:any, user?: any){
     const w:any={ organizationId: orgId };
@@ -40,10 +41,10 @@ import { PrismaService } from '../../prisma/prisma.service';
         w.employeeId = { in: ids };
       }
     }
-    return this.prisma.leaveRequest.findMany({ where:w, take:50, orderBy:{ createdAt:'desc'}, include:{ leaveType:true, employee:{ select:{ id:true, employeeCode:true, jobTitle:true, userId:true } } }});
+    return this.prisma.leaveRequest.findMany({ where:w, take:200, orderBy:{ createdAt:'desc'}, include:{ leaveType:true, employee:{ select:{ id:true, employeeCode:true, jobTitle:true, userId:true, firstName:true, lastName:true } }, reliever:{ select:{ id:true, employeeCode:true, jobTitle:true, firstName:true, lastName:true, userId:true } } }});
   }
   async getOne(orgId:string, id:string, user?: any){
-    const req = await this.prisma.leaveRequest.findFirst({ where:{ id, organizationId: orgId }, include:{ leaveType:true, employee:true }});
+    const req = await this.prisma.leaveRequest.findFirst({ where:{ id, organizationId: orgId }, include:{ leaveType:true, employee:true, reliever:true }});
     if (!req) throw new NotFoundException('Request not found');
     // employees can only view own
     if (user?.role === 'employee') {
@@ -74,7 +75,14 @@ import { PrismaService } from '../../prisma/prisma.service';
       data.days = (end.getTime() - start.getTime())/86400000+1;
     }
     if (dto.reason !== undefined) data.reason = dto.reason;
-    return this.prisma.leaveRequest.update({ where:{ id }, data, include:{ leaveType:true }});
+    if (dto.reliever_employee_id !== undefined || dto.relieverId !== undefined || dto.reliever_employeeId !== undefined) {
+      const relieverId = dto.reliever_employee_id ?? dto.relieverId ?? dto.reliever_employeeId ?? null;
+      data.relieverEmployeeId = relieverId;
+      data.relieverStatus = relieverId ? 'pending' : 'none';
+      data.relieverAckAt = null;
+      data.relieverComment = null;
+    }
+    return this.prisma.leaveRequest.update({ where:{ id }, data, include:{ leaveType:true, employee:{ select:{ id:true, employeeCode:true, jobTitle:true, firstName:true, lastName:true } }, reliever:{ select:{ id:true, employeeCode:true, jobTitle:true, firstName:true, lastName:true } } }});
   }
   async cancel(orgId:string, id:string, user:any){
     const req = await this.prisma.leaveRequest.findFirst({ where:{ id, organizationId: orgId }, include:{ employee:true }});
@@ -126,6 +134,40 @@ import { PrismaService } from '../../prisma/prisma.service';
       const emp = await this.prisma.employee.findUnique({ where:{ userId: user.sub }});
       if (emp?.id !== employeeId) throw new ForbiddenException('Can only view own balances');
     }
-    return this.prisma.leaveRequest.findMany({ where:{ organizationId: orgId, employeeId }, include:{ leaveType:true }});
+    return this.prisma.leaveRequest.findMany({ where:{ organizationId: orgId, employeeId }, include:{ leaveType:true, reliever:{ select:{ id:true, employeeCode:true, firstName:true, lastName:true, jobTitle:true } } }});
+  }
+
+  async relieving(orgId:string, user:any){
+    if (!user?.sub) return [];
+    const emp = await this.prisma.employee.findUnique({ where:{ userId: user.sub }});
+    if (!emp) return [];
+    return this.prisma.leaveRequest.findMany({
+      where:{ organizationId: orgId, relieverEmployeeId: emp.id },
+      orderBy:{ createdAt:'desc' },
+      include:{ leaveType:true, employee:{ select:{ id:true, employeeCode:true, jobTitle:true, firstName:true, lastName:true, userId:true } } }
+    });
+  }
+
+  async acknowledgeReliever(orgId:string, id:string, user:any, dto:any){
+    if (!user?.sub) throw new ForbiddenException('Unauthorized');
+    const emp = await this.prisma.employee.findUnique({ where:{ userId: user.sub }});
+    if (!emp) throw new ForbiddenException('Employee not found');
+    const req = await this.prisma.leaveRequest.findFirst({ where:{ id, organizationId: orgId }, include:{ employee:{ select:{ id:true, employeeCode:true, firstName:true, lastName:true } } } });
+    if (!req) throw new NotFoundException('Request not found');
+    if (req.relieverEmployeeId !== emp.id) throw new ForbiddenException('Only the assigned reliever can acknowledge');
+    if (req.relieverStatus !== 'pending') throw new ForbiddenException('Reliever acknowledgement already completed');
+    const action = (dto?.action || dto?.status || '').toString().toLowerCase();
+    if (action !== 'accept' && action !== 'accepted' && action !== 'decline' && action !== 'declined') throw new ForbiddenException('action must be accept or decline');
+    const accepted = action === 'accept' || action === 'accepted';
+    const updated = await this.prisma.leaveRequest.update({
+      where:{ id },
+      data:{
+        relieverStatus: accepted ? 'accepted' : 'declined',
+        relieverAckAt: new Date(),
+        relieverComment: dto?.comment || dto?.reason || null
+      },
+      include:{ leaveType:true, employee:{ select:{ id:true, employeeCode:true, jobTitle:true, firstName:true, lastName:true } }, reliever:{ select:{ id:true, employeeCode:true, jobTitle:true, firstName:true, lastName:true } } }
+    });
+    return updated;
   }
 }

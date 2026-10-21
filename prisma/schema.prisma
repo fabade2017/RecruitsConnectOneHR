@@ -188,6 +188,7 @@ model Employee {
   payrollsMerged          PayrollMerged[]
   performanceReviews      PerformanceReview[]
   tasksAssigned           Task[]                   @relation("Assignee")
+  leaveRelieverFor        LeaveRequest[]           @relation("LeaveReliever")
   workSessions            WorkSession[]
 
   @@unique([organizationId, employeeCode])
@@ -394,10 +395,15 @@ model LeaveRequest {
   status             String       @default("pending")
   approverId         String?      @map("approver_id")
   workflowInstanceId String?      @map("workflow_instance_id")
+  relieverEmployeeId String?      @map("reliever_employee_id")
+  relieverStatus     String       @default("none") @map("reliever_status")
+  relieverAckAt      DateTime?    @map("reliever_ack_at")
+  relieverComment    String?      @map("reliever_comment")
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
   approver           Employee?    @relation("Approver", fields: [approverId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   employee           Employee     @relation("Requester", fields: [employeeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reliever           Employee?    @relation("LeaveReliever", fields: [relieverEmployeeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   leaveType          LeaveType    @relation(fields: [leaveTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   organization       Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 

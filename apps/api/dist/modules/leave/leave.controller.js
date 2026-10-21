@@ -36,6 +36,8 @@ let LeaveController = class LeaveController {
     approve(id, req) { return this.svc.approve(id, req.user.sub, 'approved', req.user); }
     reject(id, req) { return this.svc.approve(id, req.user.sub, 'rejected', req.user); }
     bal(req, eid) { return this.svc.balances(req.orgId, eid, req.user); }
+    relieving(req) { return this.svc.relieving(req.orgId, req.user); }
+    ackReliever(req, id, dto) { return this.svc.acknowledgeReliever(req.orgId, id, req.user, dto); }
 };
 exports.LeaveController = LeaveController;
 __decorate([
@@ -161,6 +163,24 @@ __decorate([
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], LeaveController.prototype, "bal", null);
+__decorate([
+    (0, common_1.Get)('relieving'),
+    (0, rbac_guard_1.RequirePermissions)('leave:read'),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], LeaveController.prototype, "relieving", null);
+__decorate([
+    (0, common_1.Patch)('requests/:id/reliever/ack'),
+    (0, rbac_guard_1.RequirePermissions)('leave:read'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", void 0)
+], LeaveController.prototype, "ackReliever", null);
 exports.LeaveController = LeaveController = __decorate([
     (0, swagger_1.ApiTags)('leave'),
     (0, module_guard_1.RequireModule)('leave'),

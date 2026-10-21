@@ -22,4 +22,6 @@ export class LeaveController {
   @Patch('requests/:id/approve') @Roles('manager','hr_admin','org_admin','super_admin') @RequirePermissions('leave:approve:team') approve(@Param('id') id:string, @Req() req:any){ return this.svc.approve(id, req.user.sub, 'approved', req.user); }
   @Patch('requests/:id/reject') @Roles('manager','hr_admin','org_admin','super_admin') @RequirePermissions('leave:approve:team') reject(@Param('id') id:string, @Req() req:any){ return this.svc.approve(id, req.user.sub, 'rejected', req.user); }
   @Get('balances/:employeeId') @RequirePermissions('leave:read') bal(@Req() req:any, @Param('employeeId') eid:string){ return this.svc.balances(req.orgId, eid, req.user); }
+  @Get('relieving') @RequirePermissions('leave:read') relieving(@Req() req:any){ return this.svc.relieving(req.orgId, req.user); }
+  @Patch('requests/:id/reliever/ack') @RequirePermissions('leave:read') ackReliever(@Req() req:any, @Param('id') id:string, @Body() dto:any){ return this.svc.acknowledgeReliever(req.orgId, id, req.user, dto); }
 }
