@@ -152,34 +152,42 @@ let LearningService = class LearningService {
         return this.prisma.learningEnrollment.findMany({ where: { employeeId }, include: { course: true, attempts: { orderBy: { createdAt: 'desc' } } }, orderBy: { createdAt: 'desc' } });
     }
     async uploadMaterial(orgId, courseId, file) {
-        const course = await this.prisma.course.findFirst({ where: { id: courseId, organizationId: orgId } });
-        if (!course)
-            throw new common_1.NotFoundException('Course not found');
-        if (!file)
-            throw new common_1.BadRequestException('file required');
-        const uploadsDir = path.resolve(process.cwd(), 'uploads', 'learning');
-        if (!fs.existsSync(uploadsDir))
-            fs.mkdirSync(uploadsDir, { recursive: true });
-        const ext = path.extname(file.originalname) || '.pdf';
-        const filename = `${courseId}-${Date.now()}${ext}`;
-        const filepath = path.join(uploadsDir, filename);
-        fs.writeFileSync(filepath, file.buffer);
-        const url = `/uploads/learning/${filename}`;
-        let extractedText = null;
         try {
-            if (ext.toLowerCase() === '.pdf' || file.mimetype === 'application/pdf') {
-                const pdfParse = require('pdf-parse');
-                const data = await pdfParse(file.buffer);
-                extractedText = data.text || '';
+            const course = await this.prisma.course.findFirst({ where: { id: courseId, organizationId: orgId } });
+            if (!course)
+                throw new common_1.NotFoundException('Course not found');
+            if (!file)
+                throw new common_1.BadRequestException('file required');
+            const uploadsDir = path.resolve(process.cwd(), 'uploads', 'learning');
+            if (!fs.existsSync(uploadsDir))
+                fs.mkdirSync(uploadsDir, { recursive: true });
+            const ext = path.extname(file.originalname) || '.pdf';
+            const filename = `${courseId}-${Date.now()}${ext}`;
+            const filepath = path.join(uploadsDir, filename);
+            fs.writeFileSync(filepath, file.buffer);
+            const url = `/uploads/learning/${filename}`;
+            let extractedText = null;
+            try {
+                if (ext.toLowerCase() === '.pdf' || file.mimetype === 'application/pdf') {
+                    const pdfParse = require('pdf-parse');
+                    const data = await pdfParse(file.buffer);
+                    extractedText = data.text || '';
+                }
             }
+            catch (e) {
+                // best effort
+            }
+            const material = await this.prisma.learningMaterial.create({
+                data: { courseId, filename, originalName: file.originalname, mimeType: file.mimetype || 'application/pdf', size: file.size || 0, url, extractedText }
+            });
+            return material;
         }
         catch (e) {
-            // best effort
+            if (e.message?.includes('learning_materials') || e.code === 'P2021') {
+                throw new common_1.BadRequestException('Learning materials table not found. Run prisma db push to create tables.');
+            }
+            throw e;
         }
-        const material = await this.prisma.learningMaterial.create({
-            data: { courseId, filename, originalName: file.originalname, mimeType: file.mimetype || 'application/pdf', size: file.size || 0, url, extractedText }
-        });
-        return material;
     }
     async generateQuiz(orgId, courseId) {
         const course = await this.prisma.course.findFirst({ where: { id: courseId, organizationId: orgId }, include: { materials: true } });
