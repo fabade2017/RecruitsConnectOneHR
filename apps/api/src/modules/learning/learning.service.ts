@@ -2,6 +2,30 @@ import { Injectable, NotFoundException, ConflictException, ForbiddenException, B
 import { PrismaService } from '../../prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
+import { generateQuestions } from './quiz-generator';
+
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  // pdf-parse v2 (class based) — falls back to v1 (function) for older installs
+  const mod: any = require('pdf-parse');
+  if (mod?.PDFParse) {
+    const parser = new mod.PDFParse({ data: buffer });
+    try {
+      const result = await parser.getText();
+      return (result?.text || '').trim();
+    } finally {
+      try { await parser.destroy(); } catch {}
+    }
+  }
+  if (typeof mod === 'function') {
+    const data = await mod(buffer);
+    return (data?.text || '').trim();
+  }
+  if (mod?.default) {
+    const data = await mod.default(buffer);
+    return (data?.text || '').trim();
+  }
+  throw new Error('Unsupported pdf-parse export');
+}
 
 @Injectable()
 export class LearningService {
@@ -106,9 +130,7 @@ export class LearningService {
       let extractedText: string | null = null;
       try {
         if (ext.toLowerCase() === '.pdf' || file.mimetype === 'application/pdf') {
-          const pdfParse = require('pdf-parse');
-          const data = await pdfParse(file.buffer);
-          extractedText = data.text || '';
+          extractedText = await extractPdfText(file.buffer);
         }
       } catch (e) {
         // best effort
@@ -128,38 +150,15 @@ export class LearningService {
   async generateQuiz(orgId: string, courseId: string) {
     const course = await this.prisma.course.findFirst({ where: { id: courseId, organizationId: orgId }, include: { materials: true } });
     if (!course) throw new NotFoundException('Course not found');
-    const text = (course.materials || []).map(m => m.extractedText || '').join('\n\n');
+    const text = (course.materials || []).map((m) => m.extractedText || '').join('\n\n');
     if (!text || text.trim().length < 100) throw new BadRequestException('Need extracted PDF text (>=100 chars). Upload a PDF first.');
-    // Simple deterministic MCQ generator from sentences
-    const sentences = text.replace(/\r\n/g, '\n').split(/(?<=[.?!])\s+(?=[A-Z0-9(])/).map(s => s.trim()).filter(s => s.length > 40 && s.split(' ').length > 8);
-    const picks = sentences.slice(0, 20);
-    const questions: Array<{ question: string, options: string[], answer: string }> = [];
-    for (let i = 0; i < Math.min(5, picks.length); i++) {
-      const s = picks[i];
-      const words = s.split(/\s+/).filter(w => w.length > 4);
-      const key = words[Math.floor(words.length/2)] || words[0] || 'policy';
-      const q = `According to the training material, which of the following best relates to: "${s.slice(0, 80)}..."?`;
-      const opts = [
-        `The ${key.replace(/[^A-Za-z]/g,'')} requirement as stated`,
-        `A general unrelated procedure`,
-        `An optional recommendation with no basis`,
-        `A historical note not applicable`
-      ];
-      // ensure answer is first
-      questions.push({ question: q, options: opts, answer: opts[0] });
-    }
-    if (questions.length < 5) {
-      // fallback generic
-      for (let i = questions.length; i < 5; i++) {
-        questions.push({ question: `Question ${i+1}: Based on the uploaded onboarding/training manual, select the correct practice.`, options: ['Follow approved procedure','Ignore guidelines','Guess randomly','Bypass controls'], answer: 'Follow approved procedure' });
-      }
-    }
+    const questions = generateQuestions(text, 5);
+    if (!questions.length) throw new BadRequestException('Could not derive questions from the document. PDF may be image-based/scanned — text extraction required.');
     const quiz = await this.prisma.learningQuiz.upsert({
       where: { courseId },
       create: { courseId, title: `${course.title} Assessment`, passingScore: 80 },
       update: { title: `${course.title} Assessment`, passingScore: 80 }
     });
-    // replace questions
     await this.prisma.learningQuestion.deleteMany({ where: { quizId: quiz.id } });
     for (let i = 0; i < questions.length; i++) {
       await this.prisma.learningQuestion.create({
