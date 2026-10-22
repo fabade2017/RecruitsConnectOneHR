@@ -168,16 +168,37 @@ let LearningService = class LearningService {
         });
     }
     async listEnrollments(orgId, employeeId, user) {
+        let emp = null;
         if (user?.role === 'employee') {
             const own = await this.prisma.employee.findUnique({ where: { userId: user.sub } });
-            if (own?.id !== employeeId)
-                throw new common_1.ForbiddenException('Can only view own enrollments');
+            if (own) {
+                emp = own;
+                employeeId = own.id;
+            }
         }
-        const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, organizationId: orgId } });
+        if (!emp && employeeId) {
+            emp = await this.prisma.employee.findFirst({ where: { id: employeeId, organizationId: orgId } });
+            if (!emp) {
+                try {
+                    emp = await this.prisma.employee.findFirst({ where: { staffId: employeeId, organizationId: orgId } });
+                }
+                catch { }
+            }
+            if (emp && emp.organizationId && orgId && emp.organizationId !== orgId)
+                emp = null;
+        }
+        if (!emp && user?.sub) {
+            emp = await this.prisma.employee.findUnique({ where: { userId: user.sub } });
+            if (emp)
+                employeeId = emp.id;
+        }
         if (!emp)
             throw new common_1.NotFoundException('Employee not in org');
+        if (user?.role === 'employee' && emp.userId && user.sub && emp.userId !== user.sub) {
+            throw new common_1.ForbiddenException('Can only view own enrollments');
+        }
         return this.prisma.learningEnrollment.findMany({
-            where: { employeeId },
+            where: { employeeId: emp.id },
             include: {
                 course: { include: { materials: true, quiz: { include: { questions: { select: { id: true } } } } } },
                 attempts: { orderBy: { createdAt: 'desc' } },
