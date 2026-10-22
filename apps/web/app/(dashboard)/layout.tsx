@@ -5,6 +5,7 @@ import ChatProvider from '../../components/ChatProvider';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { clearSession, decodeJwtExpiry, installSessionGuard, logoutToLogin } from '../../lib/session';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
@@ -12,6 +13,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   useEffect(() => {
+    // Installs the global 401 -> refresh/logout interceptor + expiry timer.
+    installSessionGuard();
     // Client-side auth guard (replaces middleware.ts, which can't run under static export).
     const t = localStorage.getItem('onehr_token') || localStorage.getItem('onehr_auth') || document.cookie.includes('onehr_auth=');
     if (!t) {
@@ -19,13 +22,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace(`/login${next}`);
       return;
     }
+    // Guard against a stale token that is already past its expiry.
+    const token = localStorage.getItem('onehr_token');
+    if (token) {
+      const exp = decodeJwtExpiry(token);
+      if (!exp || exp <= Date.now()) {
+        // The global guard will try a silent refresh; only bail immediately if
+        // there is no refresh token to attempt a renewal with.
+        if (!localStorage.getItem('onehr_refresh') && !document.cookie.includes('onehr_refresh=')) {
+          logoutToLogin('expired');
+          return;
+        }
+      }
+    }
     setChecked(true);
   }, [pathname, router]);
   useEffect(() => {
     const u = localStorage.getItem('onehr_user');
     if (u) try { setUser(JSON.parse(u)); } catch {}
   }, []);
-  const logout = () => { localStorage.clear(); document.cookie='onehr_auth=; Max-Age=0; path=/'; document.cookie='onehr_token=; Max-Age=0; path=/'; window.location.href='/login'; };
+  const logout = () => { clearSession(); window.location.href = '/login'; };
   if (!checked) return null;
 
   return (

@@ -32,7 +32,12 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
 
   const handleLogout = async () => {
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, { method: 'POST' })
+    try { await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, { method: 'POST', credentials: 'include' }) } catch {}
+    localStorage.removeItem('onehr_token')
+    localStorage.removeItem('onehr_refresh')
+    localStorage.removeItem('onehr_user')
+    document.cookie = 'onehr_auth=; Max-Age=0; path=/'
+    document.cookie = 'onehr_token=; Max-Age=0; path=/'
     window.location.href = '/login'
   }
 

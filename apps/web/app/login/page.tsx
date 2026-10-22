@@ -1,26 +1,42 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { clearSession, decodeJwtExpiry } from '../../lib/session';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('admin@recruitconnect.ng');
   const [password, setPassword] = useState('Admin@123');
   const [acronym, setAcronym] = useState('RC');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [showClockPopup, setShowClockPopup] = useState(false);
   const [pendingUser, setPendingUser] = useState<any>(null);
+  const [nextPath, setNextPath] = useState('');
   const router = useRouter();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('expired') === '1') setNotice('Your session expired. Please sign in again.');
+    else if (params.get('invalid') === '1') setNotice('Your session is no longer valid. Please sign in again.');
+    const next = params.get('next') || '';
+    if (next.startsWith('/') && !next.startsWith('//')) setNextPath(next);
+
     // Replicates old middleware: already-authenticated users are routed to their home.
     const t = localStorage.getItem('onehr_token') || localStorage.getItem('onehr_auth');
     if (!t) return;
+    // Don't bounce a *stale* token back into the dashboard — that is what caused
+    // the "looks signed in but no data loads" confusion. If it is expired, wipe it.
+    const exp = decodeJwtExpiry(localStorage.getItem('onehr_token') || '');
+    if (!exp || exp <= Date.now()) {
+      clearSession();
+      return;
+    }
     try {
       const u = JSON.parse(localStorage.getItem('onehr_user') || 'null');
       const role = u?.role;
-      const target = role === 'super_admin' ? '/admin' : role === 'manager' ? '/manager' : role === 'executive' ? '/executive' : role === 'recruiter' ? '/jobs' : role === 'employee' ? '/employee' : '/hr';
+      const target = nextPath || (role === 'super_admin' ? '/admin' : role === 'manager' ? '/manager' : role === 'executive' ? '/executive' : role === 'recruiter' ? '/jobs' : role === 'employee' ? '/employee' : '/hr');
       router.replace(target);
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -40,6 +56,9 @@ export default function LoginPage() {
       // Static export has no Next server routes — token goes to localStorage (Bearer fallback in lib/api.ts:8). CORS must allow this frontend origin on the API.
       if (data.access_token) localStorage.setItem('onehr_token', data.access_token);
       else if ((data as any).accessToken) localStorage.setItem('onehr_token', (data as any).accessToken);
+      // Keep the 7-day refresh token so the session can be renewed silently.
+      if (data.refresh_token) localStorage.setItem('onehr_refresh', data.refresh_token);
+      else if ((data as any).refreshToken) localStorage.setItem('onehr_refresh', (data as any).refreshToken);
       localStorage.setItem('onehr_user', JSON.stringify(data.user));
       const role = data.user.role;
       // Employee gets immediate clock-in popup
@@ -48,7 +67,7 @@ export default function LoginPage() {
         setShowClockPopup(true);
         return;
       }
-      const target = role === 'super_admin' ? '/admin' : role === 'manager' ? '/manager' : role === 'executive' ? '/executive' : role === 'recruiter' ? '/jobs' : '/hr';
+      const target = nextPath || (role === 'super_admin' ? '/admin' : role === 'manager' ? '/manager' : role === 'executive' ? '/executive' : role === 'recruiter' ? '/jobs' : '/hr');
       router.push(target);
     } catch (err: any) {
       setError(err.message);
@@ -75,6 +94,7 @@ export default function LoginPage() {
           <p className="text-sm text-slate-500">HR Management — Sign in</p>
           <p className="text-xs text-slate-400 mt-1">Try: RC / admin@recruitconnect.ng / Admin@123 — Acronym + email + password</p>
         </div>
+        {notice && <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded">{notice}</div>}
         {error && <div className="bg-red-50 text-red-700 text-sm p-3 rounded">{error}</div>}
         <input className="w-full border rounded px-3 py-2 font-mono" placeholder="Organization Acronym (e.g. RC)" value={acronym} onChange={e=>setAcronym(e.target.value.toUpperCase())} required />
         <p className="text-xs text-slate-400 -mt-2">Acronym is required for tenant isolation. Check your welcome email.</p>

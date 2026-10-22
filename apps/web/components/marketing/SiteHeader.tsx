@@ -21,9 +21,11 @@ function AuthNav() {
   const base2 = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
   const logout = () => {
     localStorage.removeItem('onehr_user');
+    localStorage.removeItem('onehr_token');
+    localStorage.removeItem('onehr_refresh');
     document.cookie = 'onehr_auth=; Max-Age=0; path=/';
     document.cookie = 'onehr_token=; Max-Age=0; path=/';
-    fetch(`${base2}/auth/logout`, { method: 'POST' }).finally(() => { window.location.href = '/login'; });
+    fetch(`${base2}/auth/logout`, { method: 'POST', credentials: 'include' }).finally(() => { window.location.href = '/login'; });
   };
   if (user) {
     const dash = user.role === 'super_admin' ? '/admin' : user.role === 'employee' ? '/employee' : user.role === 'manager' ? '/manager' : user.role === 'executive' ? '/executive' : '/hr';
