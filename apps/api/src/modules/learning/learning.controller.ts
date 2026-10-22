@@ -25,7 +25,8 @@ export class LearningController {
   @Get('enrollments/:employeeId') @RequirePermissions('learning:read') listEnrollments(@Req() req: any, @Param('employeeId') employeeId: string) { return this.svc.listEnrollments(req.orgId, employeeId, req.user); }
 
   @Post('courses/:id/materials') @Roles('hr_admin','org_admin','super_admin') @RequirePermissions('learning:*') @UseInterceptors(FileInterceptor('file')) @ApiConsumes('multipart/form-data') @ApiBody({ schema:{ type:'object', properties:{ file:{ type:'string', format:'binary' } } } }) uploadMaterial(@Req() req: any, @Param('id') id: string, @UploadedFile() file: any) { return this.svc.uploadMaterial(req.orgId, id, file); }
-  @Post('courses/:id/quiz/generate') @Roles('hr_admin','org_admin','super_admin') @RequirePermissions('learning:*') generateQuiz(@Req() req: any, @Param('id') id: string) { return this.svc.generateQuiz(req.orgId, id); }
+  @Post('courses/:id/quiz/generate') @Roles('hr_admin','org_admin','super_admin') @RequirePermissions('learning:*') generateQuiz(@Req() req: any, @Param('id') id: string, @Body() dto: any) { return this.svc.generateQuiz(req.orgId, id, dto); }
+  @Patch('courses/:id/quiz') @Roles('hr_admin','org_admin','super_admin') @RequirePermissions('learning:*') updateQuiz(@Req() req: any, @Param('id') id: string, @Body() dto: any) { return this.svc.updateQuizSettings(req.orgId, id, dto); }
   @Get('enrollments/:enrollmentId/quiz') @RequirePermissions('learning:read') getQuiz(@Req() req: any, @Param('enrollmentId') enrollmentId: string) { return this.svc.getQuizForEnrollment(req.orgId, enrollmentId, req.user); }
   @Post('enrollments/:enrollmentId/quiz/submit') @RequirePermissions('learning:*') submitQuiz(@Req() req: any, @Param('enrollmentId') enrollmentId: string, @Body() dto: any) { return this.svc.submitQuiz(req.orgId, enrollmentId, dto, req.user); }
 }

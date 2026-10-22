@@ -13,9 +13,7 @@ export default function LearningPage() {
   const [loading, setLoading] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [quizModal, setQuizModal] = useState<any>(null);
-  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
+  const [passMarkInput, setPassMarkInput] = useState<Record<string, number>>({});
   const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
   const apiBase = api.replace(/\/v1$/, '');
 
@@ -113,9 +111,14 @@ export default function LearningPage() {
   const generateQuiz = async (courseId: string) => {
     const t = localStorage.getItem('onehr_token');
     if (!t) return;
+    const desired = passMarkInput[courseId];
     setGeneratingId(courseId);
     try {
-      const res = await fetch(`${api}/learning/courses/${courseId}/quiz/generate`, { method: 'POST', headers: { Authorization: `Bearer ${t}` } });
+      const res = await fetch(`${api}/learning/courses/${courseId}/quiz/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+        body: JSON.stringify(desired ? { passingCount: desired } : {}),
+      });
       if (!res.ok) { alert('Generate failed: ' + (await res.text()).slice(0,200)); setGeneratingId(null); return; }
       alert('5 questions generated ✓');
       load();
@@ -123,43 +126,23 @@ export default function LearningPage() {
     setGeneratingId(null);
   };
 
-  const openQuiz = async (enrollmentId: string) => {
+  const setPassMark = async (courseId: string, passingCount: number, total: number) => {
     const t = localStorage.getItem('onehr_token');
     if (!t) return;
+    setPassMarkInput({ ...passMarkInput, [courseId]: passingCount });
     try {
-      const res = await fetch(`${api}/learning/enrollments/${enrollmentId}/quiz`, { headers: { Authorization: `Bearer ${t}` } });
-      if (!res.ok) { alert('Quiz not available: ' + (await res.text()).slice(0,200)); return; }
-      const d = await res.json();
-      setQuizModal(d);
-      setQuizAnswers({});
+      const res = await fetch(`${api}/learning/courses/${courseId}/quiz`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ passingCount }),
+      });
+      if (!res.ok) { alert('Pass mark update failed: ' + (await res.text()).slice(0,200)); return; }
+      load();
     } catch (e:any) { alert(e.message); }
   };
 
-  const submitQuiz = async () => {
-    if (!quizModal) return;
-    const t = localStorage.getItem('onehr_token');
-    setSubmitting(true);
-    const answers = (quizModal.quiz.questions || []).map((q: any) => ({ questionId: q.id, answer: quizAnswers[q.id] || '' }));
-    try {
-      const res = await fetch(`${api}/learning/enrollments/${quizModal.enrollmentId}/quiz/submit`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` }, body: JSON.stringify({ answers }) });
-      const d = await res.json().catch(()=>({}));
-      if (!res.ok) { alert('Submit failed: ' + JSON.stringify(d).slice(0,200)); setSubmitting(false); return; }
-      alert(d.passed ? `Passed! Score ${d.score}% — Completed ✓` : `Score ${d.score}% — Need >=80% to complete`);
-      setQuizModal(null);
-      // refresh enrollments
-      const eid = enrollForm.employeeId;
-      if (eid) {
-        fetch(`${api}/learning/enrollments/${eid}`, { headers: { Authorization: `Bearer ${t}` } }).then(r=>r.json()).then(dd=>setEnrollments(Array.isArray(dd)?dd:dd.data||[])).catch(()=>{});
-      } else {
-        // try own
-        try {
-          const me = await fetch(`${api}/auth/me`, { headers: { Authorization: `Bearer ${t}` } }).then(r=>r.json());
-          const own = me.employee?.id || me.employeeId;
-          if (own) fetch(`${api}/learning/enrollments/${own}`, { headers: { Authorization: `Bearer ${t}` } }).then(r=>r.json()).then(dd=>setEnrollments(Array.isArray(dd)?dd:dd.data||[])).catch(()=>{});
-        } catch {}
-      }
-    } catch (e:any) { alert(e.message); }
-    setSubmitting(false);
+  const openQuiz = (enrollmentId: string) => {
+    window.location.href = `/learning/assessment?enrollment=${encodeURIComponent(enrollmentId)}`;
   };
 
   const filtered = courses.filter((c: any) => !filter || c.title.toLowerCase().includes(filter.toLowerCase()) || c.category.toLowerCase().includes(filter.toLowerCase()));
@@ -238,9 +221,12 @@ export default function LearningPage() {
         <div className="p-4 flex items-center justify-between"><h3 className="font-semibold flex items-center gap-2"><BookOpen size={16} /> Courses Registry</h3><Pill tone="blue">{filtered.length} total</Pill></div>
         <div className="overflow-auto max-h-[420px]">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-xs"><tr><th className="text-left p-2">Title</th><th className="p-2">Category</th><th className="p-2">Duration</th><th className="p-2">Material</th><th className="p-2">Quiz</th><th className="p-2">Enrolled</th><th className="p-2">Status</th><th className="text-right p-2">Action</th></tr></thead>
+            <thead className="bg-slate-50 text-xs"><tr><th className="text-left p-2">Title</th><th className="p-2">Category</th><th className="p-2">Duration</th><th className="p-2">Material</th><th className="p-2">Quiz</th><th className="p-2">Pass mark</th><th className="p-2">Enrolled</th><th className="p-2">Status</th><th className="text-right p-2">Action</th></tr></thead>
             <tbody className="divide-y">
-              {filtered.map((c: any) => (
+              {filtered.map((c: any) => {
+                const qTotal = c.quiz?.questions?.length || 0;
+                const currentPass = qTotal ? Math.max(1, Math.round(((c.quiz?.passingScore ?? 80) / 100) * qTotal)) : 0;
+                return (
                 <tr key={c.id} className="hover:bg-slate-50/50">
                   <td className="p-2 font-medium">{c.title}</td>
                   <td className="p-2 text-xs"><Pill tone="slate">{c.category}</Pill></td>
@@ -248,17 +234,32 @@ export default function LearningPage() {
                   <td className="p-2 text-center text-xs">
                     {c.materials?.length ? <a href={`${apiBase}${c.materials[0].url}`} target="_blank" className="text-violet-600 underline flex items-center gap-1 justify-center"><FileText size={12}/>Read</a> : <span className="text-slate-400">—</span>}
                   </td>
-                  <td className="p-2 text-center text-xs">{c.quiz?.questions?.length ? `${c.quiz.questions.length} Qs` : <span className="text-slate-400">—</span>}</td>
+                  <td className="p-2 text-center text-xs">{qTotal ? `${qTotal} Qs` : <span className="text-slate-400">—</span>}</td>
+                  <td className="p-2 text-center text-xs">
+                    {qTotal ? (
+                      <select
+                        value={passMarkInput[c.id] ?? currentPass}
+                        onChange={(e) => setPassMark(c.id, Number(e.target.value), qTotal)}
+                        title="Minimum correct answers required to pass"
+                        className="border rounded-lg px-1.5 py-1 text-xs"
+                      >
+                        {Array.from({ length: qTotal }, (_, i) => i + 1).map((n) => (
+                          <option key={n} value={n}>{n} of {qTotal}</option>
+                        ))}
+                      </select>
+                    ) : <span className="text-slate-400">—</span>}
+                  </td>
                   <td className="p-2 text-center text-xs">{c.enrollments?.length ?? 0}</td>
                   <td className="p-2"><Pill tone={c.status === 'ACTIVE' ? 'emerald' : 'amber'}>{c.status || 'ACTIVE'}</Pill></td>
                   <td className="p-2 text-right space-x-1">
                     <label className="text-xs bg-white border rounded-full px-2 py-1 cursor-pointer inline-flex items-center gap-1">{uploadingId===c.id?'Uploading...':(<><Upload size={10}/>Upload PDF</>)}<input type="file" accept="application/pdf" className="hidden" onChange={(e)=>{const f=e.target.files?.[0]; if(f) uploadMaterial(c.id,f); e.target.value='';}} /></label>
-                    <button onClick={()=>generateQuiz(c.id)} disabled={generatingId===c.id} className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded-full px-2 py-1">{generatingId===c.id?'Generating...':'Generate 5 Qs'}</button>
+                    <button onClick={()=>generateQuiz(c.id)} disabled={generatingId===c.id} className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded-full px-2 py-1">{generatingId===c.id?'Generating...':(qTotal ? 'Regenerate 5 Qs' : 'Generate 5 Qs')}</button>
                     <button onClick={() => setEnrollForm({ ...enrollForm, courseId: c.id })} className="text-xs bg-slate-900 text-white rounded-full px-2 py-1">Enroll</button>
                   </td>
                 </tr>
-              ))}
-              {filtered.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-500">No courses — create one (HR Admin)</td></tr>}
+                );
+              })}
+              {filtered.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-slate-500">No courses — create one (HR Admin)</td></tr>}
             </tbody>
           </table>
         </div>
@@ -282,7 +283,7 @@ export default function LearningPage() {
                       <td className="p-2 text-xs">{e.completedAt ? new Date(e.completedAt).toLocaleDateString() : '—'}</td>
                       <td className="p-2 text-right space-x-1">
                         {mat && <a href={`${apiBase}${mat.url}`} target="_blank" className="text-xs bg-white border rounded-full px-2 py-1 inline-flex items-center gap-1"><FileText size={10}/>Read Manual</a>}
-                        {hasQuiz && e.status !== 'COMPLETED' && <button onClick={()=>openQuiz(e.id)} className="text-xs bg-violet-600 text-white rounded-full px-2 py-1 inline-flex items-center gap-1"><HelpCircle size={10}/>Take Assessment (5 Qs)</button>}
+                        {hasQuiz && e.status !== 'COMPLETED' && <button onClick={()=>openQuiz(e.id)} className="text-xs bg-violet-600 text-white rounded-full px-2 py-1 inline-flex items-center gap-1"><HelpCircle size={10}/>Take Assessment</button>}
                         {e.status === 'COMPLETED' && <span className="text-xs text-emerald-600">Certified</span>}
                       </td>
                     </tr>
@@ -294,37 +295,6 @@ export default function LearningPage() {
         </GlassCard>
       )}
 
-      {quizModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40" onClick={()=>setQuizModal(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-auto p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold">Assessment — {quizModal.course?.title}</h3>
-              <button onClick={()=>setQuizModal(null)} className="text-slate-500">✕</button>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Pass mark: {quizModal.quiz.passingScore}% • 5 objective questions</p>
-            <div className="mt-4 space-y-4">
-              {(quizModal.quiz.questions||[]).map((q:any, idx:number) => (
-                <div key={q.id} className="border rounded-xl p-4">
-                  <div className="font-medium text-sm">{idx+1}. {q.question}</div>
-                  <div className="mt-2 space-y-2">
-                    {(q.options||[]).map((opt:string, oi:number) => (
-                      <label key={oi} className="flex items-center gap-2 text-sm">
-                        <input type="radio" name={q.id} checked={quizAnswers[q.id]===opt} onChange={()=>setQuizAnswers({...quizAnswers, [q.id]: opt})} />
-                        <span>{opt}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 flex gap-3">
-              <button onClick={()=>setQuizModal(null)} className="flex-1 glass rounded-xl py-2">Cancel</button>
-              <button onClick={submitQuiz} disabled={submitting} className="flex-1 bg-violet-600 text-white rounded-xl py-2">{submitting?'Submitting...':'Submit Answers'}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

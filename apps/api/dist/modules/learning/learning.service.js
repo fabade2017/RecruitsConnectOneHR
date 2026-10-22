@@ -176,7 +176,14 @@ let LearningService = class LearningService {
         const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, organizationId: orgId } });
         if (!emp)
             throw new common_1.NotFoundException('Employee not in org');
-        return this.prisma.learningEnrollment.findMany({ where: { employeeId }, include: { course: true, attempts: { orderBy: { createdAt: 'desc' } } }, orderBy: { createdAt: 'desc' } });
+        return this.prisma.learningEnrollment.findMany({
+            where: { employeeId },
+            include: {
+                course: { include: { materials: true, quiz: { include: { questions: { select: { id: true } } } } } },
+                attempts: { orderBy: { createdAt: 'desc' } },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
     }
     async uploadMaterial(orgId, courseId, file) {
         try {
@@ -214,7 +221,7 @@ let LearningService = class LearningService {
             throw e;
         }
     }
-    async generateQuiz(orgId, courseId) {
+    async generateQuiz(orgId, courseId, dto) {
         const course = await this.prisma.course.findFirst({ where: { id: courseId, organizationId: orgId }, include: { materials: true } });
         if (!course)
             throw new common_1.NotFoundException('Course not found');
@@ -224,10 +231,17 @@ let LearningService = class LearningService {
         const questions = (0, quiz_generator_1.generateQuestions)(text, 5);
         if (!questions.length)
             throw new common_1.BadRequestException('Could not derive questions from the document. PDF may be image-based/scanned — text extraction required.');
+        const total = questions.length;
+        // HR/admin chooses how many of the questions must be answered correctly.
+        const rawCount = dto?.passingCount ?? dto?.passing_count ?? dto?.minCorrect;
+        const passingCount = rawCount === undefined || rawCount === null || rawCount === ''
+            ? Math.ceil(total * 0.8)
+            : Math.min(total, Math.max(1, parseInt(String(rawCount), 10) || 1));
+        const passingScore = Math.round((passingCount / total) * 100);
         const quiz = await this.prisma.learningQuiz.upsert({
             where: { courseId },
-            create: { courseId, title: `${course.title} Assessment`, passingScore: 80 },
-            update: { title: `${course.title} Assessment`, passingScore: 80 }
+            create: { courseId, title: `${course.title} Assessment`, passingScore },
+            update: { title: `${course.title} Assessment`, passingScore }
         });
         await this.prisma.learningQuestion.deleteMany({ where: { quizId: quiz.id } });
         for (let i = 0; i < questions.length; i++) {
@@ -236,6 +250,22 @@ let LearningService = class LearningService {
             });
         }
         return this.prisma.learningQuiz.findUnique({ where: { id: quiz.id }, include: { questions: { orderBy: { order: 'asc' } } } });
+    }
+    async updateQuizSettings(orgId, courseId, dto) {
+        const course = await this.prisma.course.findFirst({ where: { id: courseId, organizationId: orgId } });
+        if (!course)
+            throw new common_1.NotFoundException('Course not found');
+        const quiz = await this.prisma.learningQuiz.findUnique({ where: { courseId }, include: { questions: true } });
+        if (!quiz)
+            throw new common_1.NotFoundException('Quiz not generated yet');
+        const total = quiz.questions.length || 5;
+        const rawCount = dto?.passingCount ?? dto?.passing_count ?? dto?.minCorrect;
+        if (rawCount === undefined || rawCount === null || rawCount === '')
+            throw new common_1.BadRequestException('passingCount required');
+        const passingCount = Math.min(total, Math.max(1, parseInt(String(rawCount), 10) || 1));
+        const passingScore = Math.round((passingCount / total) * 100);
+        const updated = await this.prisma.learningQuiz.update({ where: { id: quiz.id }, data: { passingScore } });
+        return { ...updated, passingCount, total };
     }
     async getQuizForEnrollment(orgId, enrollmentId, user) {
         const enr = await this.prisma.learningEnrollment.findUnique({ where: { id: enrollmentId }, include: { course: true, employee: true } });
@@ -251,7 +281,16 @@ let LearningService = class LearningService {
         const quiz = await this.prisma.learningQuiz.findUnique({ where: { courseId: enr.courseId }, include: { questions: { orderBy: { order: 'asc' }, select: { id: true, question: true, options: true, order: true } } } });
         if (!quiz)
             throw new common_1.NotFoundException('Quiz not generated yet');
-        return { enrollmentId: enr.id, course: enr.course, quiz: { id: quiz.id, passingScore: quiz.passingScore, questions: quiz.questions.map(q => ({ ...q, options: JSON.parse(q.options) })) } };
+        const total = quiz.questions.length;
+        const passingCount = Math.max(1, Math.round((quiz.passingScore / 100) * total));
+        return {
+            enrollmentId: enr.id,
+            status: enr.status,
+            progress: enr.progress,
+            employeeId: enr.employeeId,
+            course: { id: enr.course.id, title: enr.course.title, description: enr.course.description, category: enr.course.category },
+            quiz: { id: quiz.id, title: quiz.title, passingScore: quiz.passingScore, passingCount, total, questions: quiz.questions.map(q => ({ ...q, options: JSON.parse(q.options) })) },
+        };
     }
     async submitQuiz(orgId, enrollmentId, dto, user) {
         const enr = await this.prisma.learningEnrollment.findUnique({ where: { id: enrollmentId }, include: { course: true } });
@@ -269,13 +308,17 @@ let LearningService = class LearningService {
             throw new common_1.NotFoundException('Quiz not generated yet');
         const answers = Array.isArray(dto.answers) ? dto.answers : [];
         let correct = 0;
-        for (const q of quiz.questions) {
+        const review = quiz.questions.map((q) => {
             const a = answers.find((x) => x.questionId === q.id);
-            if (a && a.answer === q.answer)
+            const isCorrect = !!a && a.answer === q.answer;
+            if (isCorrect)
                 correct++;
-        }
-        const score = Math.round((correct / Math.max(1, quiz.questions.length)) * 100);
-        const passed = score >= (quiz.passingScore || 80);
+            return { questionId: q.id, question: q.question, selected: a?.answer ?? null, correctAnswer: q.answer, isCorrect };
+        });
+        const total = quiz.questions.length;
+        const passingCount = Math.max(1, Math.round(((quiz.passingScore || 80) / 100) * total));
+        const score = Math.round((correct / Math.max(1, total)) * 100);
+        const passed = correct >= passingCount;
         await this.prisma.learningAttempt.create({ data: { enrollmentId: enr.id, quizId: quiz.id, answers: JSON.stringify(answers), score, passed } });
         if (passed) {
             await this.prisma.learningEnrollment.update({ where: { id: enr.id }, data: { progress: 100, status: 'COMPLETED', completedAt: new Date() } });
@@ -283,7 +326,7 @@ let LearningService = class LearningService {
         else {
             await this.prisma.learningEnrollment.update({ where: { id: enr.id }, data: { progress: Math.max(enr.progress || 0, Math.min(99, score)), status: enr.status === 'ENROLLED' ? 'IN_PROGRESS' : enr.status } });
         }
-        return { score, passed, correct, total: quiz.questions.length, status: passed ? 'COMPLETED' : 'IN_PROGRESS' };
+        return { score, passed, correct, total, passingCount, passingScore: quiz.passingScore || 80, review, status: passed ? 'COMPLETED' : 'IN_PROGRESS' };
     }
 };
 exports.LearningService = LearningService;

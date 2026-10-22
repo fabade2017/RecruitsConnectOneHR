@@ -36,7 +36,8 @@ let LearningController = class LearningController {
     enroll(req, dto) { return this.svc.enroll(req.orgId, dto, req.user); }
     listEnrollments(req, employeeId) { return this.svc.listEnrollments(req.orgId, employeeId, req.user); }
     uploadMaterial(req, id, file) { return this.svc.uploadMaterial(req.orgId, id, file); }
-    generateQuiz(req, id) { return this.svc.generateQuiz(req.orgId, id); }
+    generateQuiz(req, id, dto) { return this.svc.generateQuiz(req.orgId, id, dto); }
+    updateQuiz(req, id, dto) { return this.svc.updateQuizSettings(req.orgId, id, dto); }
     getQuiz(req, enrollmentId) { return this.svc.getQuizForEnrollment(req.orgId, enrollmentId, req.user); }
     submitQuiz(req, enrollmentId, dto) { return this.svc.submitQuiz(req.orgId, enrollmentId, dto, req.user); }
 };
@@ -167,10 +168,22 @@ __decorate([
     (0, rbac_guard_1.RequirePermissions)('learning:*'),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:paramtypes", [Object, String, Object]),
     __metadata("design:returntype", void 0)
 ], LearningController.prototype, "generateQuiz", null);
+__decorate([
+    (0, common_1.Patch)('courses/:id/quiz'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('learning:*'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", void 0)
+], LearningController.prototype, "updateQuiz", null);
 __decorate([
     (0, common_1.Get)('enrollments/:enrollmentId/quiz'),
     (0, rbac_guard_1.RequirePermissions)('learning:read'),
