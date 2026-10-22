@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LearningController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
 const swagger_1 = require("@nestjs/swagger");
 const learning_service_1 = require("./learning.service");
 const rbac_guard_1 = require("../../common/guards/rbac.guard");
@@ -23,8 +24,7 @@ let LearningController = class LearningController {
     constructor(svc) {
         this.svc = svc;
     }
-    courses(req, q) { return this.svc.courses(req.orgId, q); }
-    listAlias(req, q) { return this.svc.courses(req.orgId, q); }
+    listCourses(req) { return this.svc.listCourses(req.orgId); }
     getCourse(req, id) { return this.svc.getCourse(req.orgId, id); }
     getCourseAlias(req, id) { return this.svc.getCourse(req.orgId, id); }
     create(req, dto) { return this.svc.createCourse(req.orgId, dto); }
@@ -34,28 +34,21 @@ let LearningController = class LearningController {
     removeCourse(req, id) { return this.svc.removeCourse(req.orgId, id); }
     removeAlias(req, id) { return this.svc.removeCourse(req.orgId, id); }
     enroll(req, dto) { return this.svc.enroll(req.orgId, dto, req.user); }
-    enrollments(req, id) { return this.svc.enrollments(req.orgId, id, req.user); }
-    update(req, id, dto) { return this.svc.updateProgress(req.orgId, id, dto, req.user); }
+    listEnrollments(req, employeeId) { return this.svc.listEnrollments(req.orgId, employeeId, req.user); }
+    uploadMaterial(req, id, file) { return this.svc.uploadMaterial(req.orgId, id, file); }
+    generateQuiz(req, id) { return this.svc.generateQuiz(req.orgId, id); }
+    getQuiz(req, enrollmentId) { return this.svc.getQuizForEnrollment(req.orgId, enrollmentId, req.user); }
+    submitQuiz(req, enrollmentId, dto) { return this.svc.submitQuiz(req.orgId, enrollmentId, dto, req.user); }
 };
 exports.LearningController = LearningController;
 __decorate([
     (0, common_1.Get)('courses'),
     (0, rbac_guard_1.RequirePermissions)('learning:read'),
     __param(0, (0, common_1.Req)()),
-    __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
-], LearningController.prototype, "courses", null);
-__decorate([
-    (0, common_1.Get)(),
-    (0, rbac_guard_1.RequirePermissions)('learning:read'),
-    __param(0, (0, common_1.Req)()),
-    __param(1, (0, common_1.Query)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
-    __metadata("design:returntype", void 0)
-], LearningController.prototype, "listAlias", null);
+], LearningController.prototype, "listCourses", null);
 __decorate([
     (0, common_1.Get)('courses/:id'),
     (0, rbac_guard_1.RequirePermissions)('learning:read'),
@@ -138,7 +131,7 @@ __decorate([
 ], LearningController.prototype, "removeAlias", null);
 __decorate([
     (0, common_1.Post)('enroll'),
-    (0, rbac_guard_1.RequirePermissions)('learning:enroll'),
+    (0, rbac_guard_1.RequirePermissions)('learning:*'),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -153,17 +146,50 @@ __decorate([
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
-], LearningController.prototype, "enrollments", null);
+], LearningController.prototype, "listEnrollments", null);
 __decorate([
-    (0, common_1.Patch)('enrollments/:id'),
-    (0, rbac_guard_1.RequirePermissions)('learning:read'),
+    (0, common_1.Post)('courses/:id/materials'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('learning:*'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
+    (0, swagger_1.ApiConsumes)('multipart/form-data'),
+    (0, swagger_1.ApiBody)({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } }),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.UploadedFile)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", void 0)
+], LearningController.prototype, "uploadMaterial", null);
+__decorate([
+    (0, common_1.Post)('courses/:id/quiz/generate'),
+    (0, rbac_guard_1.Roles)('hr_admin', 'org_admin', 'super_admin'),
+    (0, rbac_guard_1.RequirePermissions)('learning:*'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], LearningController.prototype, "generateQuiz", null);
+__decorate([
+    (0, common_1.Get)('enrollments/:enrollmentId/quiz'),
+    (0, rbac_guard_1.RequirePermissions)('learning:read'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('enrollmentId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], LearningController.prototype, "getQuiz", null);
+__decorate([
+    (0, common_1.Post)('enrollments/:enrollmentId/quiz/submit'),
+    (0, rbac_guard_1.RequirePermissions)('learning:*'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('enrollmentId')),
     __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String, Object]),
     __metadata("design:returntype", void 0)
-], LearningController.prototype, "update", null);
+], LearningController.prototype, "submitQuiz", null);
 exports.LearningController = LearningController = __decorate([
     (0, swagger_1.ApiTags)('learning'),
     (0, module_guard_1.RequireModule)('learning'),

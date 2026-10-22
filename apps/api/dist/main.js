@@ -114,6 +114,12 @@ async function bootstrap() {
                 rateMap.delete(k);
     }, 5 * 60 * 1000).unref();
     app.setGlobalPrefix('v1');
+    // Serve uploaded learning materials
+    try {
+        const uploadsDir = path.resolve(process.cwd(), 'uploads');
+        expressApp.use('/uploads', express.static(uploadsDir));
+    }
+    catch { }
     const parseOrigins = (v) => (v || '').split(',').map(s => s.trim().replace(/\/$/, '')).filter(Boolean);
     // Known product frontends — always allowed, in addition to CORS_ORIGIN.
     // Still an explicit allowlist, never origin:true.

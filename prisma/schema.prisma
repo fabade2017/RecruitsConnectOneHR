@@ -861,25 +861,90 @@ model Course {
   updatedAt      DateTime             @updatedAt @map("updated_at")
   organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   enrollments    LearningEnrollment[]
+  materials      LearningMaterial[]
+  quiz           LearningQuiz?
 
   @@index([organizationId, category])
   @@map("courses")
 }
 
+model LearningMaterial {
+  id           String   @id @default(uuid())
+  courseId     String   @map("course_id")
+  filename     String
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  size         Int
+  url          String
+  extractedText String? @map("extracted_text") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@map("learning_materials")
+}
+
+model LearningQuiz {
+  id          String             @id @default(uuid())
+  courseId    String             @unique @map("course_id")
+  title       String?
+  passingScore Int               @default(80) @map("passing_score")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  course      Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions   LearningQuestion[]
+  attempts    LearningAttempt[]
+
+  @@map("learning_quizzes")
+}
+
+model LearningQuestion {
+  id        String      @id @default(uuid())
+  quizId    String      @map("quiz_id")
+  question  String      @db.Text
+  options   String      @db.Text // JSON array of options
+  answer    String      @db.Text // correct answer
+  order     Int         @default(0)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  quiz      LearningQuiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId, order])
+  @@map("learning_questions")
+}
+
 model LearningEnrollment {
-  id          String    @id @default(uuid())
-  employeeId  String    @map("employee_id")
-  courseId    String    @map("course_id")
-  progress    Int       @default(0)
-  status      String    @default("ENROLLED")
-  completedAt DateTime? @map("completed_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id          String           @id @default(uuid())
+  employeeId  String           @map("employee_id")
+  courseId    String           @map("course_id")
+  progress    Int              @default(0)
+  status      String           @default("ENROLLED")
+  completedAt DateTime?        @map("completed_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  course      Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  employee    Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  attempts    LearningAttempt[]
 
   @@unique([employeeId, courseId])
   @@map("learning_enrollments")
+}
+
+model LearningAttempt {
+  id           String             @id @default(uuid())
+  enrollmentId String             @map("enrollment_id")
+  quizId       String             @map("quiz_id")
+  answers      String             @db.Text // JSON
+  score        Int
+  passed       Boolean            @default(false)
+  createdAt    DateTime           @default(now()) @map("created_at")
+  enrollment   LearningEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  quiz         LearningQuiz       @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId])
+  @@index([quizId])
+  @@map("learning_attempts")
 }
 
 model EngagementSurvey {
