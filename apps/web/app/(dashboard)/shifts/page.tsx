@@ -24,7 +24,7 @@ export default function ShiftsPage() {
       .catch(() => {});
   };
 
-  useEffect(load, [api]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [api]);
 
   const createShift = async () => {
     if (!shiftForm.name) return alert('Shift name required');
@@ -45,17 +45,28 @@ export default function ShiftsPage() {
     let eid = rosterForm.employeeId;
     const t = localStorage.getItem('onehr_token');
     if (!eid) {
-      const emps = await fetch(`${api}/employees?limit=1`, { headers: { Authorization: `Bearer ${t}` } }).then((r) => r.json()).catch(()=>[]);
-      eid = Array.isArray(emps) ? emps[0]?.id : emps.data?.[0]?.id;
+      try {
+        const emps = await fetch(`${api}/employees?limit=1`, { headers: { Authorization: `Bearer ${t}` } }).then((r) => r.json()).catch(()=>[]);
+        eid = Array.isArray(emps) ? emps[0]?.id : emps.data?.[0]?.id || emps?.employees?.[0]?.id;
+      } catch {}
       if (!eid) return alert('No employee found — provide Employee ID');
     }
-    await fetch(`${api}/rosters`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
-      body: JSON.stringify({ employeeId: eid, shiftId: rosterForm.shiftId, date: rosterForm.date, notes: rosterForm.notes }),
-    });
-    setRosterForm({ employeeId: '', shiftId: '', date: '', notes: '' });
-    load();
+    try {
+      const res = await fetch(`${api}/rosters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ employee_ids: [eid], shift_id: rosterForm.shiftId, dates: [rosterForm.date] }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert('Failed to assign roster: ' + (body.message || JSON.stringify(body)).slice(0, 200));
+        return;
+      }
+      setRosterForm({ employeeId: '', shiftId: '', date: '', notes: '' });
+      load();
+    } catch (e: any) {
+      alert(e.message);
+    }
   };
 
   return (
