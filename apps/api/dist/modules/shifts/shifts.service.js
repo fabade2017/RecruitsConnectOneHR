@@ -58,20 +58,41 @@ let ShiftsService = class ShiftsService {
         const shift = await this.prisma.shift.findFirst({ where: { id: shiftId, organizationId: orgId } });
         if (!shift)
             throw new common_1.NotFoundException('Shift not found');
-        const employeeIds = dto.employee_ids || dto.employeeIds || (dto.employee_id ? [dto.employee_id] : []);
+        const rawEmployeeIds = dto.employee_ids || dto.employeeIds
+            || (dto.employee_id ? [dto.employee_id] : [])
+            || (dto.employeeId ? [dto.employeeId] : []);
         const dates = dto.dates || (dto.date ? [dto.date] : []);
-        if (!employeeIds.length)
+        if (!rawEmployeeIds.length)
             throw new common_1.ConflictException('employee_ids required');
         if (!dates.length)
             throw new common_1.ConflictException('dates required');
-        // validate employees belong to org
-        for (const eid of employeeIds) {
-            const e = await this.prisma.employee.findFirst({ where: { id: eid, organizationId: orgId } });
+        // Resolve employees by internal id OR employee code (e.g. RC-000012)
+        const employeeIds = [];
+        for (const raw of rawEmployeeIds) {
+            let e = await this.prisma.employee.findFirst({ where: { id: raw, organizationId: orgId } });
             if (!e)
-                throw new common_1.NotFoundException(`Employee ${eid} not found in org`);
+                e = await this.prisma.employee.findFirst({ where: { employeeCode: raw, organizationId: orgId } });
+            if (!e)
+                throw new common_1.NotFoundException(`Employee ${raw} not found in org`);
+            if (!employeeIds.includes(e.id))
+                employeeIds.push(e.id);
         }
-        const data = employeeIds.flatMap((eid) => dates.map((d) => ({ employeeId: eid, shiftId, date: new Date(d), scheduledMinutes: dto.scheduledMinutes || dto.scheduled_minutes || 480 })));
-        return this.prisma.rosterAssignment.createMany({ data });
+        const scheduledMinutes = dto.scheduledMinutes || dto.scheduled_minutes || 480;
+        const saved = [];
+        for (const eid of employeeIds) {
+            for (const d of dates) {
+                const date = new Date(d);
+                if (isNaN(date.getTime()))
+                    throw new common_1.ConflictException(`Invalid date: ${d}`);
+                const rec = await this.prisma.rosterAssignment.upsert({
+                    where: { employeeId_date: { employeeId: eid, date } },
+                    create: { employeeId: eid, shiftId, date, scheduledMinutes },
+                    update: { shiftId, scheduledMinutes },
+                });
+                saved.push(rec);
+            }
+        }
+        return { count: saved.length, data: saved };
     }
     async rosters(orgId, q, user) {
         const w = {};
@@ -99,14 +120,24 @@ let ShiftsService = class ShiftsService {
                 w.employeeId = { in: ids };
             }
         }
-        // verify org scoping via shift organizationId - filter by shift's org via employee?
-        // For MSSQL we ensure via employee's org already; additional filter by joining shift
-        const list = await this.prisma.rosterAssignment.findMany({ where: w, take: 100, orderBy: { date: 'desc' } });
-        // Filter to org shifts only
-        const shiftIds = list.map(r => r.shiftId);
-        const orgShifts = await this.prisma.shift.findMany({ where: { id: { in: shiftIds }, organizationId: orgId }, select: { id: true } });
-        const validIds = new Set(orgShifts.map(s => s.id));
-        return list.filter(r => validIds.has(r.shiftId));
+        const list = await this.prisma.rosterAssignment.findMany({
+            where: w,
+            take: 200,
+            orderBy: { date: 'desc' },
+            include: { shift: true },
+        });
+        // Only org shifts
+        const scoped = list.filter((r) => r.shift?.organizationId === orgId);
+        // Attach employee display info
+        const empIds = Array.from(new Set(scoped.map((r) => r.employeeId)));
+        const emps = empIds.length
+            ? await this.prisma.employee.findMany({
+                where: { id: { in: empIds } },
+                select: { id: true, employeeCode: true, firstName: true, lastName: true },
+            })
+            : [];
+        const empMap = new Map(emps.map((e) => [e.id, e]));
+        return scoped.map((r) => ({ ...r, employee: empMap.get(r.employeeId) || null }));
     }
 };
 exports.ShiftsService = ShiftsService;

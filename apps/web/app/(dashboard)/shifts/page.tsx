@@ -6,6 +6,7 @@ import { Clock, Calendar, Users, Plus, RefreshCw, Timer } from 'lucide-react';
 export default function ShiftsPage() {
   const [shifts, setShifts] = useState<any[]>([]);
   const [rosters, setRosters] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [shiftForm, setShiftForm] = useState({ name: '', startTime: '09:00', endTime: '17:00', breakMinutes: 60 });
   const [rosterForm, setRosterForm] = useState({ employeeId: '', shiftId: '', date: '', notes: '' });
   const [loading, setLoading] = useState(false);
@@ -21,6 +22,10 @@ export default function ShiftsPage() {
     fetch(`${api}/rosters`, { headers: { Authorization: `Bearer ${t}` } })
       .then((r) => r.json())
       .then((d) => setRosters(Array.isArray(d) ? d : d.data || []))
+      .catch(() => {});
+    fetch(`${api}/employees?limit=100&status=active`, { headers: { Authorization: `Bearer ${t}` } })
+      .then((r) => r.json())
+      .then((d) => setEmployees(Array.isArray(d) ? d : d.data || d.employees || []))
       .catch(() => {});
   };
 
@@ -42,20 +47,13 @@ export default function ShiftsPage() {
 
   const createRoster = async () => {
     if (!rosterForm.shiftId || !rosterForm.date) return alert('Select shift and date');
-    let eid = rosterForm.employeeId;
+    if (!rosterForm.employeeId) return alert('Select an employee');
     const t = localStorage.getItem('onehr_token');
-    if (!eid) {
-      try {
-        const emps = await fetch(`${api}/employees?limit=1`, { headers: { Authorization: `Bearer ${t}` } }).then((r) => r.json()).catch(()=>[]);
-        eid = Array.isArray(emps) ? emps[0]?.id : emps.data?.[0]?.id || emps?.employees?.[0]?.id;
-      } catch {}
-      if (!eid) return alert('No employee found — provide Employee ID');
-    }
     try {
       const res = await fetch(`${api}/rosters`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
-        body: JSON.stringify({ employee_ids: [eid], shift_id: rosterForm.shiftId, dates: [rosterForm.date] }),
+        body: JSON.stringify({ employee_ids: [rosterForm.employeeId], shift_id: rosterForm.shiftId, dates: [rosterForm.date] }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -97,7 +95,14 @@ export default function ShiftsPage() {
         <GlassCard>
           <h3 className="font-semibold flex items-center gap-2"><Calendar size={16}/> Assign Roster</h3>
           <div className="mt-3 space-y-3">
-            <input placeholder="Employee ID (auto if empty)" value={rosterForm.employeeId} onChange={(e)=>setRosterForm({...rosterForm, employeeId:e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm" />
+            <select value={rosterForm.employeeId} onChange={(e)=>setRosterForm({...rosterForm, employeeId:e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm">
+              <option value="">Select employee</option>
+              {employees.map((emp:any) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.employeeCode} — {[emp.firstName, emp.lastName].filter(Boolean).join(' ') || emp.user?.email || 'Unnamed'}
+                </option>
+              ))}
+            </select>
             <select value={rosterForm.shiftId} onChange={(e)=>setRosterForm({...rosterForm, shiftId:e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm">
               <option value="">Select shift</option>
               {shifts.map((s:any)=> <option key={s.id} value={s.id}>{s.name} ({s.startTime}-{s.endTime})</option>)}
